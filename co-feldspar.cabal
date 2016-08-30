@@ -16,9 +16,18 @@ extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
 library
-  -- exposed-modules:     
+  exposed-modules:
+    Feldspar,
+    Feldspar.Primitive,
+    Data.Struct
+    
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       base >=4.9 && <4.10
+  build-depends:
+    base >=4.9 && <4.10,
+    constraints >=0.8,
+    syntactic >=3.6.1,
+    operational-alacarte >=0.3,
+    imperative-edsl >=0.6
   hs-source-dirs:      src
   default-language:    Haskell2010
