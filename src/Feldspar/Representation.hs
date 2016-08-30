@@ -169,6 +169,30 @@ instance {-# overlapping #-} (Syn a, c ~ C a, i ~ I a, SynN f fi) => SynN (a -> 
     desugN f = desugN . f . sug
     sugN   f = sugN . f . desug
 
+-- | ...
+sugSym
+    :: ( Signature sig
+       , fi  ~ SmartFun sup sig
+       , sig ~ SmartSig fi
+       , sup ~ SmartSym fi
+       , SynN f fi
+       , sub :<: sup
+       )
+    => sub sig -> f
+sugSym = sugN . smartSym
+
+-- | ...
+sugSymDecor
+    :: ( Signature sig
+       , fi             ~ SmartFun (sup :&: info) sig
+       , sig            ~ SmartSig fi
+       , (sup :&: info) ~ SmartSym fi
+       , SynN f fi
+       , sub :<: sup
+       )
+    => info (DenResult sig) -> sub sig -> f
+sugSymDecor i = sugN . smartSymDecor i
+
 --------------------------------------------------------------------------------
 
 class    (Syn a, CoType (I a)) => Syntax a

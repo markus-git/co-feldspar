@@ -29,16 +29,23 @@ import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 --------------------------------------------------------------------------------
 
 -- | ...
-class LET exp where
-  shareTag :: (CoType a, CoType b) => String -> exp a -> (exp a -> exp b) -> exp b
+value :: Syn a => I a -> a
+value = error "todo: value"
+
+--------------------------------------------------------------------------------
+
+-- | ...
+class LET exp
+  where
+    shareTag :: (CoType a, CoType b)
+      => String
+      -> exp a
+      -> (exp a -> exp b)
+      -> exp b
 
 -- | ...
 share :: (LET exp, CoType a, CoType b) => exp a -> (exp a -> exp b) -> exp b
 share = shareTag ""
-
--- | ...
-value :: Syntax a => I a -> a
-value = error "todo: value"
 
 --------------------------------------------------------------------------------
 
