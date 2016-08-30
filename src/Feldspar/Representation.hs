@@ -7,6 +7,9 @@
 {-# language StandaloneDeriving #-}
 {-# language MultiParamTypeClasses #-}
 {-# language TypeFamilies #-}
+{-# language ScopedTypeVariables #-}
+{-# language Rank2Types #-}
+{-# language FunctionalDependencies #-}
 
 module Feldspar.Representation where
 
@@ -26,6 +29,7 @@ import Language.Syntactic.Functional.Tuple
 
 -- imperative-edsl
 import qualified Language.Embedded.Imperative.CMD as Imp (Ref, RefCMD, ControlCMD)
+import qualified Language.Embedded.Expression     as Imp
 
 --------------------------------------------------------------------------------
 -- *
@@ -118,18 +122,52 @@ type CoDomain = CoConstructs :+: TypeRepF
 -- *
 --------------------------------------------------------------------------------
 
+-- | Associate an expression type with its type constraint.
+type family PredOf (c :: * -> *) :: (* -> Constraint)
+
 -- | ...
 class Syn a
   where
     type C a :: * -> *
     type I a :: *
-    
     desug :: a -> (C a) (I a)
     sug   :: (C a) (I a) -> a
+    trep  :: Proxy a -> Struct (PredOf (C a)) PrimitiveTypeRep (I a)
 
 -- | Syntactic type casting.
 resug :: (Syn a, Syn b, C a ~ C b, I a ~ I b) => a -> b
 resug = sug . desug
+
+{-
+instance Syn (Expr a)
+  where
+    type C (Expr a) = Expr
+    type I (Expr a) = a
+    desug = sug = id
+    ...
+
+instance Sym (Struct Pred Expr a)
+  where
+    type C (Struct ...) = Expr
+    type I (Struct ...) = a
+-}
+--------------------------------------------------------------------------------
+
+-- | ...
+class SynN f internal | f -> internal
+  where
+    desugN :: f -> internal
+    sugN   :: internal -> f
+
+instance {-# overlapping #-} (Syn f, fi ~ (C f) (I f)) => SynN f fi
+  where
+    desugN = desug
+    sugN   = sug
+
+instance {-# overlapping #-} (Syn a, c ~ C a, i ~ I a, SynN f fi) => SynN (a -> f) (c i -> fi)
+  where
+    desugN f = desugN . f . sug
+    sugN   f = sugN . f . desug
 
 --------------------------------------------------------------------------------
 
@@ -139,15 +177,29 @@ instance (Syn a, CoType (I a)) => Syntax a
 --------------------------------------------------------------------------------
 -- **
 
--- | Associate a syntactic object with its type constraint.
-type family PredOf (c :: *) :: (* -> Constraint)
-
 -- | ...
-newtype Ref a = Ref { unRef :: Struct (PredOf a) Imp.Ref (I a) }
-
---------------------------------------------------------------------------------
+newtype Ref a = Ref { unRef :: Struct (PredOf (C a)) Imp.Ref (I a) }
 
 -- | ...
 type CoCMD = Imp.RefCMD Oper.:+: Imp.ControlCMD
 
+--------------------------------------------------------------------------------
+-- **
+
+-- | ...
+class PrimDict expr
+  where
+    withPrim :: Proxy expr -> Proxy a -> (Imp.FreePred expr a => b) -> (PredOf expr a => b)
+
+{-
+instance Imp.FreeExp Expr => PrimDict Expr
+  where
+    withPrim :: Proxy Expr -> Proxy a -> (Imp.FreePred Expr a => b) -> (PrimitiveType => b)
+    withPrim p _ f = case freeDict p (primitiveTypeRep :: PrimitiveTypeRep a) of Dict -> f
+
+freeDict :: Proxy Expr -> PrimitiveTypeRep a -> Dict (Imp.FreePred Expr a)
+freeDict _ rep = case rep of
+  BoolT -> Dict
+  ...
+-}
 --------------------------------------------------------------------------------

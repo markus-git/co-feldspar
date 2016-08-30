@@ -4,7 +4,6 @@
 {-# language UndecidableInstances #-}
 {-# language MultiParamTypeClasses #-}
 {-# language ConstraintKinds #-}
-
 {-# language ScopedTypeVariables #-}
 {-# language FlexibleContexts #-}
 
@@ -15,8 +14,9 @@ import Feldspar.Representation
 
 import Data.Constraint
 import Data.Struct
+import Data.Proxy
 
-import Language.Syntactic
+import Language.Syntactic hiding (E)
 
 import qualified Control.Monad.Operational.Higher as Oper (Program, Param2)
 
@@ -48,16 +48,21 @@ class NUM exp where
   minus  :: (Type a, Num a) => exp a -> exp a -> exp a
   times  :: (Type a, Num a) => exp a -> exp a -> exp a
   negate :: (Type a, Num a) => exp a -> exp a
-  
+
+--------------------------------------------------------------------------------
+
+-- | ... short-hand ...
+type E expr = (LET expr, NUM expr)
+
 --------------------------------------------------------------------------------
 -- *
 --------------------------------------------------------------------------------
 
--- | ... hidden ...
+-- | ... should be hidden ...
 type Prog pred exp = Oper.Program CoCMD (Oper.Param2 exp pred)
 
 -- | ... NUM (Expr m), ...
-class Monad m => MonadComp m
+class (Monad m, E (Expr m)) => MonadComp m
   where
     type Expr m :: * -> *
     type Pred m :: * -> Constraint
@@ -66,22 +71,32 @@ class Monad m => MonadComp m
 
 --------------------------------------------------------------------------------
 
-class    ( Expr m ~ C a
-         , Pred m ~ PredOf a
-         , Syn (Struct (Pred m) (Expr m) (I a))
-         , C (Struct (Pred m) (Expr m) (I a)) ~ Expr m
-         , I (Struct (Pred m) (Expr m) (I a)) ~ I a
-         )
-         => Co m a
-
-instance ( Expr m ~ C a
-         , Pred m ~ PredOf a
-         , Syn (Struct (Pred m) (Expr m) (I a))
-         , C (Struct (Pred m) (Expr m) (I a)) ~ Expr m
-         , I (Struct (Pred m) (Expr m) (I a)) ~ I a
-         ) => Co m a
-
+-- | ... short-hand ...
 type MonadCo m a = (MonadComp m, Co m a)
+
+-- | ...
+class
+  ( -- tie language types and expression types togheter.
+    Expr m ~ C a
+  , Pred m ~ PredOf (C a)
+    -- defer imperative-edsl constraints to `Pred m`.
+  , PrimDict    (Expr m)
+  , Imp.FreeExp (Expr m)
+    -- make sure expressions can be interpreted as `Struct`
+  , Syn (Struct (Pred m) (Expr m) (I a))
+  , C   (Struct (Pred m) (Expr m) (I a)) ~ Expr m
+  , I   (Struct (Pred m) (Expr m) (I a)) ~ I a
+  ) => Co m a
+
+instance
+  ( Expr m ~ C a
+  , Pred m ~ PredOf (C a)    
+  , PrimDict    (Expr m)    
+  , Imp.FreeExp (Expr m)
+  , Syn (Struct (Pred m) (Expr m) (I a))
+  , C   (Struct (Pred m) (Expr m) (I a)) ~ Expr m
+  , I   (Struct (Pred m) (Expr m) (I a)) ~ I a
+  ) => Co m a
 
 --------------------------------------------------------------------------------
 -- **
@@ -96,21 +111,39 @@ initNamedRef name val = liftCo . fmap Ref . mapStructA (Imp.initNamedRef name) $
   where
     sugar :: Struct (Pred m) (Expr m) (I a)
     sugar = resug val
-{-
+
 -- | ...
 newRef :: (MonadCo m a, Syntax a) => m (Ref a)
 newRef = newNamedRef "r"
--}
+
 -- | ...
-newNamedRef
-  :: forall m a. (MonadCo m a, Syntax a
-     -- bad
-     , PredOf a ~ PrimitiveType
-     )
-  => String -> m (Ref a)
+newNamedRef :: forall m a. (MonadCo m a, Syntax a) => String -> m (Ref a)
 newNamedRef name = liftCo . fmap Ref . mapStructA (const $ Imp.newNamedRef name) $ sugar
   where
-    sugar :: Struct PrimitiveType PrimitiveTypeRep (I a)
-    sugar = typeRep
+    sugar :: Struct (Pred m) PrimitiveTypeRep (I a)
+    sugar = trep (Proxy :: Proxy a)
+
+-- | ...
+getRef :: forall m a. (MonadCo m a, Syntax a) => Ref a -> m a
+getRef = liftCo . fmap sugar . mapStructA getty . unRef
+  where
+    getty :: forall b. Pred m b => Imp.Ref b -> Prog (Pred m) (Expr m) (Expr m b)
+    getty = withPrim (Proxy :: Proxy (Expr m)) (Proxy :: Proxy b) Imp.getRef
+
+    sugar :: Struct (Pred m) (Expr m) (I a) -> a
+    sugar = resug
+
+-- | ... why can't it see the type for sequence_ ?! ...
+setRef :: forall m a. (MonadCo m a, Syntax a) => Ref a -> a -> m ()
+setRef ref = liftCo
+           . (sequence_ :: [Prog (Pred m) (Expr m) ()] -> Prog (Pred m) (Expr m) ())
+           . zipListStruct setty (unRef ref)
+           . sugar
+  where
+    setty :: forall b. Imp.Ref b -> Expr m b -> Prog (Pred m) (Expr m) ()
+    setty = undefined
+    
+    sugar :: a -> Struct (Pred m) (Expr m) (I a)
+    sugar = resug
 
 --------------------------------------------------------------------------------

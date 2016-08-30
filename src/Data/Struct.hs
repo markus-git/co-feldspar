@@ -29,7 +29,7 @@ mapStruct f = go
     go (Node a) = Node (f a)
     go (Branch a b) = Branch (go a) (go b)
 
--- | Monadic map over a `Struct`
+-- | Monadic map over a `Struct`.
 mapStructA :: forall m pred c1 c2 b
   .  Applicative m
   => (forall a. pred a => c1 a -> m (c2 a))
@@ -40,5 +40,17 @@ mapStructA f = go
     go :: Struct pred c1 a -> m (Struct pred c2 a)
     go (Node a) = Node <$> f a
     go (Branch a b) = Branch <$> go a <*> go b
+
+-- | Zip two 'Struct's to a list.
+zipListStruct :: forall pred c1 c2 b r
+    . (forall a . pred a => c1 a -> c2 a -> r)
+    -> Struct pred c1 b
+    -> Struct pred c2 b
+    -> [r]
+zipListStruct f = go
+  where
+    go :: Struct pred c1 a -> Struct pred c2 a -> [r]
+    go (Node a)     (Node b)     = [f a b]
+    go (Branch a b) (Branch c d) = go a c ++ go b d
 
 --------------------------------------------------------------------------------
