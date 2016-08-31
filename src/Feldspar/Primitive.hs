@@ -17,7 +17,7 @@ import Data.Typeable
 import Data.Constraint (Dict(..))
 
 import Language.Syntactic
-import Language.Syntactic.Functional hiding (Var)
+import Language.Syntactic.Functional (Eval(..), EvalEnv, Denotation)
 
 --------------------------------------------------------------------------------
 -- * Primitive Types.
@@ -26,14 +26,14 @@ import Language.Syntactic.Functional hiding (Var)
 -- | Representation of supported primitive types.
 data PrimitiveTypeRep a
   where
-    -- booleans.
+    -- ^ booleans.
     BoolT   :: PrimitiveTypeRep Bool
-    -- signed numbers.
+    -- ^ signed numbers.
     Int8T   :: PrimitiveTypeRep Int8
 --  Int16T  :: PrimitiveTypeRep Int16
 --  Int32T  :: PrimitiveTypeRep Int32
 --  Int64T  :: PrimitiveTypeRep Int64
-    -- unsigned numbers.
+    -- ^ unsigned numbers.
     Word8T  :: PrimitiveTypeRep Word8
 --  Word16T :: PrimitiveTypeRep Word16
 --  Word32T :: PrimitiveTypeRep Word32
@@ -57,18 +57,15 @@ instance PrimitiveType Word8 where primitiveRep = Word8T
 
 --------------------------------------------------------------------------------
 
--- | ...
 primitiveTypeOf :: PrimitiveType a => a -> PrimitiveTypeRep a
 primitiveTypeOf _ = primitiveRep
 
--- | ...
 primitiveTypeEq :: PrimitiveTypeRep a -> PrimitiveTypeRep b -> Maybe (Dict (a ~ b))
 primitiveTypeEq BoolT  BoolT  = Just Dict
 primitiveTypeEq Int8T  Int8T  = Just Dict
 primitiveTypeEq Word8T Word8T = Just Dict
 primitiveTypeEq _      _      = Nothing
 
--- | ...
 primitiveTypeWit :: PrimitiveTypeRep a -> Dict (PrimitiveType a)
 primitiveTypeWit BoolT  = Dict
 primitiveTypeWit Int8T  = Dict
@@ -102,7 +99,7 @@ deriving instance Typeable (Primitive a)
 
 --------------------------------------------------------------------------------
 
--- | ...
+-- | Primitive symbols tagged with their type representation.
 type PrimitiveDomain = Primitive :&: PrimitiveTypeRep
 
 -- | Primitive expressions.

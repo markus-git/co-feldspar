@@ -3,36 +3,34 @@
 {-# language FlexibleContexts #-}
 {-# language UndecidableInstances #-}
 {-# language TypeOperators #-}
-{-# language GeneralizedNewtypeDeriving #-}
-{-# language StandaloneDeriving #-}
-{-# language MultiParamTypeClasses #-}
-{-# language TypeFamilies #-}
-{-# language ScopedTypeVariables #-}
 {-# language Rank2Types #-}
-{-# language FunctionalDependencies #-}
 
 module Feldspar.Representation where
 
 import Feldspar.Primitive
-
-import qualified Control.Monad.Operational.Higher as Oper (Program, Param2, (:+:))
+import Feldspar.Sugar
+import Data.Struct
 
 import Data.Constraint
 import Data.Int (Int8)
 import Data.List (genericTake)
 import Data.Typeable hiding (typeRep, TypeRep)
-import Data.Struct
 
-import Language.Syntactic
+import Language.Syntactic hiding (Syntactic(..), SyntacticN(..))
 import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
+
+import qualified Control.Monad.Operational.Higher as Oper (Program, Param2, (:+:))
 
 -- imperative-edsl
 import qualified Language.Embedded.Imperative.CMD as Imp (Ref, RefCMD, ControlCMD)
 import qualified Language.Embedded.Expression     as Imp
 
+-- hardware-edsl
+-- ...
+
 --------------------------------------------------------------------------------
--- *
+-- * ...
 --------------------------------------------------------------------------------
 
 -- | Representation of supported feldspar types as typed binary trees over
@@ -48,18 +46,18 @@ data TypeRepF a
 
 --------------------------------------------------------------------------------
 
--- | Class of supported feldspar types.
+-- | Class of supported co-design types.
 class (Eq a, Show a, Typeable a) => CoType a
   where
     -- | Reify a type.
     typeRep :: TypeRep a
 
--- any primitive type is a valid feldspar type.
+-- any primitive type is a valid co-design type.
 instance (Eq a, Show a, Typeable a, PrimitiveType a) => CoType a
   where
     typeRep = Node primitiveRep
 
--- pairs of feldspar types are also a valid type.
+-- any pair of valid co-design types is also a valid type.
 instance (CoType a, CoType b) => CoType (a, b)
   where
     typeRep = Branch typeRep typeRep
@@ -70,7 +68,12 @@ instance (CoType a, CoType b) => CoType (a, b)
 class    (PrimitiveType a, CoType a) => Type a
 instance (PrimitiveType a, CoType a) => Type a
 
+-- | Alias for the conjunction of `Syntactic` and `CoType`.
+class    (Syntactic a, CoType (Internal a)) => Syntax a
+instance (Syntactic a, CoType (Internal a)) => Syntax a
+
 --------------------------------------------------------------------------------
+-- ** ...
 
 -- | ...
 asTypeRep :: Struct PrimitiveType c a -> TypeRep a
@@ -104,116 +107,36 @@ typeableWit (Branch l r)
   = Dict
 
 --------------------------------------------------------------------------------
--- *
+-- * ...
 --------------------------------------------------------------------------------
 
--- | ...
+newtype Ref a = Ref { unRef :: Struct (PredOf (Constructor a)) Imp.Ref (Internal a) }
+
+--------------------------------------------------------------------------------
+-- ** ...
+
 type CoConstructs
   =   Primitive
-  -- # extra layer of primitives.
+  -- ^ extra layer of primitives.
   :+: BindingT -- typed variables.
   :+: Let      -- let bindings.
   :+: Tuple    -- pairs.
 
--- | ...
-type CoDomain = CoConstructs :+: TypeRepF
+type CoDomain = CoConstructs :&: TypeRepF
 
 --------------------------------------------------------------------------------
--- *
---------------------------------------------------------------------------------
+-- ** ...
 
--- | Associate an expression type with its type constraint.
-type family PredOf (c :: * -> *) :: (* -> Constraint)
-
--- | ...
-class Syn a
-  where
-    type C a :: * -> *
-    type I a :: *
-    desug :: a -> (C a) (I a)
-    sug   :: (C a) (I a) -> a
-    trep  :: Proxy a -> Struct (PredOf (C a)) PrimitiveTypeRep (I a)
-
--- | Syntactic type casting.
-resug :: (Syn a, Syn b, C a ~ C b, I a ~ I b) => a -> b
-resug = sug . desug
-
-{-
-instance Syn (Expr a)
-  where
-    type C (Expr a) = Expr
-    type I (Expr a) = a
-    desug = sug = id
-    ...
-
-instance Sym (Struct Pred Expr a)
-  where
-    type C (Struct ...) = Expr
-    type I (Struct ...) = a
--}
---------------------------------------------------------------------------------
-
--- | ...
-class SynN f internal | f -> internal
-  where
-    desugN :: f -> internal
-    sugN   :: internal -> f
-
-instance {-# overlapping #-} (Syn f, fi ~ (C f) (I f)) => SynN f fi
-  where
-    desugN = desug
-    sugN   = sug
-
-instance {-# overlapping #-} (Syn a, c ~ C a, i ~ I a, SynN f fi) => SynN (a -> f) (c i -> fi)
-  where
-    desugN f = desugN . f . sug
-    sugN   f = sugN . f . desug
-
--- | ...
-sugSym
-    :: ( Signature sig
-       , fi  ~ SmartFun sup sig
-       , sig ~ SmartSig fi
-       , sup ~ SmartSym fi
-       , SynN f fi
-       , sub :<: sup
-       )
-    => sub sig -> f
-sugSym = sugN . smartSym
-
--- | ...
-sugSymDecor
-    :: ( Signature sig
-       , fi             ~ SmartFun (sup :&: info) sig
-       , sig            ~ SmartSig fi
-       , (sup :&: info) ~ SmartSym fi
-       , SynN f fi
-       , sub :<: sup
-       )
-    => info (DenResult sig) -> sub sig -> f
-sugSymDecor i = sugN . smartSymDecor i
-
---------------------------------------------------------------------------------
-
-class    (Syn a, CoType (I a)) => Syntax a
-instance (Syn a, CoType (I a)) => Syntax a
-
---------------------------------------------------------------------------------
--- **
-
--- | ...
-newtype Ref a = Ref { unRef :: Struct (PredOf (C a)) Imp.Ref (I a) }
-
--- | ...
 type CoCMD = Imp.RefCMD Oper.:+: Imp.ControlCMD
 
 --------------------------------------------------------------------------------
--- **
+-- ** ...
 
--- | ...
 class PrimDict expr
   where
-    withPrim :: Proxy expr -> Proxy a -> (Imp.FreePred expr a => b) -> (PredOf expr a => b)
+    withPrim :: Proxy expr -> Proxy a
+      -> (Imp.FreePred expr a => b)
+      -> (PredOf expr a => b)
 
 {-
 instance Imp.FreeExp Expr => PrimDict Expr
