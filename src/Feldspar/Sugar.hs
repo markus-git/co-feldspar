@@ -4,6 +4,8 @@
 {-# language UndecidableInstances #-}
 {-# language FlexibleInstances #-}
 {-# language TypeOperators #-}
+{-# language ScopedTypeVariables #-}
+{-# language Rank2Types #-}
 
 module Feldspar.Sugar where
 
@@ -11,8 +13,19 @@ import Data.Constraint (Constraint)
 import Data.Proxy (Proxy(..))
 import Data.Struct
 
-import Language.Syntactic.Syntax
-import Language.Syntactic.Decoration
+import Language.Syntactic.Syntax as Syn
+  ( AST(..), ASTFull(..), ASTF
+  , Full(..), (:->)
+  , Signature(..), SigRep(..)
+  , (:+:), (:<:)
+  , SmartSym, SmartSig, DenResult
+  )
+import Language.Syntactic.Decoration as Syn
+  ((:&:))
+
+import qualified Language.Syntactic.Syntax     as S
+import qualified Language.Syntactic.Sugar      as S
+import qualified Language.Syntactic.Decoration as S
 
 --------------------------------------------------------------------------------
 -- * Sugaring of expressions.
@@ -26,14 +39,22 @@ class Syntactic a
     desugar :: a -> Constructor a (Internal a)
     sugar   :: Constructor a (Internal a) -> a
 
---  trep    :: Proxy a -> Struct (PredOf (Constructor a)) (TypeOf a) (Internal a)
-
--- | Associate an expression type with its type constraint.
-type family PredOf (c :: * -> *) :: (* -> Constraint)
+-- | Associate a syntactical object with its predicate type.
+type family PredOf (a :: * -> *) :: * -> Constraint
 
 -- | Syntactic type casting.
 resugar :: (Syntactic a, Syntactic b, Constructor a ~ Constructor b, Internal a ~ Internal b) => a -> b
 resugar = sugar . desugar
+
+--------------------------------------------------------------------------------
+
+instance Syntactic (ASTFull sym a)
+  where
+    type Constructor (ASTFull sym a) = ASTFull sym
+    type Internal    (ASTFull sym a) = a
+
+    desugar = id
+    sugar   = id
 
 --------------------------------------------------------------------------------
 -- ** Sugaring extended to functions.
@@ -56,28 +77,8 @@ instance {-# overlapping #-} (Syntactic a, c ~ Constructor a, i ~ Internal a, Sy
     sugarN   f = sugarN . f . desugar
 
 --------------------------------------------------------------------------------
--- ** Sugaring of symbols.
+-- ** Smart constructors.
 
-sugarSym
-    :: ( Signature sig
-       , fi  ~ SmartFun sup sig
-       , sig ~ SmartSig fi
-       , sup ~ SmartSym fi
-       , SyntacticN f fi
-       , sub :<: sup
-       )
-    => sub sig -> f
-sugarSym = sugarN . smartSym
-
-sugarSymDecor
-    :: ( Signature sig
-       , fi             ~ SmartFun (sup :&: info) sig
-       , sig            ~ SmartSig fi
-       , (sup :&: info) ~ SmartSym fi
-       , SyntacticN f fi
-       , sub :<: sup
-       )
-    => info (DenResult sig) -> sub sig -> f
-sugarSymDecor i = sugarN . smartSymDecor i
+-- ...
 
 --------------------------------------------------------------------------------

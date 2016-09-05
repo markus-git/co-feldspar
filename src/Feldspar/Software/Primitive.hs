@@ -2,6 +2,7 @@
 {-# language StandaloneDeriving #-}
 {-# language TypeOperators #-}
 {-# language FlexibleInstances #-}
+{-# language UndecidableInstances #-}
 {-# language MultiParamTypeClasses #-}
 {-# language TypeFamilies #-}
 
@@ -9,11 +10,12 @@ module Feldspar.Software.Primitive where
 
 import Feldspar.Primitive
 import Feldspar.Representation
+import Data.Struct
 
 import Data.Int
 import Data.Word
 import Data.List (genericTake)
-import Data.Typeable
+import Data.Typeable hiding (TypeRep)
 
 import Language.Syntactic
 import Language.Syntactic.Functional
@@ -47,76 +49,73 @@ deriving instance Typeable (SoftwareTypeRep a)
 
 --------------------------------------------------------------------------------
 
-class (Eq a, Show a, Typeable a) => SoftwareType a
+-- | Class of supported software types.
+class (Eq a, Show a, Typeable a) => SoftwarePrimType a
   where
     softwareRep :: SoftwareTypeRep a
 
-instance SoftwareType Bool  where softwareRep = BoolST
-instance SoftwareType Int8  where softwareRep = Int8ST
-instance SoftwareType Word8 where softwareRep = Word8ST
+instance SoftwarePrimType Bool  where softwareRep = BoolST
+instance SoftwarePrimType Int8  where softwareRep = Int8ST
+instance SoftwarePrimType Word8 where softwareRep = Word8ST
+instance SoftwarePrimType Float where softwareRep = FloatST
 
 --------------------------------------------------------------------------------
 
--- ...
+-- | Short-hand for representation of software types.
+type SoftTypeRep = TypeRep SoftwarePrimType SoftwareTypeRep
 
 --------------------------------------------------------------------------------
--- *
+-- * ... prim ...
 --------------------------------------------------------------------------------
 
-type Length = Int8
-type Index  = Int8
-
--- | For loop.
-data ForLoop sig
+-- | Software primitive symbols.
+data SoftwarePrimitive sig
   where
-    ForLoop :: Type st =>
-        ForLoop (Length :-> st :-> (Index -> st -> st) :-> Full st)
+    -- ^ geometrical operators.
+    Sin :: Floating a => SoftwarePrimitive (a :-> Full a)
+    Cos :: Floating a => SoftwarePrimitive (a :-> Full a)
+    Tan :: Floating a => SoftwarePrimitive (a :-> Full a)
 
-deriving instance Eq       (ForLoop a)
-deriving instance Show     (ForLoop a)
-deriving instance Typeable (ForLoop a)
-
---------------------------------------------------------------------------------
-
--- | ...
-type SoftwareConstructs = CoConstructs :+: ForLoop
-
--- | ...
-type SoftwareDomain = SoftwareConstructs :&: TypeRepF
-
--- | Software expressions.
-newtype Data a = Data { unData :: ASTF SoftwareDomain a }
+deriving instance Eq       (SoftwarePrimitive a)
+deriving instance Show     (SoftwarePrimitive a)
+deriving instance Typeable (SoftwarePrimitive a)
 
 --------------------------------------------------------------------------------
 
-instance Syn (Data a)
-  where
-    type C (Data a) = Data
-    type I (Data a) = a
+-- | Software primitive symbols.
+type SoftwarePrimitiveConstructs = SoftwarePrimitive :+: CoConstructs
 
-    desug = id
-    sug   = id
-    trep  = undefined
+-- | Software primitive symbols tagged with their type representation.
+type SoftwarePrimitiveDomain = SoftwarePrimitiveConstructs :&: TypeRepF SoftwarePrimType SoftwareTypeRep
+
+-- | Software primitive expressions.
+newtype SoftPrim a = SoftPrim { unSPrim :: ASTF SoftwarePrimitiveDomain a }
 
 --------------------------------------------------------------------------------
--- ...
+-- syntactic instances.
 
-instance Eval ForLoop
+instance Eval SoftwarePrimitive
   where
-    evalSym ForLoop = \len init body ->
-        foldl (flip body) init $ genericTake len [0..]
+    evalSym Sin = sin
+    evalSym Cos = cos
+    evalSym Tan = tan
 
-instance Symbol ForLoop
+instance Symbol SoftwarePrimitive
   where
-    symSig (ForLoop) = signature
+    symSig Sin = signature
+    symSig Cos = signature
+    symSig Tan = signature
 
-instance Render ForLoop
+instance Render SoftwarePrimitive
   where
     renderSym  = show
     renderArgs = renderArgsSmart
 
-instance EvalEnv ForLoop env
+instance Equality SoftwarePrimitive
+  where
+    equal s1 s2 = show s1 == show s2
 
-instance StringTree ForLoop
+instance StringTree SoftwarePrimitive
+instance EvalEnv SoftwarePrimitive env
 
 --------------------------------------------------------------------------------

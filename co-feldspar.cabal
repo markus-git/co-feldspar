@@ -25,6 +25,7 @@ library
   -- other-extensions:    
   build-depends:
     base >=4.9 && <4.10,
+    mtl >=2.2.1,
     constraints >=0.8,
     syntactic >=3.6.1,
     operational-alacarte >=0.3,

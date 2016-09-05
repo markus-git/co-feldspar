@@ -126,7 +126,7 @@ newRef = newNamedRef "r"
 newNamedRef :: forall m a. (MonadCo m a, Syntax a) => String -> m (Ref a)
 newNamedRef name = liftCo . fmap Ref . mapStructA (const $ Imp.newNamedRef name) $ sugar
   where
-    sugar :: Struct (Pred m) tr (Internal a)
+    sugar :: Struct pred c (Internal a)
     sugar = undefined -- trep (Proxy :: Proxy a)
 
 --------------------------------------------------------------------------------

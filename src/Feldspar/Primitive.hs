@@ -80,16 +80,16 @@ data Primitive sig
   where
     Var :: PrimitiveType a => String -> Primitive (Full a)
     Lit :: PrimitiveType a => a      -> Primitive (Full a)
-    -- numerical operations.
+    -- ^ numerical operations.
     Add :: (PrimitiveType a, Num a) => Primitive (a :-> a :-> Full a)
     Mul :: (PrimitiveType a, Num a) => Primitive (a :-> a :-> Full a)
-    -- integral operations.
+    -- ^ integral operations.
     Div :: (PrimitiveType a, Integral a) => Primitive (a :-> a :-> Full a)
     Mod :: (PrimitiveType a, Integral a) => Primitive (a :-> a :-> Full a)
-    -- logical operations.
+    -- ^ logical operations.
     Not :: Primitive (Bool :-> Full Bool)
     And :: Primitive (Bool :-> Bool :-> Full Bool)
-    -- relational operations.
+    -- ^ relational operations.
     Eq  :: (PrimitiveType a, Eq a)  => Primitive (a :-> a :-> Full Bool)
     Lt  :: (PrimitiveType a, Ord a) => Primitive (a :-> a :-> Full Bool)
 
