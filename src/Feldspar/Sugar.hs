@@ -79,6 +79,30 @@ instance {-# overlapping #-} (Syntactic a, c ~ Constructor a, i ~ Internal a, Sy
 --------------------------------------------------------------------------------
 -- ** Smart constructors.
 
--- ...
+-- > SmartFunFull sym (a :-> b :-> ... :-> c) = ASTFull sym a -> ASTFull sym b -> ... -> ASTFull sym c
+type family   SmartFull (sym :: * -> *) sig
+type instance SmartFull sym (Full a)    = ASTFull sym a
+type instance SmartFull sym (a :-> sig) = ASTFull sym a -> SmartFull sym sig
+
+-- > S.SmartSig (ASTF sym a -> ASTF sym b -> ... -> ASTF sym c) = a :-> b :-> ... :-> c
+-- > family   S.SmartSig f
+type instance S.SmartSig (ASTFull sym sig)      = Full sig
+type instance S.SmartSig (ASTFull sym sig -> f) = sig :-> S.SmartSig f
+
+-- > family   S.SmartSym f :: * -> *
+type instance S.SmartSym (ASTFull sym sig) = sym
+
+-- | ...
+sugarSymDecor
+  :: ( Signature sig
+     , f              ~ SmartFull  (sup :&: info) sig
+     , fi             ~ S.SmartFun (sup :&: info) sig
+     , sig            ~ S.SmartSig fi
+     , (sup :&: info) ~ S.SmartSym fi
+     , sub :<: sup
+     , S.SyntacticN f fi
+     )
+  => info (S.DenResult sig) -> sub sig -> f
+sugarSymDecor = S.sugarSymDecor
 
 --------------------------------------------------------------------------------

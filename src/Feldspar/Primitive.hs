@@ -78,47 +78,24 @@ primitiveTypeWit Word8T = Dict
 -- | Primitive symbols.
 data Primitive sig
   where
-    Var :: PrimitiveType a => String -> Primitive (Full a)
-    Lit :: PrimitiveType a => a      -> Primitive (Full a)
+    Var ::                   String -> Primitive (Full a)
+    Lit :: (Show a, Eq a) => a      -> Primitive (Full a)
     -- ^ numerical operations.
-    Add :: (PrimitiveType a, Num a) => Primitive (a :-> a :-> Full a)
-    Mul :: (PrimitiveType a, Num a) => Primitive (a :-> a :-> Full a)
+    Add :: Num a => Primitive (a :-> a :-> Full a)
+    Mul :: Num a => Primitive (a :-> a :-> Full a)
     -- ^ integral operations.
-    Div :: (PrimitiveType a, Integral a) => Primitive (a :-> a :-> Full a)
-    Mod :: (PrimitiveType a, Integral a) => Primitive (a :-> a :-> Full a)
+    Div :: Integral a => Primitive (a :-> a :-> Full a)
+    Mod :: Integral a => Primitive (a :-> a :-> Full a)
     -- ^ logical operations.
     Not :: Primitive (Bool :-> Full Bool)
     And :: Primitive (Bool :-> Bool :-> Full Bool)
     -- ^ relational operations.
-    Eq  :: (PrimitiveType a, Eq a)  => Primitive (a :-> a :-> Full Bool)
-    Lt  :: (PrimitiveType a, Ord a) => Primitive (a :-> a :-> Full Bool)
+    Eq  :: Eq a  => Primitive (a :-> a :-> Full Bool)
+    Lt  :: Ord a => Primitive (a :-> a :-> Full Bool)
 
 deriving instance Eq       (Primitive a)
 deriving instance Show     (Primitive a)
 deriving instance Typeable (Primitive a)
-
---------------------------------------------------------------------------------
-
--- | Primitive symbols tagged with their type representation.
-type PrimitiveDomain = Primitive :&: PrimitiveTypeRep
-
--- | Primitive expressions.
-newtype Prim a = Prim { unPrim :: ASTF PrimitiveDomain a }
-
---------------------------------------------------------------------------------
-
--- | Evaluate a closed primitive expressions.
-evalPrim :: Prim a -> a
-evalPrim = go . unPrim
-  where
-    go :: AST PrimitiveDomain sig -> Denotation sig
-    go (Sym (s :&: _)) = evalSym s
-    go (f :$ a) = go f $ go a
-
---------------------------------------------------------------------------------
--- imperative-edsl/hardware-edsl instances.
-
--- ...
 
 --------------------------------------------------------------------------------
 -- syntactic instances.

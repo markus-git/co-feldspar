@@ -40,26 +40,26 @@ import qualified Language.Syntactic as S
 -- * ... types ...
 --------------------------------------------------------------------------------
 
-class (Eq a, Show a, Typeable a) => SoftwareRepType a
+class (Eq a, Show a, Typeable a) => SoftwareType a
   where
     -- | Reify a type.
     softRep :: SoftTypeRep a
 
-instance (Eq a, Show a, Typeable a, SoftwarePrimType a) => SoftwareRepType a
+instance (Eq a, Show a, Typeable a, SoftwarePrimType a) => SoftwareType a
   where
     softRep = Node softwareRep
 
-instance (SoftwareRepType a, SoftwareRepType b) => SoftwareRepType (a, b)
+instance (SoftwareType a, SoftwareType b) => SoftwareType (a, b)
   where
     softRep = Branch softRep softRep
 
 --------------------------------------------------------------------------------
-
+{-
 type SoftTypeRepF = TypeRepF SoftwarePrimType SoftwareTypeRep
 
 class    (SoftwarePrimType a, SoftwareRepType a) => SoftwareType a
 instance (SoftwarePrimType a, SoftwareRepType a) => SoftwareType a
-
+-}
 --------------------------------------------------------------------------------
 -- * ... expressions ...
 --------------------------------------------------------------------------------
@@ -83,7 +83,7 @@ deriving instance Typeable (ForLoop a)
 type SoftwareConstructs = ForLoop :+: SoftwarePrimitiveConstructs
 
 -- | Software symbols tagged with their type representation.
-type SoftwareDomain = SoftwareConstructs :&: SoftTypeRepF
+type SoftwareDomain = SoftwareConstructs :&: TypeRepF SoftwarePrimType SoftwareTypeRep
 
 -- | Software expressions.
 newtype Data a = Data { unData :: ASTFull SoftwareDomain a }
@@ -98,19 +98,7 @@ instance Syntactic (Data a)
     sugar   = Data
 
 --------------------------------------------------------------------------------
-
--- > SmartFunFull sym (a :-> b :-> ... :-> c) = ASTFull sym a -> ASTFull sym b -> ... -> ASTFull sym c
-type family   SmartFunFull (sym :: * -> *) sig
-type instance SmartFunFull sym (Full a)    = ASTFull sym a
-type instance SmartFunFull sym (a :-> sig) = ASTFull sym a -> SmartFunFull sym sig
-
--- > S.SmartSig (ASTF sym a -> ASTF sym b -> ... -> ASTF sym c) = a :-> b :-> ... :-> c
-type instance S.SmartSig (ASTFull sym sig)      = Full sig
-type instance S.SmartSig (ASTFull sym sig -> f) = sig :-> S.SmartSig f
-
---type family   S.SmartSym f :: * -> *
-type instance S.SmartSym (ASTFull sym sig) = sym
-
+{-
 sugarSymDecorSoft
     :: ( Signature sig
        , fi             ~ S.SmartFun   SoftwareDomain sig
@@ -143,9 +131,9 @@ sugarSymSoft = sugarN . sugarSymDecorSoft info
   where
     info :: SoftTypeRepF (S.DenResult sig)
     info = ValT softRep
-
+-}
 --------------------------------------------------------------------------------
-
+{-
 sugarSymDecorSoftPrim
     :: ( Signature sig
        , fi             ~ S.SmartFun   SoftwareDomain sig
@@ -178,21 +166,44 @@ sugarSymSoftPrim = sugarN . sugarSymDecorSoftPrim info
   where
     info :: TypeRepF SoftwarePrimType SoftwareTypeRep (S.DenResult sig)
     info = ValT $ Node $ softwareRep
- 
-
+-} 
 --------------------------------------------------------------------------------
-
-instance LET Data where
-  shareTag tag = undefined
 
 instance NUM Data where
   plus   = undefined
   minus  = undefined
   times  = undefined
-  negate = undefined    
+  negate = undefined
+
+--------------------------------------------------------------------------------
+-- * ...
+--------------------------------------------------------------------------------
+{-
+type SoftwareCMD = CoCMD Oper.:+: Imp.FileCMD
+
+-- | Monad for building software programs in Feldspar.
+newtype Software a = Software { runSoftware ::
+    Oper.ProgramT SoftwareCMD (Oper.Param2 Data SoftwarePrimType)
+      (Oper.Program CoCMD (Oper.Param2 Data SoftwarePrimType))
+      a
+  } deriving (Functor, Applicative, Monad)
+-}
+--------------------------------------------------------------------------------
+{-
+instance MonadComp Software
+  where
+    type Expr Software = Data
+    type Pred Software = SoftwarePrimType
+
+    liftCo = Software . lift
+-}
+--------------------------------------------------------------------------------
+
+-- ...
 
 --------------------------------------------------------------------------------
 -- ... syntactic isntances ...
+--------------------------------------------------------------------------------
 
 instance Eval ForLoop
   where
@@ -211,27 +222,5 @@ instance Render ForLoop
 instance EvalEnv ForLoop env
 
 instance StringTree ForLoop
-
---------------------------------------------------------------------------------
--- * ...
---------------------------------------------------------------------------------
-
-type SoftwareCMD = CoCMD Oper.:+: Imp.FileCMD
-
--- | Monad for building software programs in Feldspar.
-newtype Software a = Software { runSoftware ::
-    Oper.ProgramT SoftwareCMD (Oper.Param2 Data SoftwarePrimType)
-      (Oper.Program CoCMD (Oper.Param2 Data SoftwarePrimType))
-      a
-  } deriving (Functor, Applicative, Monad)
-
---------------------------------------------------------------------------------
-
-instance MonadComp Software
-  where
-    type Expr Software = Data
-    type Pred Software = SoftwarePrimType
-
-    liftCo = Software . lift
 
 --------------------------------------------------------------------------------

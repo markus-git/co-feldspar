@@ -60,11 +60,6 @@ instance SoftwarePrimType Word8 where softwareRep = Word8ST
 instance SoftwarePrimType Float where softwareRep = FloatST
 
 --------------------------------------------------------------------------------
-
--- | Short-hand for representation of software types.
-type SoftTypeRep = TypeRep SoftwarePrimType SoftwareTypeRep
-
---------------------------------------------------------------------------------
 -- * ... prim ...
 --------------------------------------------------------------------------------
 
@@ -83,13 +78,13 @@ deriving instance Typeable (SoftwarePrimitive a)
 --------------------------------------------------------------------------------
 
 -- | Software primitive symbols.
-type SoftwarePrimitiveConstructs = SoftwarePrimitive :+: CoConstructs
+type SoftwarePrimitiveConstructs = SoftwarePrimitive :+: Primitive
 
 -- | Software primitive symbols tagged with their type representation.
 type SoftwarePrimitiveDomain = SoftwarePrimitiveConstructs :&: TypeRepF SoftwarePrimType SoftwareTypeRep
 
 -- | Software primitive expressions.
-newtype SoftPrim a = SoftPrim { unSPrim :: ASTF SoftwarePrimitiveDomain a }
+newtype Prim a = Prim { unPrim :: ASTF SoftwarePrimitiveDomain a }
 
 --------------------------------------------------------------------------------
 -- syntactic instances.

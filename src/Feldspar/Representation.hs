@@ -1,10 +1,12 @@
 {-# language GADTs #-}
 {-# language TypeFamilies #-}
+{-# language MultiParamTypeClasses #-}
 {-# language FlexibleInstances #-}
 {-# language FlexibleContexts #-}
 {-# language UndecidableInstances #-}
 {-# language TypeOperators #-}
 {-# language Rank2Types #-}
+{-# language ConstraintKinds #-}
 
 module Feldspar.Representation where
 
@@ -23,7 +25,7 @@ import Language.Syntactic.Functional.Tuple
 
 import qualified Control.Monad.Operational.Higher as Oper (Program, Param2, (:+:))
 
--- imperative-edsl
+-- imperative-edslJust True
 import qualified Language.Embedded.Imperative.CMD as Imp (Ref, RefCMD, ControlCMD)
 import qualified Language.Embedded.Expression     as Imp
 
@@ -47,43 +49,26 @@ data TypeRepF pred rep a
 
 --------------------------------------------------------------------------------
 
--- | Short-hand for representation of primitive types.
-type PrimTypeRep = TypeRep PrimitiveType PrimitiveTypeRep
-
--- | Class of supported co-design types.
-class (Eq a, Show a, Typeable a) => CoType a
-  where    
+class (Eq (Internal a), Show (Internal a), Typeable (Internal a)) => Type a
+  where
     -- | Reify a type.
-    typeRep :: PrimTypeRep a
+    typeRep :: Proxy a -> TypeRep (PredOf (Constructor a)) (RepOf (Constructor a)) (Internal a)
 
--- any primitive type is a valid co-design type.
-instance (Eq a, Show a, Typeable a, PrimitiveType a) => CoType a
-  where    
-    typeRep = Node primitiveRep
-
--- any pair of valid co-design types is also a valid type.
-instance (CoType a, CoType b) => CoType (a, b)
-  where    
-    typeRep = Branch typeRep typeRep
+-- | ...
+type family RepOf (exp :: * -> *) :: * -> *
 
 --------------------------------------------------------------------------------
-
--- | Alias for the conjunction of `PrimitiveType` and `FeldType`.
-class    (PrimitiveType a, CoType a) => Type a
-instance (PrimitiveType a, CoType a) => Type a
 
 -- | Alias for the conjunction of `Syntactic` and `CoType`.
-class    (Syntactic a, CoType (Internal a)) => Syntax a
-instance (Syntactic a, CoType (Internal a)) => Syntax a
+type Syntax a = (Syntactic a, Type a)
 
 --------------------------------------------------------------------------------
--- ** ... generalize to type representations other than primitive ones ...
 {-
-asTypeRep :: Struct PrimitiveType c a -> TypeRep a
+asTypeRep :: Struct pred rep a -> TypeRep pred rep a
 asTypeRep = mapStruct (const primitiveRep)
 
-typeEq :: TypeRep a -> TypeRep b -> Maybe (Dict (a ~ b))
-typeEq (Node u)       (Node v)       = primitiveTypeEq  u v
+typeEq :: TypeRep pred rep a -> TypeRep pred rep b -> Maybe (Dict (a ~ b))
+typeEq (Node u)       (Node v)       = undefined
 typeEq (Branch l1 r1) (Branch l2 r2) = do
   Dict <- typeEq l1 l2
   Dict <- typeEq r1 r2
@@ -106,7 +91,6 @@ typeableWit (Branch l r)
   , Dict <- typeableWit r
   = Dict
 -}
-
 --------------------------------------------------------------------------------
 -- * ...
 --------------------------------------------------------------------------------
@@ -114,19 +98,6 @@ typeableWit (Branch l r)
 newtype Ref a = Ref { unRef :: Struct (PredOf (Constructor a)) Imp.Ref (Internal a) }
 
 --------------------------------------------------------------------------------
--- ** ...
-
-type CoConstructs
-  =   Primitive
-  -- ^ extra layer of primitives.
-  :+: BindingT -- typed variables.
-  :+: Let      -- let bindings.
-  :+: Tuple    -- pairs.
-
-type CoDomain = CoConstructs :&: TypeRepF PrimitiveType PrimitiveTypeRep
-
---------------------------------------------------------------------------------
--- ** ...
 
 type CoCMD = Imp.RefCMD Oper.:+: Imp.ControlCMD
 
@@ -139,15 +110,4 @@ class PrimDict expr
       -> (Imp.FreePred expr a => b)
       -> (PredOf expr a => b)
 
-{-
-instance Imp.FreeExp Expr => PrimDict Expr
-  where
-    withPrim :: Proxy Expr -> Proxy a -> (Imp.FreePred Expr a => b) -> (PrimitiveType => b)
-    withPrim p _ f = case freeDict p (primitiveTypeRep :: PrimitiveTypeRep a) of Dict -> f
-
-freeDict :: Proxy Expr -> PrimitiveTypeRep a -> Dict (Imp.FreePred Expr a)
-freeDict _ rep = case rep of
-  BoolT -> Dict
-  ...
--}
 --------------------------------------------------------------------------------
