@@ -52,21 +52,20 @@ data TypeRepF pred rep a
 -- | ...
 type family RepOf (exp :: * -> *) :: * -> *
 
--- | ...
-class ( Eq (Internal a), Show (Internal a), Typeable (Internal a))
-    => Type a
+-- | Class of representable types.
+class (Eq a, Show a, Typeable a) => Type exp a
   where
     -- | Reify a type.
-    typeRep :: Proxy a
-      -> TypeRep
-           (PredOf (Constructor a))
-           (RepOf  (Constructor a))
-           (Internal a)
+    typeRep :: Proxy exp -> TypeRep (PredOf exp) (RepOf exp) a
+
+instance (Type exp a, Type exp b) => Type exp (a, b)
+  where
+    typeRep p = Branch (typeRep p) (typeRep p)
 
 --------------------------------------------------------------------------------
 
--- | Alias for the conjunction of `Syntactic` and `CoType`.
-type Syntax a = (Syntactic a, Type a)
+-- | Alias for the conjunction of `Syntactic` and `Type`.
+type Syntax a = (Syntactic a, Type (Constructor a) (Internal a))
 
 --------------------------------------------------------------------------------
 {-
@@ -98,7 +97,7 @@ typeableWit (Branch l r)
   = Dict
 -}
 --------------------------------------------------------------------------------
--- * ...
+-- * ... todo ...
 --------------------------------------------------------------------------------
 
 newtype Ref a = Ref { unRef :: Struct (PredOf (Constructor a)) Imp.Ref (Internal a) }

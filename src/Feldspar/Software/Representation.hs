@@ -7,7 +7,6 @@
 {-# language TypeFamilies #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language FlexibleContexts #-}
-
 {-# language ScopedTypeVariables #-}
 
 module Feldspar.Software.Representation where
@@ -40,26 +39,14 @@ import qualified Language.Syntactic as S
 -- * ... types ...
 --------------------------------------------------------------------------------
 
-class (Eq a, Show a, Typeable a) => SoftwareType a
+type instance PredOf (ASTFull SoftwareDomain) = SoftwarePrimType
+
+type instance RepOf  (ASTFull SoftwareDomain) = SoftwareTypeRep
+
+instance (Eq a, Show a, Typeable a, SoftwarePrimType a) => Type (ASTFull SoftwareDomain) a
   where
-    -- | Reify a type.
-    softRep :: SoftTypeRep a
+    typeRep _ = Node softwareRep
 
-instance (Eq a, Show a, Typeable a, SoftwarePrimType a) => SoftwareType a
-  where
-    softRep = Node softwareRep
-
-instance (SoftwareType a, SoftwareType b) => SoftwareType (a, b)
-  where
-    softRep = Branch softRep softRep
-
---------------------------------------------------------------------------------
-{-
-type SoftTypeRepF = TypeRepF SoftwarePrimType SoftwareTypeRep
-
-class    (SoftwarePrimType a, SoftwareRepType a) => SoftwareType a
-instance (SoftwarePrimType a, SoftwareRepType a) => SoftwareType a
--}
 --------------------------------------------------------------------------------
 -- * ... expressions ...
 --------------------------------------------------------------------------------
@@ -70,7 +57,7 @@ type Index  = Int8
 -- | For loop.
 data ForLoop sig
   where
-    ForLoop :: Type st =>
+    ForLoop :: Syntax st =>
         ForLoop (Length :-> st :-> (Index -> st -> st) :-> Full st)
 
 deriving instance Eq       (ForLoop a)
