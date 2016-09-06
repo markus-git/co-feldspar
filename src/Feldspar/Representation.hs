@@ -13,6 +13,7 @@ module Feldspar.Representation where
 import Feldspar.Primitive
 import Feldspar.Sugar
 import Data.Struct
+import Data.Inhabited
 
 import Data.Constraint
 import Data.Int (Int8)
@@ -53,7 +54,7 @@ data TypeRepF pred rep a
 type family RepOf (exp :: * -> *) :: * -> *
 
 -- | Class of representable types.
-class (Eq a, Show a, Typeable a) => Type exp a
+class (Eq a, Show a, Typeable a, Inhabited a) => Type exp a
   where
     -- | Reify a type.
     typeRep :: Proxy exp -> TypeRep (PredOf exp) (RepOf exp) a
@@ -100,18 +101,22 @@ typeableWit (Branch l r)
 -- * ... todo ...
 --------------------------------------------------------------------------------
 
+-- | Mutable variable.
 newtype Ref a = Ref { unRef :: Struct (PredOf (Constructor a)) Imp.Ref (Internal a) }
 
 --------------------------------------------------------------------------------
 
+-- | ...
 type CoCMD = Imp.RefCMD Oper.:+: Imp.ControlCMD
 
 --------------------------------------------------------------------------------
--- ** ...
 
+-- | ...
 class PrimDict expr
   where
-    withPrim :: Proxy expr -> Proxy a
+    withPrim
+      :: Proxy expr
+      -> Proxy a
       -> (Imp.FreePred expr a => b)
       -> (PredOf expr a => b)
 

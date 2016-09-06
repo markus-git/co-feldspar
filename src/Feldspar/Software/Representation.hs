@@ -15,12 +15,14 @@ import Feldspar.Primitive
 import Feldspar.Representation
 import Feldspar.Frontend
 import Feldspar.Sugar
+import Data.Inhabited
 
 import Feldspar.Software.Primitive
 
 import Control.Monad.Trans
 
 import Data.Int
+import Data.Word
 import Data.List (genericTake)
 import Data.Typeable (Typeable)
 import Data.Proxy
@@ -40,13 +42,11 @@ import qualified Language.Syntactic as S
 -- * ... types ...
 --------------------------------------------------------------------------------
 
-type instance PredOf (ASTFull SoftwareDomain) = SoftwarePrimType
+type instance RepOf Data = SoftwareTypeRep
 
-type instance RepOf  (ASTFull SoftwareDomain) = SoftwareTypeRep
-
-instance (Eq a, Show a, Typeable a, SoftwarePrimType a) => Type (ASTFull SoftwareDomain) a
-  where
-    typeRep _ = Node softwareRep
+instance Type Data Bool  where typeRep _ = Node softwareRep
+instance Type Data Int8  where typeRep _ = Node softwareRep
+instance Type Data Word8 where typeRep _ = Node softwareRep
 
 --------------------------------------------------------------------------------
 -- * ... expressions ...
@@ -78,6 +78,8 @@ newtype Data a = Data { unData :: ASTFull SoftwareDomain a }
 
 --------------------------------------------------------------------------------
 
+type instance PredOf Data = SoftwarePrimType
+
 instance Syntactic (Data a)
   where
     type Constructor (Data a) = ASTFull SoftwareDomain
@@ -103,58 +105,24 @@ sugarSymSoft
        -- lifted symbol is part of our set software symbols.
      , sub :<: SoftwareConstructs
        -- its type is representable in our set of software types.
-     , Type (ASTFull SoftwareDomain) (S.DenResult sig)
-     )
-  => sub sig -> f
-sugarSymSoft = sugarN . sugarSymDecor (ValT $ typeRep (Proxy :: Proxy (ASTFull SoftwareDomain)))
-
---------------------------------------------------------------------------------
-{-
-sugarSymDecorSoftPrim
-    :: ( Signature sig
-       , fi             ~ S.SmartFun   SoftwareDomain sig
-       , sig            ~ S.SmartSig fi
-       , SoftwareDomain ~ S.SmartSym fi
-       , sub :<: SoftwareConstructs
-       , S.SyntacticN f fi
-         
-       , f ~ SmartFunFull SoftwareDomain sig
-       )
-    => SoftTypeRep (S.DenResult sig) -> sub sig -> f
-sugarSymDecorSoftPrim i = S.sugarSymDecor i
-
-sugarSymSoftPrim
-  :: forall sig sub f fi hi
-  .  ( Signature sig
-     , hi             ~ S.SmartFun SoftwareDomain sig
-     , S.SmartSig fi  ~ S.SmartSig hi
-     , S.SmartSym fi  ~ S.SmartSym hi
-     , S.SyntacticN fi hi
-     , fi             ~ SmartFunFull SoftwareDomain sig
-     , sig            ~ S.SmartSig fi
-     , SoftwareDomain ~ S.SmartSym fi
-     , SyntacticN f fi       
-     , sub :<: SoftwareConstructs       
      , SoftwarePrimType (S.DenResult sig)
      )
   => sub sig -> f
-sugarSymSoftPrim = sugarN . sugarSymDecorSoftPrim info
-  where
-    info :: TypeRepF SoftwarePrimType SoftwareTypeRep (S.DenResult sig)
-    info = ValT $ Node $ softwareRep
--} 
+sugarSymSoft = sugarN . sugarSymDecor (ValT $ Node $ softwareRep)
+
 --------------------------------------------------------------------------------
 
 instance NUM Data where
-  plus   = undefined
-  minus  = undefined
-  times  = undefined
-  negate = undefined
+  plus   = sugarSymSoft Add
+  minus  = sugarSymSoft Sub
+  times  = sugarSymSoft Mul
+  negate = sugarSymSoft Neg
 
 --------------------------------------------------------------------------------
 -- * ...
 --------------------------------------------------------------------------------
-{-
+
+-- | ...
 type SoftwareCMD = CoCMD Oper.:+: Imp.FileCMD
 
 -- | Monad for building software programs in Feldspar.
@@ -163,16 +131,16 @@ newtype Software a = Software { runSoftware ::
       (Oper.Program CoCMD (Oper.Param2 Data SoftwarePrimType))
       a
   } deriving (Functor, Applicative, Monad)
--}
+
 --------------------------------------------------------------------------------
-{-
+
 instance MonadComp Software
   where
     type Expr Software = Data
     type Pred Software = SoftwarePrimType
 
-    liftCo = Software . lift
--}
+    liftComp = Software . lift
+
 --------------------------------------------------------------------------------
 
 -- ...

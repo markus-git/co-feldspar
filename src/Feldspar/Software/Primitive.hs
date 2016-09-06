@@ -11,6 +11,7 @@ module Feldspar.Software.Primitive where
 import Feldspar.Primitive
 import Feldspar.Representation
 import Data.Struct
+import Data.Inhabited
 
 import Data.Int
 import Data.Word
@@ -50,7 +51,7 @@ deriving instance Typeable (SoftwareTypeRep a)
 --------------------------------------------------------------------------------
 
 -- | Class of supported software types.
-class (Eq a, Show a, Typeable a) => SoftwarePrimType a
+class (Eq a, Show a, Typeable a, Inhabited a) => SoftwarePrimType a
   where
     softwareRep :: SoftwareTypeRep a
 
