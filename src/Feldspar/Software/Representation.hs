@@ -22,7 +22,8 @@ import Control.Monad.Trans
 
 import Data.Int
 import Data.List (genericTake)
-import Data.Typeable
+import Data.Typeable (Typeable)
+import Data.Proxy
 import Data.Struct
 
 import Language.Syntactic hiding (Syntactic(..), SyntacticN(..), SmartFun, sugarSymDecor)
@@ -85,40 +86,28 @@ instance Syntactic (Data a)
     sugar   = Data
 
 --------------------------------------------------------------------------------
-{-
-sugarSymDecorSoft
-    :: ( Signature sig
-       , fi             ~ S.SmartFun   SoftwareDomain sig
-       , sig            ~ S.SmartSig fi
-       , SoftwareDomain ~ S.SmartSym fi
-       , sub :<: SoftwareConstructs
-       , S.SyntacticN f fi
-         
-       , f ~ SmartFunFull SoftwareDomain sig
-       )
-    => SoftTypeRepF (S.DenResult sig) -> sub sig -> f
-sugarSymDecorSoft i = S.sugarSymDecor i
 
 sugarSymSoft
-  :: forall sig sub f fi hi
-  .  ( Signature sig
+  :: ( -- its an OK signature
+       Signature sig
+       -- internal (hi) of internal (fi) is a function over `ASTF`.
      , hi             ~ S.SmartFun SoftwareDomain sig
      , S.SmartSig fi  ~ S.SmartSig hi
      , S.SmartSym fi  ~ S.SmartSym hi
      , S.SyntacticN fi hi
-     , fi             ~ SmartFunFull SoftwareDomain sig
+       -- internal (fi) of our function (f) is a function over `ASTFull`.
+     , fi             ~ SmartFull SoftwareDomain sig
      , sig            ~ S.SmartSig fi
      , SoftwareDomain ~ S.SmartSym fi
-     , SyntacticN f fi       
-     , sub :<: SoftwareConstructs       
-     , SoftwareRepType (S.DenResult sig)
+     , SyntacticN f fi
+       -- lifted symbol is part of our set software symbols.
+     , sub :<: SoftwareConstructs
+       -- its type is representable in our set of software types.
+     , Type (ASTFull SoftwareDomain) (S.DenResult sig)
      )
   => sub sig -> f
-sugarSymSoft = sugarN . sugarSymDecorSoft info
-  where
-    info :: SoftTypeRepF (S.DenResult sig)
-    info = ValT softRep
--}
+sugarSymSoft = sugarN . sugarSymDecor (ValT $ typeRep (Proxy :: Proxy (ASTFull SoftwareDomain)))
+
 --------------------------------------------------------------------------------
 {-
 sugarSymDecorSoftPrim
