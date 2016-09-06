@@ -49,13 +49,19 @@ data TypeRepF pred rep a
 
 --------------------------------------------------------------------------------
 
-class (Eq (Internal a), Show (Internal a), Typeable (Internal a)) => Type a
-  where
-    -- | Reify a type.
-    typeRep :: Proxy a -> TypeRep (PredOf (Constructor a)) (RepOf (Constructor a)) (Internal a)
-
 -- | ...
 type family RepOf (exp :: * -> *) :: * -> *
+
+-- | ...
+class ( Eq (Internal a), Show (Internal a), Typeable (Internal a))
+    => Type a
+  where
+    -- | Reify a type.
+    typeRep :: Proxy a
+      -> TypeRep
+           (PredOf (Constructor a))
+           (RepOf  (Constructor a))
+           (Internal a)
 
 --------------------------------------------------------------------------------
 
