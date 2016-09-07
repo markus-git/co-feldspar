@@ -78,8 +78,8 @@ primitiveTypeWit Word8T = Dict
 -- | Primitive symbols.
 data Primitive sig
   where
-    Var ::                   String -> Primitive (Full a)
-    Lit :: (Show a, Eq a) => a      -> Primitive (Full a)
+    FreeVar :: String -> Primitive (Full a)
+    Lit     :: (Show a, Eq a) => a -> Primitive (Full a)
     -- ^ numerical operations.
     Neg :: Num a => Primitive (a :-> Full a)
     Add :: Num a => Primitive (a :-> a :-> Full a)
@@ -104,8 +104,8 @@ deriving instance Typeable (Primitive a)
 
 instance Eval Primitive
   where
-    evalSym (Var v) = error $ "evaluating free variable " ++ show v
-    evalSym (Lit a) = a
+    evalSym (FreeVar v) = error $ "evaluating free variable " ++ show v
+    evalSym (Lit a)     = a
     evalSym Neg = negate
     evalSym Add = (+)
     evalSym Sub = (-)
@@ -119,8 +119,8 @@ instance Eval Primitive
 
 instance Symbol Primitive
   where
-    symSig (Var v) = signature
-    symSig (Lit a) = signature
+    symSig (FreeVar v) = signature
+    symSig (Lit a)     = signature
     symSig Neg     = signature
     symSig Add     = signature
     symSig Sub     = signature

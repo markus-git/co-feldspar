@@ -5,6 +5,8 @@
 
 module Data.Struct where
 
+import Control.Monad.Identity
+
 --------------------------------------------------------------------------------
 -- * Representation.
 --------------------------------------------------------------------------------
@@ -14,6 +16,40 @@ data Struct pred con a
   where
     Node   :: pred a => con a -> Struct pred con a
     Branch :: Struct pred con a -> Struct pred con b -> Struct pred con (a, b)
+
+extractNode :: pred a => Struct pred con a -> con a
+extractNode (Node a) = a
+
+--------------------------------------------------------------------------------
+
+toStruct :: Struct pred con a -> a -> Struct pred Identity a
+toStruct rep = go rep . Identity
+  where
+    go :: Struct pred con a -> Identity a -> Struct pred Identity a
+    go (Node _) i = Node i
+    go (Branch u v) (Identity (a, b)) = Branch (go u (Identity a)) (go v (Identity b))
+
+listStruct :: forall pred cont b c . (forall y . pred y => cont y -> c) -> Struct pred cont b -> [c]
+listStruct f = go
+  where
+    go :: Struct pred cont a -> [c]
+    go (Node a)     = [f a]
+    go (Branch u v) = go u ++ go v
+
+liftStruct
+  :: (pred a, pred b)
+  => (con a -> con b)
+  -> Struct pred con a
+  -> Struct pred con b
+liftStruct f (Node a) = Node (f a)
+
+liftStruct2
+  :: (pred a, pred b, pred c)
+  => (con a -> con b -> con c)
+  -> Struct pred con a
+  -> Struct pred con b
+  -> Struct pred con c
+liftStruct2 f (Node a) (Node b) = Node (f a b)
 
 --------------------------------------------------------------------------------
 -- ** Operations

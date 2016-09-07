@@ -11,22 +11,20 @@
 
 module Feldspar.Software.Representation where
 
-import Feldspar.Primitive
 import Feldspar.Representation
 import Feldspar.Frontend
 import Feldspar.Sugar
+import Data.Struct
 import Data.Inhabited
 
 import Feldspar.Software.Primitive
-
-import Control.Monad.Trans
 
 import Data.Int
 import Data.Word
 import Data.List (genericTake)
 import Data.Typeable (Typeable)
 import Data.Proxy
-import Data.Struct
+import Data.Constraint
 
 import Language.Syntactic hiding (Syntactic(..), SyntacticN(..), SmartFun, sugarSymDecor)
 import Language.Syntactic.Functional
@@ -34,6 +32,7 @@ import Language.Syntactic.Functional.Tuple
 
 import qualified Control.Monad.Operational.Higher as Oper
 
+import qualified Language.Embedded.Expression as Imp
 import qualified Language.Embedded.Imperative as Imp
 
 import qualified Language.Syntactic as S
@@ -47,6 +46,30 @@ type instance RepOf Data = SoftwareTypeRep
 instance Type Data Bool  where typeRep _ = Node softwareRep
 instance Type Data Int8  where typeRep _ = Node softwareRep
 instance Type Data Word8 where typeRep _ = Node softwareRep
+
+--------------------------------------------------------------------------------
+
+class    (Type Data a, SoftwarePrimType a) => SoftwareType a
+instance (Type Data a, SoftwarePrimType a) => SoftwareType a
+
+--------------------------------------------------------------------------------
+
+type STypeRep  = TypeRep  SoftwarePrimType SoftwareTypeRep
+
+type STypeRepF = TypeRepF SoftwarePrimType SoftwareTypeRep
+
+--------------------------------------------------------------------------------
+
+sTypeEq :: STypeRep a -> STypeRep b -> Maybe (Dict (a ~ b))
+sTypeEq (Node t)       (Node u) = sPrimTypeEq t u
+sTypeEq (Branch t1 u1) (Branch t2 u2) = do
+  Dict <- sTypeEq t1 t2
+  Dict <- sTypeEq u1 u2
+  return Dict
+sTypeEq _ _ = Nothing
+
+sTypeRep :: Struct SoftwarePrimType c a -> STypeRep a
+sTypeRep = mapStruct (const softwareRep)
 
 --------------------------------------------------------------------------------
 -- * ... expressions ...
@@ -111,14 +134,6 @@ sugarSymSoft
 sugarSymSoft = sugarN . sugarSymDecor (ValT $ Node $ softwareRep)
 
 --------------------------------------------------------------------------------
-
-instance NUM Data where
-  plus   = sugarSymSoft Add
-  minus  = sugarSymSoft Sub
-  times  = sugarSymSoft Mul
-  negate = sugarSymSoft Neg
-
---------------------------------------------------------------------------------
 -- * ...
 --------------------------------------------------------------------------------
 
@@ -126,7 +141,7 @@ instance NUM Data where
 type SoftwareCMD = CoCMD Oper.:+: Imp.FileCMD
 
 -- | Monad for building software programs in Feldspar.
-newtype Software a = Software { runSoftware ::
+newtype Software a = Software { unSoftware ::
     Oper.ProgramT SoftwareCMD (Oper.Param2 Data SoftwarePrimType)
       (Oper.Program CoCMD (Oper.Param2 Data SoftwarePrimType))
       a
@@ -134,16 +149,11 @@ newtype Software a = Software { runSoftware ::
 
 --------------------------------------------------------------------------------
 
-instance MonadComp Software
+instance Imp.FreeExp Data
   where
-    type Expr Software = Data
-    type Pred Software = SoftwarePrimType
-
-    liftComp = Software . lift
-
---------------------------------------------------------------------------------
-
--- ...
+    type FreePred Data = SoftwarePrimType
+    constExp = sugarSymSoft . Lit
+    varExp   = sugarSymSoft . FreeVar
 
 --------------------------------------------------------------------------------
 -- ... syntactic isntances ...
