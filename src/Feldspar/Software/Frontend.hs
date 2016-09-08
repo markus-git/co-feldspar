@@ -3,9 +3,7 @@
 
 module Feldspar.Software.Frontend where
 
-import Feldspar.Primitive
 import Feldspar.Frontend
-
 import Feldspar.Software.Primitive
 import Feldspar.Software.Representation
 

@@ -19,7 +19,15 @@ library
   exposed-modules:
     Feldspar,
     Feldspar.Primitive,
-    Data.Struct
+    Feldspar.Representation,
+    Feldspar.Frontend,
+    Feldspar.Software.Primitive,
+    Feldspar.Software.Primitive.Backend,
+    Feldspar.Software.Representation,
+    Feldspar.Software.Frontend,
+    Feldspar.Software.Compile,
+    Data.Struct,
+    Data.Inhabited
     
   -- other-modules:       
   -- other-extensions:    
