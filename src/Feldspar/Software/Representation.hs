@@ -26,6 +26,8 @@ import Data.Typeable (Typeable)
 import Data.Proxy
 import Data.Constraint
 
+import Control.Monad.Trans
+
 import Language.Syntactic as S
 import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
@@ -48,6 +50,17 @@ newtype Software a = Software { unSoftware ::
       (Program CompCMD (Param2 Data SoftwarePrimType))
         a
   } deriving (Functor, Applicative, Monad)
+
+
+--------------------------------------------------------------------------------
+
+instance MonadComp Software
+  where
+    type Expr Software = Data
+    type Pred Software = SoftwarePrimType
+    type TRep Software = SoftwarePrimTypeRep
+
+    liftComp = Software . lift
 
 --------------------------------------------------------------------------------
 -- * Expression.

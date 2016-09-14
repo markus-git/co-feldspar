@@ -22,7 +22,7 @@ import Language.C.Monad
 import Language.Embedded.Backend.C
 
 --------------------------------------------------------------------------------
--- * ...
+-- * Compilation of software primitives.
 --------------------------------------------------------------------------------
 
 viewLitPrim :: ASTF SoftwarePrimDomain a -> Maybe a

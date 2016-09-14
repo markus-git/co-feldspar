@@ -27,6 +27,20 @@ import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 -- * Expressions.
 --------------------------------------------------------------------------------
 
+type family   TypeOf (expr :: * -> *) :: * -> Constraint
+--   instance TypeOf Data = SoftwareType
+
+--------------------------------------------------------------------------------
+
+class NUM expr
+  where
+    plus    :: (TypeOf expr a, Num a) => expr a -> expr a -> expr a
+    minus   :: (TypeOf expr a, Num a) => expr a -> expr a -> expr a
+    times   :: (TypeOf expr a, Num a) => expr a -> expr a -> expr a
+    negate  :: (TypeOf expr a, Num a) => expr a -> expr a
+
+--------------------------------------------------------------------------------
+
 -- ...
 
 --------------------------------------------------------------------------------

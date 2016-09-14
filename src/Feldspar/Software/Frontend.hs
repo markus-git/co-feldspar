@@ -3,44 +3,50 @@
 
 module Feldspar.Software.Frontend where
 
+import Feldspar.Representation
 import Feldspar.Frontend
+
 import Feldspar.Software.Primitive
 import Feldspar.Software.Representation
 
 import Data.Struct
 
-import Control.Monad.Trans
-
 import qualified Control.Monad.Operational.Higher as Oper
 
+-- imperative-edsl.
 import Language.Embedded.Imperative.Frontend.General hiding (Ref, Arr, IArr)
 import qualified Language.Embedded.Imperative     as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
 
---------------------------------------------------------------------------------
--- * ...
---------------------------------------------------------------------------------
-
-instance NUM Data where
-  plus   = sugarSymSoft Add
-  minus  = sugarSymSoft Sub
-  times  = sugarSymSoft Mul
-  negate = sugarSymSoft Neg
+-- syntactic.
+import Language.Syntactic
 
 --------------------------------------------------------------------------------
--- * ...
+-- * Software expressions.
 --------------------------------------------------------------------------------
 
-instance MonadComp Software
+type instance TypeOf Data = SoftwareType
+
+--------------------------------------------------------------------------------
+
+value :: Syntax a => Internal a -> a
+value = sugarSymSoftware Lit
+
+--------------------------------------------------------------------------------
+
+instance NUM Data
   where
-    type Expr Software = Data
-    type Pred Software = SoftwarePrimType
+    plus    = sugarSymSoftware Add
+    minus   = sugarSymSoftware Sub
+    times   = sugarSymSoftware Mul
+    negate  = sugarSymSoftware Neg
 
-    liftComp = Software . lift
+--------------------------------------------------------------------------------
+-- * Software instructions.
+--------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 -- * File handling.
-
 
 -- | Open a file
 fopen :: FilePath -> IOMode -> Software Handle
@@ -68,6 +74,7 @@ fget :: (Formattable a, SoftwareType a) => Handle -> Software (Data a)
 fget = Software . Imp.fget
 
 --------------------------------------------------------------------------------
+-- * Printing.
 
 class PrintfType r
   where
