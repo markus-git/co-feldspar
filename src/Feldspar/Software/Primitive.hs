@@ -33,34 +33,34 @@ import Language.Embedded.Expression
 -- * Software Types.
 --------------------------------------------------------------------------------
 
-data SoftwareTypeRep a
+data SoftwarePrimTypeRep a
   where
     -- booleans
-    BoolST   :: SoftwareTypeRep Bool
+    BoolST   :: SoftwarePrimTypeRep Bool
     -- signed numbers.
-    Int8ST   :: SoftwareTypeRep Int8
---  Int16ST  :: SoftwareTypeRep Int16
---  Int32ST  :: SoftwareTypeRep Int32
---  Int64ST  :: SoftwareTypeRep Int64
+    Int8ST   :: SoftwarePrimTypeRep Int8
+--  Int16ST  :: SoftwarePrimTypeRep Int16
+--  Int32ST  :: SoftwarePrimTypeRep Int32
+--  Int64ST  :: SoftwarePrimTypeRep Int64
     -- unsigned numbers.
-    Word8ST  :: SoftwareTypeRep Word8
---  Word16ST :: SoftwareTypeRep Word16
---  Word32ST :: SoftwareTypeRep Word32
---  Word64ST :: SoftwareTypeRep Word64
+    Word8ST  :: SoftwarePrimTypeRep Word8
+--  Word16ST :: SoftwarePrimTypeRep Word16
+--  Word32ST :: SoftwarePrimTypeRep Word32
+--  Word64ST :: SoftwarePrimTypeRep Word64
     -- floating point numbers.
-    FloatST  :: SoftwareTypeRep Float
---  DoulbeST :: SoftwareTypeRep Double
+    FloatST  :: SoftwarePrimTypeRep Float
+--  DoulbeST :: SoftwarePrimTypeRep Double
 
-deriving instance Eq       (SoftwareTypeRep a)
-deriving instance Show     (SoftwareTypeRep a)
-deriving instance Typeable (SoftwareTypeRep a)
+deriving instance Eq       (SoftwarePrimTypeRep a)
+deriving instance Show     (SoftwarePrimTypeRep a)
+deriving instance Typeable (SoftwarePrimTypeRep a)
 
 --------------------------------------------------------------------------------
 
 -- | Class of supported software types.
 class (Eq a, Show a, Typeable a, Inhabited a) => SoftwarePrimType a
   where
-    softwareRep :: SoftwareTypeRep a
+    softwareRep :: SoftwarePrimTypeRep a
 
 instance SoftwarePrimType Bool  where softwareRep = BoolST
 instance SoftwarePrimType Int8  where softwareRep = Int8ST
@@ -69,17 +69,17 @@ instance SoftwarePrimType Float where softwareRep = FloatST
 
 --------------------------------------------------------------------------------
 
-sPrimTypeEq :: SoftwareTypeRep a -> SoftwareTypeRep b -> Maybe (Dict (a ~ b))
+sPrimTypeEq :: SoftwarePrimTypeRep a -> SoftwarePrimTypeRep b -> Maybe (Dict (a ~ b))
 sPrimTypeEq (BoolST)  (BoolST)  = Just Dict
 sPrimTypeEq (Int8ST)  (Int8ST)  = Just Dict
 sPrimTypeEq (Word8ST) (Word8ST) = Just Dict
 sPrimTypeEq (FloatST) (FloatST) = Just Dict
 sPrimTypeEq _         _         = Nothing
 
-sPrimTypeOf :: SoftwarePrimType a => a -> SoftwareTypeRep a
+sPrimTypeOf :: SoftwarePrimType a => a -> SoftwarePrimTypeRep a
 sPrimTypeOf _ = softwareRep
 
-sPrimWitType :: SoftwareTypeRep a -> Dict (SoftwarePrimType a)
+sPrimWitType :: SoftwarePrimTypeRep a -> Dict (SoftwarePrimType a)
 sPrimWitType BoolST  = Dict
 sPrimWitType Int8ST  = Dict
 sPrimWitType Word8ST = Dict
@@ -90,77 +90,86 @@ sPrimWitType FloatST = Dict
 --------------------------------------------------------------------------------
 
 -- | Software primitive symbols.
-data SoftwarePrimitive sig
+data SoftwarePrim sig
   where
-    FreeVar :: (SoftwarePrimType a)               => String -> SoftwarePrimitive (Full a)
-    Lit     :: (SoftwarePrimType a, Show a, Eq a) => a -> SoftwarePrimitive (Full a)
+    FreeVar :: (SoftwarePrimType a)               => String -> SoftwarePrim (Full a)
+    Lit     :: (SoftwarePrimType a, Show a, Eq a) => a      -> SoftwarePrim (Full a)
     -- ^ numerical operations.
-    Neg :: (SoftwarePrimType a, Num a) => SoftwarePrimitive (a :-> Full a)
-    Add :: (SoftwarePrimType a, Num a) => SoftwarePrimitive (a :-> a :-> Full a)
-    Sub :: (SoftwarePrimType a, Num a) => SoftwarePrimitive (a :-> a :-> Full a)
-    Mul :: (SoftwarePrimType a, Num a) => SoftwarePrimitive (a :-> a :-> Full a)
+    Neg     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> Full a)
+    Add     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> a :-> Full a)
+    Sub     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> a :-> Full a)
+    Mul     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> a :-> Full a)
     -- ^ integral operations.
-    Div :: (SoftwarePrimType a, Integral a) => SoftwarePrimitive (a :-> a :-> Full a)
-    Mod :: (SoftwarePrimType a, Integral a) => SoftwarePrimitive (a :-> a :-> Full a)
+    Div     :: (SoftwarePrimType a, Integral a)   => SoftwarePrim (a :-> a :-> Full a)
+    Mod     :: (SoftwarePrimType a, Integral a)   => SoftwarePrim (a :-> a :-> Full a)
     -- ^ logical operations.
-    Not :: SoftwarePrimitive (Bool :-> Full Bool)
-    And :: SoftwarePrimitive (Bool :-> Bool :-> Full Bool)
+    Not     ::                                       SoftwarePrim (Bool :-> Full Bool)
+    And     ::                                       SoftwarePrim (Bool :-> Bool :-> Full Bool)
     -- ^ relational operations.
-    Eq  :: (SoftwarePrimType a, Eq a)  => SoftwarePrimitive (a :-> a :-> Full Bool)
-    Lt  :: (SoftwarePrimType a, Ord a) => SoftwarePrimitive (a :-> a :-> Full Bool)
+    Eq      :: (SoftwarePrimType a, Eq a)         => SoftwarePrim (a :-> a :-> Full Bool)
+    Lt      :: (SoftwarePrimType a, Ord a)        => SoftwarePrim (a :-> a :-> Full Bool)
     -- ^ geometrical operators.
-    Sin :: (SoftwarePrimType a, Floating a) => SoftwarePrimitive (a :-> Full a)
-    Cos :: (SoftwarePrimType a, Floating a) => SoftwarePrimitive (a :-> Full a)
-    Tan :: (SoftwarePrimType a, Floating a) => SoftwarePrimitive (a :-> Full a)
+    Sin     :: (SoftwarePrimType a, Floating a)   => SoftwarePrim (a :-> Full a)
+    Cos     :: (SoftwarePrimType a, Floating a)   => SoftwarePrim (a :-> Full a)
+    Tan     :: (SoftwarePrimType a, Floating a)   => SoftwarePrim (a :-> Full a)
 
-deriving instance Eq       (SoftwarePrimitive a)
-deriving instance Show     (SoftwarePrimitive a)
-deriving instance Typeable (SoftwarePrimitive a)
+deriving instance Eq       (SoftwarePrim a)
+deriving instance Show     (SoftwarePrim a)
+deriving instance Typeable (SoftwarePrim a)
 
 --------------------------------------------------------------------------------
 
 -- | Software primitive symbols.
-type SoftwarePrimitiveConstructs = SoftwarePrimitive
+type SoftwarePrimConstructs = SoftwarePrim
 
 -- | Software primitive symbols tagged with their type representation.
-type SoftwarePrimitiveDomain = SoftwarePrimitiveConstructs :&: SoftwareTypeRep
+type SoftwarePrimDomain = SoftwarePrimConstructs :&: SoftwarePrimTypeRep
 
 -- | Software primitive expressions.
-newtype Prim a = Prim { unPrim :: ASTF SoftwarePrimitiveDomain a }
+newtype Prim a = Prim { unPrim :: ASTF SoftwarePrimDomain a }
 
 --------------------------------------------------------------------------------
 
 evalPrim :: Prim a -> a
 evalPrim = go . unPrim
   where
-    go :: AST SoftwarePrimitiveDomain sig -> Denotation sig
+    go :: AST SoftwarePrimDomain sig -> Denotation sig
     go (Sym (s :&: _)) = evalSym s
     go (f :$ a)        = go f $ go a
 
 --------------------------------------------------------------------------------
--- ** ...
 
 instance Syntactic (Prim a)
   where
-    type Domain   (Prim a) = SoftwarePrimitiveDomain
+    type Domain   (Prim a) = SoftwarePrimDomain
     type Internal (Prim a) = a
     desugar = unPrim
     sugar   = Prim
-
---------------------------------------------------------------------------------
 
 sugarSymPrim
   :: ( Signature sig
      , fi  ~ SmartFun dom sig
      , sig ~ SmartSig fi
      , dom ~ SmartSym fi
-     , dom ~ SoftwarePrimitiveDomain
+     , dom ~ SoftwarePrimDomain
      , SyntacticN f fi
-     , sub :<: SoftwarePrimitiveConstructs
+     , sub :<: SoftwarePrimConstructs
      , SoftwarePrimType (DenResult sig)
      )
   => sub sig -> f
 sugarSymPrim = sugarSymDecor softwareRep
+
+--------------------------------------------------------------------------------
+
+instance FreeExp Prim
+  where
+    type FreePred Prim = SoftwarePrimType
+    constExp = sugarSymPrim . Lit
+    varExp   = sugarSymPrim . FreeVar
+
+instance EvalExp Prim
+  where
+    evalExp = evalPrim
 
 --------------------------------------------------------------------------------
 
@@ -177,7 +186,7 @@ instance (SoftwarePrimType a, Num a) => Num (Prim a)
 --------------------------------------------------------------------------------
 -- syntactic instances.
 
-instance Eval SoftwarePrimitive
+instance Eval SoftwarePrim
   where
     evalSym (FreeVar v) = error $ "evaluating free variable " ++ show v
     evalSym (Lit a)     = a
@@ -195,7 +204,7 @@ instance Eval SoftwarePrimitive
     evalSym Cos         = cos
     evalSym Tan         = tan
 
-instance Symbol SoftwarePrimitive
+instance Symbol SoftwarePrim
   where
     symSig (FreeVar v) = signature
     symSig (Lit a)     = signature
@@ -213,28 +222,16 @@ instance Symbol SoftwarePrimitive
     symSig Cos         = signature
     symSig Tan         = signature
 
-instance Render SoftwarePrimitive
+instance Render SoftwarePrim
   where
     renderSym  = show
     renderArgs = renderArgsSmart
 
-instance Equality SoftwarePrimitive
+instance Equality SoftwarePrim
   where
     equal s1 s2 = show s1 == show s2
 
-instance StringTree SoftwarePrimitive
-instance EvalEnv SoftwarePrimitive env
-
---------------------------------------------------------------------------------
-
-instance FreeExp Prim
-  where
-    type FreePred Prim = SoftwarePrimType
-    constExp = sugarSymPrim . Lit
-    varExp   = sugarSymPrim . FreeVar
-
-instance EvalExp Prim
-  where
-    evalExp = evalPrim
+instance StringTree SoftwarePrim
+instance EvalEnv SoftwarePrim env
 
 --------------------------------------------------------------------------------

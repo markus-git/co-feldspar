@@ -38,28 +38,47 @@ import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Syntactic as S
 
 --------------------------------------------------------------------------------
--- * ... types ...
+-- * Types.
 --------------------------------------------------------------------------------
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--------------------------------------------------------------------------------
+-- * ... types ...
+--------------------------------------------------------------------------------
+{-
 type instance RepOf Data = SoftwareTypeRep
 
 instance Type Data Bool  where typeRep _ = Node softwareRep
 instance Type Data Int8  where typeRep _ = Node softwareRep
 instance Type Data Word8 where typeRep _ = Node softwareRep
-
+-}
 --------------------------------------------------------------------------------
-
+{-
 class    (Type Data a, SoftwarePrimType a) => SoftwareType a
 instance (Type Data a, SoftwarePrimType a) => SoftwareType a
-
+-}
 --------------------------------------------------------------------------------
-
+{-
 type STypeRep  = TypeRep  SoftwarePrimType SoftwareTypeRep
 
 type STypeRepF = TypeRepF SoftwarePrimType SoftwareTypeRep
-
+-}
 --------------------------------------------------------------------------------
-
+{-
 sTypeEq :: STypeRep a -> STypeRep b -> Maybe (Dict (a ~ b))
 sTypeEq (Node t)       (Node u) = sPrimTypeEq t u
 sTypeEq (Branch t1 u1) (Branch t2 u2) = do
@@ -70,11 +89,11 @@ sTypeEq _ _ = Nothing
 
 sTypeRep :: Struct SoftwarePrimType c a -> STypeRep a
 sTypeRep = mapStruct (const softwareRep)
-
+-}
 --------------------------------------------------------------------------------
 -- * ... expressions ...
 --------------------------------------------------------------------------------
-
+{-
 type Length = Int8
 type Index  = Int8
 
@@ -87,9 +106,9 @@ data ForLoop sig
 deriving instance Eq       (ForLoop a)
 deriving instance Show     (ForLoop a)
 deriving instance Typeable (ForLoop a)
-
+-}
 --------------------------------------------------------------------------------
-
+{-
 -- | Software symbols.
 type SoftwareConstructs = ForLoop :+: SoftwarePrimitiveConstructs
 
@@ -98,9 +117,9 @@ type SoftwareDomain = SoftwareConstructs :&: TypeRepF SoftwarePrimType SoftwareT
 
 -- | Software expressions.
 newtype Data a = Data { unData :: ASTFull SoftwareDomain a }
-
+-}
 --------------------------------------------------------------------------------
-
+{-
 type instance PredOf Data = SoftwarePrimType
 
 instance Syntactic (Data a)
@@ -109,9 +128,9 @@ instance Syntactic (Data a)
     type Internal    (Data a) = a
     desugar = unData
     sugar   = Data
-
+-}
 --------------------------------------------------------------------------------
-
+{-
 sugarSymSoft
   :: ( -- its an OK signature
        Signature sig
@@ -132,11 +151,11 @@ sugarSymSoft
      )
   => sub sig -> f
 sugarSymSoft = sugarN . sugarSymDecor (ValT $ Node $ softwareRep)
-
+-}
 --------------------------------------------------------------------------------
 -- * ...
 --------------------------------------------------------------------------------
-
+{-
 -- | ...
 type SoftwareCMD = CoCMD Oper.:+: Imp.FileCMD
 
@@ -146,19 +165,19 @@ newtype Software a = Software { unSoftware ::
       (Oper.Program CoCMD (Oper.Param2 Data SoftwarePrimType))
       a
   } deriving (Functor, Applicative, Monad)
-
+-}
 --------------------------------------------------------------------------------
-
+{-
 instance Imp.FreeExp Data
   where
     type FreePred Data = SoftwarePrimType
     constExp = sugarSymSoft . Lit
     varExp   = sugarSymSoft . FreeVar
-
+-}
 --------------------------------------------------------------------------------
 -- ... syntactic isntances ...
 --------------------------------------------------------------------------------
-
+{-
 instance Eval ForLoop
   where
     evalSym ForLoop = \len init body ->
@@ -176,5 +195,5 @@ instance Render ForLoop
 instance EvalEnv ForLoop env
 
 instance StringTree ForLoop
-
+-}
 --------------------------------------------------------------------------------

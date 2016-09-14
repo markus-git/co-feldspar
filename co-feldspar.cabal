@@ -18,7 +18,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:
     Feldspar,
-    Feldspar.Primitive,
+--  Feldspar.Primitive,
     Feldspar.Representation,
     Feldspar.Frontend,
     Feldspar.Software.Primitive,

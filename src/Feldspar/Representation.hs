@@ -8,10 +8,10 @@
 {-# language Rank2Types #-}
 {-# language ConstraintKinds #-}
 
+{-# language ScopedTypeVariables #-}
+
 module Feldspar.Representation where
 
-import Feldspar.Primitive
-import Feldspar.Sugar
 import Data.Struct
 import Data.Inhabited
 
@@ -20,11 +20,11 @@ import Data.Int (Int8)
 import Data.List (genericTake)
 import Data.Typeable hiding (typeRep, TypeRep)
 
-import Language.Syntactic hiding (Syntactic(..), SyntacticN(..))
+import Language.Syntactic hiding ((:+:))
 import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
 
-import qualified Control.Monad.Operational.Higher as Oper (Program, Param2, (:+:))
+import Control.Monad.Operational.Higher (Program, Param2, (:+:))
 
 -- imperative-edslJust True
 import qualified Language.Embedded.Imperative.CMD as Imp (Ref, RefCMD, ControlCMD)
@@ -34,7 +34,59 @@ import qualified Language.Embedded.Expression     as Imp
 -- ...
 
 --------------------------------------------------------------------------------
--- * ...
+-- * Programs.
+--------------------------------------------------------------------------------
+
+type Prog expr pred = Program CompCMD (Param2 expr pred)
+
+-- | Class of monads that support lifting of computational programs.
+class Monad m => MonadComp m
+  where
+    -- | Expressions.
+    type Expr m :: * -> *
+    -- | Predicate.
+    type Pred m :: * -> Constraint
+    -- | Representation of types.
+    type TRep m :: * -> *
+
+    -- | lift a computational progams.
+    liftComp :: Prog (Expr m) (Pred m) a -> m a
+
+--------------------------------------------------------------------------------
+
+-- | Instructions of a purely computational nature.
+type CompCMD = Imp.RefCMD :+: Imp.ControlCMD
+
+-- | Mutable references.
+newtype Ref a = Ref { unRef :: Struct (PredOf (Domain a)) Imp.Ref (Internal a) }
+
+--------------------------------------------------------------------------------
+-- * Expressions.
+--------------------------------------------------------------------------------
+
+type family   ExprOf (dom :: * -> *) :: * -> *
+--   instance ExprOf SDomain = SData
+
+type family   PredOf (dom :: * -> *) :: * -> Constraint
+--   instance PredOf SDomain = SType
+
+type family   TRepOf (dom :: * -> *) :: * -> *
+--   instance TRepOf SDomain = SRep
+
+--------------------------------------------------------------------------------
+
+construct :: Syntax a => a -> Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a)
+construct = resugar
+
+destruct  :: Syntax a => Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a) -> a
+destruct  = resugar
+
+--------------------------------------------------------------------------------
+
+-- ...
+
+--------------------------------------------------------------------------------
+-- * Types.
 --------------------------------------------------------------------------------
 
 -- | Representation of supported feldspar types as typed binary trees over
@@ -50,74 +102,40 @@ data TypeRepF pred rep a
 
 --------------------------------------------------------------------------------
 
--- | ...
-type family RepOf (exp :: * -> *) :: * -> *
-
--- | Class of representable types.
-class (Eq a, Show a, Typeable a, Inhabited a) => Type exp a
+class (Eq a, Show a, Typeable a, Inhabited a) => Type dom a
   where
-    -- | Reify a type.
-    typeRep :: Proxy exp -> TypeRep (PredOf exp) (RepOf exp) a
+    typeRep :: Proxy dom -> TypeRep (PredOf dom) (TRepOf dom) a
 
-instance (Type exp a, Type exp b) => Type exp (a, b)
+--------------------------------------------------------------------------------
+
+class TypeDict dom
   where
-    typeRep p = Branch (typeRep p) (typeRep p)
+    withType :: Proxy dom -> Proxy a -> (Imp.FreePred (ExprOf dom) a => b) -> (PredOf dom a => b)
 
 --------------------------------------------------------------------------------
 
--- | Alias for the conjunction of `Syntactic` and `Type`.
-type Syntax a = (Syntactic a, Type (Constructor a) (Internal a))
-
---------------------------------------------------------------------------------
-{-
-asTypeRep :: Struct pred rep a -> TypeRep pred rep a
-asTypeRep = mapStruct (const primitiveRep)
-
-typeEq :: TypeRep pred rep a -> TypeRep pred rep b -> Maybe (Dict (a ~ b))
-typeEq (Node u)       (Node v)       = undefined
-typeEq (Branch l1 r1) (Branch l2 r2) = do
-  Dict <- typeEq l1 l2
-  Dict <- typeEq r1 r2
-  return Dict
-typeEq _ _ = Nothing
-
-typeEqF :: TypeRepF a -> TypeRepF b -> Maybe (Dict (a ~ b))
-typeEqF (ValT u)     (ValT v)     = typeEq u v
-typeEqF (FunT l1 r1) (FunT l2 r2) = do
-  Dict <- typeEq  l1 l2
-  Dict <- typeEqF r1 r2
-  return Dict
-typeEqF _ _ = Nothing
-
-typeableWit :: TypeRep a -> Dict (Typeable a)
-typeableWit (Node u)
-  | Dict <- primitiveTypeWit u = Dict
-typeableWit (Branch l r)
-  | Dict <- typeableWit l
-  , Dict <- typeableWit r
-  = Dict
--}
---------------------------------------------------------------------------------
--- * ... todo ...
---------------------------------------------------------------------------------
-
--- | Mutable variable.
-newtype Ref a = Ref { unRef :: Struct (PredOf (Constructor a)) Imp.Ref (Internal a) }
+class ( -- `a` is sugared.
+        Syntactic a
+        -- `a` can be resugared into a `Struct`.
+      , Syntactic (Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a))
+      , Domain    (Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a)) ~ Domain a
+      , Internal  (Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a)) ~ Internal a
+        -- type of `a` is representable.
+      , Type (Domain a) (Internal a)
+      )
+  => Syntax a
 
 --------------------------------------------------------------------------------
 
--- | ...
-type CoCMD = Imp.RefCMD Oper.:+: Imp.ControlCMD
-
---------------------------------------------------------------------------------
-
--- | ...
-class PrimDict expr
-  where
-    withPrim
-      :: Proxy expr
-      -> Proxy a
-      -> (Imp.FreePred expr a => b)
-      -> (PredOf expr a => b)
+class ( -- `a` can be resugared into a struct and has a representable type.
+        Syntax a
+        -- expression and predicate types associated with `a` is the same as those for `m`.
+      , ExprOf (Domain a) ~ Expr m
+      , PredOf (Domain a) ~ Pred m        
+        -- type of `a` subsumes `FreePred`.
+      , TypeDict (Domain a)
+      , Imp.FreeExp (Expr m)
+      )
+  => CoType m a
 
 --------------------------------------------------------------------------------

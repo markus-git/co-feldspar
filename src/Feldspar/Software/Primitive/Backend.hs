@@ -25,7 +25,7 @@ import Language.Embedded.Backend.C
 -- * ...
 --------------------------------------------------------------------------------
 
-viewLitPrim :: ASTF SoftwarePrimitiveDomain a -> Maybe a
+viewLitPrim :: ASTF SoftwarePrimDomain a -> Maybe a
 viewLitPrim (Sym (Lit a :&: _)) = Just a
 viewLitPrim _                   = Nothing
 
@@ -33,7 +33,7 @@ viewLitPrim _                   = Nothing
 
 instance CompTypeClass SoftwarePrimType
   where
-    compType _ (_ :: proxy a) = case softwareRep :: SoftwareTypeRep a of
+    compType _ (_ :: proxy a) = case softwareRep :: SoftwarePrimTypeRep a of
       BoolST  -> addInclude "<stdbool.h>" >> return [cty| typename bool |]
       Int8ST  -> addInclude "<stdint.h>"  >> return [cty| typename int8_t |]
       Word8ST -> addInclude "<stdint.h>"  >> return [cty| typename uint8_t |]
@@ -58,7 +58,7 @@ instance CompExp Prim
 compUnOp
   :: MonadC m
   => C.UnOp
-  -> ASTF SoftwarePrimitiveDomain a
+  -> ASTF SoftwarePrimDomain a
   -> m C.Exp
 compUnOp op a = do
   a' <- compPrim $ Prim a
@@ -67,8 +67,8 @@ compUnOp op a = do
 compBinOp
   :: MonadC m
   => C.BinOp
-  -> ASTF SoftwarePrimitiveDomain a
-  -> ASTF SoftwarePrimitiveDomain b
+  -> ASTF SoftwarePrimDomain a
+  -> ASTF SoftwarePrimDomain b
   -> m C.Exp
 compBinOp op a b = do
   a' <- compPrim $ Prim a
@@ -78,7 +78,7 @@ compBinOp op a b = do
 compFun
   :: MonadC m
   => String
-  -> Args (AST SoftwarePrimitiveDomain) sig
+  -> Args (AST SoftwarePrimDomain) sig
   -> m C.Exp
 compFun fun args = do
   as <- sequence $ listArgs (compPrim . Prim) args
@@ -91,9 +91,9 @@ compPrim = simpleMatch (\(s :&: t) -> go t s) . unPrim
   where
     go :: forall m sig
        .  MonadC m
-       => SoftwareTypeRep (DenResult sig)
-       -> SoftwarePrimitiveConstructs sig
-       -> Args (AST SoftwarePrimitiveDomain) sig
+       => SoftwarePrimTypeRep (DenResult sig)
+       -> SoftwarePrimConstructs sig
+       -> Args (AST SoftwarePrimDomain) sig
        -> m C.Exp
     go _ (FreeVar v) Nil = touchVar v >> return [cexp| $id:v |]
     go t (Lit a)     Nil | Dict <- sPrimWitType t = compLit (Proxy :: Proxy SoftwarePrimType) a
