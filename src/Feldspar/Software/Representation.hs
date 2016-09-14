@@ -13,11 +13,11 @@ module Feldspar.Software.Representation where
 
 import Feldspar.Representation
 import Feldspar.Frontend
-import Feldspar.Sugar
-import Data.Struct
-import Data.Inhabited
 
 import Feldspar.Software.Primitive
+
+import Data.Struct
+import Data.Inhabited
 
 import Data.Int
 import Data.Word
@@ -26,7 +26,7 @@ import Data.Typeable (Typeable)
 import Data.Proxy
 import Data.Constraint
 
-import Language.Syntactic hiding (Syntactic(..), SyntacticN(..), SmartFun, sugarSymDecor)
+import Language.Syntactic
 import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
 
@@ -38,11 +38,78 @@ import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Syntactic as S
 
 --------------------------------------------------------------------------------
--- * Types.
+-- * Expression.
 --------------------------------------------------------------------------------
 
+type Length = Int8
+type Index  = Int8
 
+-- | For loop.
+data ForLoop sig
+  where
+    ForLoop :: Syntax st =>
+        ForLoop (Length :-> st :-> (Index -> st -> st) :-> Full st)
 
+deriving instance Eq       (ForLoop a)
+deriving instance Show     (ForLoop a)
+deriving instance Typeable (ForLoop a)
+
+--------------------------------------------------------------------------------
+
+-- | Software symbols.
+type SoftwareConstructs = ForLoop :+: SoftwarePrimConstructs
+
+-- | Software symbols tagged with their type representation.
+type SoftwareDomain = SoftwareConstructs :&: TypeRepF SoftwarePrimType SoftwarePrimTypeRep
+
+-- | Software expressions.
+newtype Data a = Data { unData :: ASTF SoftwareDomain a }
+
+-- | ...
+type instance ExprOf SoftwareDomain = Data
+type instance PredOf SoftwareDomain = SoftwarePrimType    -- ? 
+type instance TRepOf SoftwareDomain = SoftwarePrimTypeRep -- ?
+
+--------------------------------------------------------------------------------
+
+instance Syntactic (Data a)
+  where
+    type Domain   (Data a) = SoftwareDomain
+    type Internal (Data a) = a
+
+    desugar = unData
+    sugar   = Data
+{-
+-- | ...
+sugarSymSoftware
+    :: ( Signature sig
+       , fi             ~ SmartFun SoftwareDomain sig
+       , sig            ~ SmartSig fi
+       , SoftwareDomain ~ SmartSym fi
+       , SyntacticN f fi
+       , sub :<: SoftwareConstructs
+       , SoftwareType (DenResult sig)
+       )
+    => sub sig -> f
+sugarSymSoftware = sugarSymDecor $ ValT typeRep
+
+-- | ...
+sugarSymPrimSoftware
+    :: ( Signature sig
+       , fi             ~ SmartFun SoftwareDomain sig
+       , sig            ~ SmartSig fi
+       , SoftwareDomain ~ SmartSym fi
+       , SyntacticN f fi
+       , sub :<: SoftwareConstructs
+       , SoftwarePrimType (DenResult sig)
+       )
+    => sub sig -> f
+sugarSymPrimSoftware = sugarSymDecor $ ValT $ Node softwareRep
+-}
+--------------------------------------------------------------------------------
+-- * Types.
+--------------------------------------------------------------------------------
+ 
 
 
 
@@ -94,40 +161,13 @@ sTypeRep = mapStruct (const softwareRep)
 -- * ... expressions ...
 --------------------------------------------------------------------------------
 {-
-type Length = Int8
-type Index  = Int8
-
--- | For loop.
-data ForLoop sig
-  where
-    ForLoop :: Syntax st =>
-        ForLoop (Length :-> st :-> (Index -> st -> st) :-> Full st)
-
-deriving instance Eq       (ForLoop a)
-deriving instance Show     (ForLoop a)
-deriving instance Typeable (ForLoop a)
 -}
 --------------------------------------------------------------------------------
 {-
--- | Software symbols.
-type SoftwareConstructs = ForLoop :+: SoftwarePrimitiveConstructs
-
--- | Software symbols tagged with their type representation.
-type SoftwareDomain = SoftwareConstructs :&: TypeRepF SoftwarePrimType SoftwareTypeRep
-
--- | Software expressions.
-newtype Data a = Data { unData :: ASTFull SoftwareDomain a }
 -}
 --------------------------------------------------------------------------------
 {-
 type instance PredOf Data = SoftwarePrimType
-
-instance Syntactic (Data a)
-  where
-    type Constructor (Data a) = ASTFull SoftwareDomain
-    type Internal    (Data a) = a
-    desugar = unData
-    sugar   = Data
 -}
 --------------------------------------------------------------------------------
 {-
