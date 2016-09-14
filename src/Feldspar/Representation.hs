@@ -106,6 +106,11 @@ class (Eq a, Show a, Typeable a, Inhabited a) => Type dom a
   where
     typeRep :: Proxy dom -> TypeRep (PredOf dom) (TRepOf dom) a
 
+-- Pairs of valid types are themselves also valid types.
+instance (Type dom a, Type dom b) => Type dom (a, b)
+  where
+    typeRep dom = Branch (typeRep dom) (typeRep dom)
+
 --------------------------------------------------------------------------------
 
 class TypeDict dom
