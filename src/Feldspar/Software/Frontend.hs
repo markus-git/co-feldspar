@@ -1,5 +1,6 @@
 {-# language TypeFamilies #-}
 {-# language FlexibleInstances #-}
+{-# language FlexibleContexts #-}
 
 module Feldspar.Software.Frontend where
 
@@ -23,6 +24,11 @@ import Language.Syntactic
 
 --------------------------------------------------------------------------------
 -- * Software expressions.
+--------------------------------------------------------------------------------
+
+value :: (Syntax a, Domain a ~ SoftwareDomain, SoftwarePrimType (Internal a)) => Internal a -> a
+value = sugarSymPrimSoftware . Lit
+
 --------------------------------------------------------------------------------
 
 instance NUM Data
