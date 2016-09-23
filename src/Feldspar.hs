@@ -10,7 +10,6 @@ module Feldspar
   , Ref
   ) where
 
-import Feldspar.Primitive
 import Feldspar.Representation
 import Feldspar.Frontend
 import Feldspar.Sugar

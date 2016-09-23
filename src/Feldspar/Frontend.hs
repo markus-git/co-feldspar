@@ -27,21 +27,17 @@ import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 -- * Expressions.
 --------------------------------------------------------------------------------
 
-type family   TypeOf (expr :: * -> *) :: * -> Constraint
---   instance TypeOf Data = SoftwareType
-
---------------------------------------------------------------------------------
-
 class NUM expr
   where
-    plus    :: (TypeOf expr a, Num a) => expr a -> expr a -> expr a
-    minus   :: (TypeOf expr a, Num a) => expr a -> expr a -> expr a
-    times   :: (TypeOf expr a, Num a) => expr a -> expr a -> expr a
-    negate  :: (TypeOf expr a, Num a) => expr a -> expr a
+    plus    :: (PredOf expr a, Num a) => expr a -> expr a -> expr a
+    minus   :: (PredOf expr a, Num a) => expr a -> expr a -> expr a
+    times   :: (PredOf expr a, Num a) => expr a -> expr a -> expr a
+    negate  :: (PredOf expr a, Num a) => expr a -> expr a
 
 --------------------------------------------------------------------------------
 
--- ...
+-- | Short-hand for computational monads that support standard expressions.
+type CoMonad m = (MonadComp m, NUM (Expr m))
 
 --------------------------------------------------------------------------------
 -- * Commands.

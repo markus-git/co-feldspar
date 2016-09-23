@@ -69,21 +69,21 @@ instance SoftwarePrimType Float where softwareRep = FloatST
 
 --------------------------------------------------------------------------------
 
-sPrimTypeEq :: SoftwarePrimTypeRep a -> SoftwarePrimTypeRep b -> Maybe (Dict (a ~ b))
-sPrimTypeEq (BoolST)  (BoolST)  = Just Dict
-sPrimTypeEq (Int8ST)  (Int8ST)  = Just Dict
-sPrimTypeEq (Word8ST) (Word8ST) = Just Dict
-sPrimTypeEq (FloatST) (FloatST) = Just Dict
-sPrimTypeEq _         _         = Nothing
+softwarePrimTypeEq :: SoftwarePrimTypeRep a -> SoftwarePrimTypeRep b -> Maybe (Dict (a ~ b))
+softwarePrimTypeEq (BoolST)  (BoolST)  = Just Dict
+softwarePrimTypeEq (Int8ST)  (Int8ST)  = Just Dict
+softwarePrimTypeEq (Word8ST) (Word8ST) = Just Dict
+softwarePrimTypeEq (FloatST) (FloatST) = Just Dict
+softwarePrimTypeEq _         _         = Nothing
 
-sPrimTypeOf :: SoftwarePrimType a => a -> SoftwarePrimTypeRep a
-sPrimTypeOf _ = softwareRep
+softwarePrimTypeOf :: SoftwarePrimType a => a -> SoftwarePrimTypeRep a
+softwarePrimTypeOf _ = softwareRep
 
-sPrimWitType :: SoftwarePrimTypeRep a -> Dict (SoftwarePrimType a)
-sPrimWitType BoolST  = Dict
-sPrimWitType Int8ST  = Dict
-sPrimWitType Word8ST = Dict
-sPrimWitType FloatST = Dict
+softwarePrimWitType :: SoftwarePrimTypeRep a -> Dict (SoftwarePrimType a)
+softwarePrimWitType BoolST  = Dict
+softwarePrimWitType Int8ST  = Dict
+softwarePrimWitType Word8ST = Dict
+softwarePrimWitType FloatST = Dict
 
 --------------------------------------------------------------------------------
 -- * ... prim ...

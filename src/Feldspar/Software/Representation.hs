@@ -51,7 +51,6 @@ newtype Software a = Software { unSoftware ::
         a
   } deriving (Functor, Applicative, Monad)
 
-
 --------------------------------------------------------------------------------
 
 instance MonadComp Software
@@ -90,10 +89,14 @@ type SoftwareDomain = SoftwareConstructs :&: TypeRepF SoftwarePrimType SoftwareP
 -- | Software expressions.
 newtype Data a = Data { unData :: ASTF SoftwareDomain a }
 
--- | ...
 type instance ExprOf SoftwareDomain = Data
-type instance PredOf SoftwareDomain = SoftwarePrimType    -- ? 
+type instance ExprOf Data           = Data
+
+type instance PredOf SoftwareDomain = SoftwarePrimType    -- ?
+type instance PredOf Data           = SoftwareType
+
 type instance TRepOf SoftwareDomain = SoftwarePrimTypeRep -- ?
+type instance TRepOf Data           = SoftwarePrimTypeRep
 
 -- | Evaluate a closed expression
 eval :: (Syntactic a, Domain a ~ SoftwareDomain) => a -> Internal a
@@ -179,16 +182,21 @@ class    (Type SoftwareDomain a, SoftwarePrimType a) => SoftwareType a
 instance (Type SoftwareDomain a, SoftwarePrimType a) => SoftwareType a
 
 --------------------------------------------------------------------------------
-{-
-sTypeEq :: STypeRep a -> STypeRep b -> Maybe (Dict (a ~ b))
-sTypeEq (Node t)       (Node u) = sPrimTypeEq t u
-sTypeEq (Branch t1 u1) (Branch t2 u2) = do
-  Dict <- sTypeEq t1 t2
-  Dict <- sTypeEq u1 u2
-  return Dict
-sTypeEq _ _ = Nothing
 
-sTypeRep :: Struct SoftwarePrimType c a -> STypeRep a
-sTypeRep = mapStruct (const softwareRep)
--}
+-- | ...
+type SoftwareTypeRep = TypeRep SoftwarePrimType SoftwarePrimTypeRep
+
+--------------------------------------------------------------------------------
+
+softwareTypeEq :: SoftwareTypeRep a -> SoftwareTypeRep b -> Maybe (Dict (a ~ b))
+softwareTypeEq (Node t)       (Node u) = softwarePrimTypeEq t u
+softwareTypeEq (Branch t1 u1) (Branch t2 u2) = do
+  Dict <- softwareTypeEq t1 t2
+  Dict <- softwareTypeEq u1 u2
+  return Dict
+softwareTypeEq _ _ = Nothing
+
+softwareTypeRep :: Struct SoftwarePrimType c a -> SoftwareTypeRep a
+softwareTypeRep = mapStruct (const softwareRep)
+
 --------------------------------------------------------------------------------

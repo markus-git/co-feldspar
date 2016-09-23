@@ -39,7 +39,7 @@ instance CompTypeClass SoftwarePrimType
       Word8ST -> addInclude "<stdint.h>"  >> return [cty| typename uint8_t |]
       FloatST -> return [cty| float |]
 
-    compLit _ a = case sPrimTypeOf a of
+    compLit _ a = case softwarePrimTypeOf a of
       BoolST  ->
         do addInclude "<stdbool.h>"
            return $ if a then [cexp| true |] else [cexp| false |]
@@ -96,7 +96,7 @@ compPrim = simpleMatch (\(s :&: t) -> go t s) . unPrim
        -> Args (AST SoftwarePrimDomain) sig
        -> m C.Exp
     go _ (FreeVar v) Nil = touchVar v >> return [cexp| $id:v |]
-    go t (Lit a)     Nil | Dict <- sPrimWitType t = compLit (Proxy :: Proxy SoftwarePrimType) a
+    go t (Lit a)     Nil | Dict <- softwarePrimWitType t = compLit (Proxy :: Proxy SoftwarePrimType) a
     go _ Neg (a :* Nil)      = compUnOp  C.Negate a
     go _ Add (a :* b :* Nil) = compBinOp C.Add a b
     go _ Sub (a :* b :* Nil) = compBinOp C.Sub a b

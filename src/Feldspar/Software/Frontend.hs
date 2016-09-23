@@ -25,15 +25,6 @@ import Language.Syntactic
 -- * Software expressions.
 --------------------------------------------------------------------------------
 
-type instance TypeOf Data = SoftwareType
-
---------------------------------------------------------------------------------
-
-value :: Syntax a => Internal a -> a
-value = sugarSymSoftware Lit
-
---------------------------------------------------------------------------------
-
 instance NUM Data
   where
     plus    = sugarSymSoftware Add

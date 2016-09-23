@@ -64,26 +64,27 @@ newtype Ref a = Ref { unRef :: Struct (PredOf (Domain a)) Imp.Ref (Internal a) }
 -- * Expressions.
 --------------------------------------------------------------------------------
 
-type family   ExprOf (dom :: * -> *) :: * -> *
+type family   ExprOf (syn :: * -> *) :: * -> *
 --   instance ExprOf SDomain = SData
+--   instance ExprOf SData   = SData
 
-type family   PredOf (dom :: * -> *) :: * -> Constraint
+type family   PredOf (syn :: * -> *) :: * -> Constraint
 --   instance PredOf SDomain = SType
+--   instance PredOf SData   = SType
 
-type family   TRepOf (dom :: * -> *) :: * -> *
+type family   TRepOf (syn :: * -> *) :: * -> *
 --   instance TRepOf SDomain = SRep
+--   instance TRepOf SData   = SRep
 
 --------------------------------------------------------------------------------
 
+-- | ... to internal representation ...
 construct :: Syntax a => a -> Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a)
 construct = resugar
 
+-- | ... to sugared representation ...
 destruct  :: Syntax a => Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a) -> a
 destruct  = resugar
-
---------------------------------------------------------------------------------
-
--- ...
 
 --------------------------------------------------------------------------------
 -- * Types.
@@ -125,8 +126,12 @@ class ( -- `a` is sugared.
       , Syntactic (Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a))
       , Domain    (Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a)) ~ Domain a
       , Internal  (Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a)) ~ Internal a
-        -- type of `a` is representable.
-      , Type (Domain a) (Internal a)
+        -- type of `a` is representable and ..
+      , Type     (Domain a) (Internal a)
+      , TypeDict (Domain a)
+        -- ..
+      , Imp.FreeExp (ExprOf (Domain a))
+
       )
   => Syntax a
 
@@ -137,9 +142,6 @@ class ( -- `a` can be resugared into a struct and has a representable type.
         -- expression and predicate types associated with `a` is the same as those for `m`.
       , ExprOf (Domain a) ~ Expr m
       , PredOf (Domain a) ~ Pred m        
-        -- type of `a` subsumes `FreePred`.
-      , TypeDict (Domain a)
-      , Imp.FreeExp (Expr m)
       )
   => CoType m a
 
