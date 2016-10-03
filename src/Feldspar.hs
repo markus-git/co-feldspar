@@ -3,16 +3,17 @@ module Feldspar
   , module Data.Int
   , module Data.Word
   , Inhabited
-  , Syntactic
-  , Constructor
-  , Internal
-  , Syntax
   , Ref
+  , MonadComp
+  , Expr, ExprOf
+  , Pred, PredOf
+  , Type
+  , Syntax
+  , CoType
   ) where
 
 import Feldspar.Representation
 import Feldspar.Frontend
-import Feldspar.Sugar
 
 import Data.Inhabited
 

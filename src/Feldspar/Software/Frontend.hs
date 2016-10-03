@@ -26,9 +26,13 @@ import Language.Syntactic
 -- * Software expressions.
 --------------------------------------------------------------------------------
 
+instance VAL SoftwareDomain
+  where
+    value = sugarSymPrimSoftware . Lit
+{-
 value :: (Syntax a, Domain a ~ SoftwareDomain, SoftwarePrimType (Internal a)) => Internal a -> a
 value = sugarSymPrimSoftware . Lit
-
+-}
 --------------------------------------------------------------------------------
 
 instance NUM Data

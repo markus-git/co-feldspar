@@ -9,6 +9,9 @@
 {-# language FlexibleContexts #-}
 {-# language ScopedTypeVariables #-}
 
+{-# language InstanceSigs #-}
+{-# language Rank2Types #-}
+
 module Feldspar.Software.Representation where
 
 import Feldspar.Representation
@@ -89,18 +92,20 @@ type SoftwareDomain = SoftwareConstructs :&: TypeRepF SoftwarePrimType SoftwareP
 -- | Software expressions.
 newtype Data a = Data { unData :: ASTF SoftwareDomain a }
 
+-- | Evaluate a closed expression
+eval :: (Syntactic a, Domain a ~ SoftwareDomain) => a -> Internal a
+eval = evalClosed . desugar
+
+--------------------------------------------------------------------------------
+
 type instance ExprOf SoftwareDomain = Data
-type instance ExprOf Data           = Data
+type instance ExprOf Data           = SoftwareDomain
 
 type instance PredOf SoftwareDomain = SoftwarePrimType    -- ?
 type instance PredOf Data           = SoftwareType
 
 type instance TRepOf SoftwareDomain = SoftwarePrimTypeRep -- ?
 type instance TRepOf Data           = SoftwarePrimTypeRep
-
--- | Evaluate a closed expression
-eval :: (Syntactic a, Domain a ~ SoftwareDomain) => a -> Internal a
-eval = evalClosed . desugar
 
 --------------------------------------------------------------------------------
 
@@ -112,7 +117,16 @@ instance Syntactic (Data a)
     desugar = unData
     sugar   = Data
 
--- | ...
+instance Syntactic (Struct SoftwarePrimType Data a)
+  where
+    type Domain   (Struct SoftwarePrimType Data a) = SoftwareDomain
+    type Internal (Struct SoftwarePrimType Data a) = a
+
+    desugar = undefined
+    sugar   = undefined
+
+--------------------------------------------------------------------------------
+
 sugarSymSoftware
     :: ( Signature sig
        , fi             ~ SmartFun SoftwareDomain sig
@@ -125,7 +139,8 @@ sugarSymSoftware
     => sub sig -> f
 sugarSymSoftware = sugarSymDecor $ ValT $ typeRep (Proxy :: Proxy SoftwareDomain)
 
--- | ...
+--------------------------------------------------------------------------------
+
 sugarSymPrimSoftware
     :: ( Signature sig
        , fi             ~ SmartFun SoftwareDomain sig
@@ -175,6 +190,7 @@ instance StringTree ForLoop
 instance Type SoftwareDomain Bool  where typeRep _ = Node BoolST
 instance Type SoftwareDomain Int8  where typeRep _ = Node Int8ST
 instance Type SoftwareDomain Word8 where typeRep _ = Node Word8ST
+instance Type SoftwareDomain Float where typeRep _ = Node FloatST
 
 --------------------------------------------------------------------------------
 
@@ -183,8 +199,30 @@ instance (Type SoftwareDomain a, SoftwarePrimType a) => SoftwareType a
 
 --------------------------------------------------------------------------------
 
--- | ...
 type SoftwareTypeRep = TypeRep SoftwarePrimType SoftwarePrimTypeRep
+
+--------------------------------------------------------------------------------
+
+instance Type SoftwareDomain a => Syntax (Data a)
+
+--------------------------------------------------------------------------------
+
+instance TypeDict SoftwareDomain
+  where
+    withType :: forall proxy1 proxy2 a b
+      .  proxy1 SoftwareDomain
+      -> proxy2 a
+      -> (Imp.FreePred Data a => b)
+      -> (SoftwarePrimType  a => b)
+    withType pd pa f = case softwareDict (softwareRep :: SoftwarePrimTypeRep a) of
+      Dict -> f
+
+softwareDict :: SoftwarePrimTypeRep a -> Dict (Imp.FreePred Data a)
+softwareDict rep = case rep of
+  BoolST  -> Dict
+  Int8ST  -> Dict
+  Word8ST -> Dict
+  FloatST -> Dict
 
 --------------------------------------------------------------------------------
 

@@ -27,6 +27,12 @@ import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 -- * Expressions.
 --------------------------------------------------------------------------------
 
+class VAL dom
+  where
+    value :: (Syntax a, dom ~ Domain a, PredOf dom (Internal a)) => Internal a -> a
+
+--------------------------------------------------------------------------------
+
 class NUM expr
   where
     plus    :: (PredOf expr a, Num a) => expr a -> expr a -> expr a

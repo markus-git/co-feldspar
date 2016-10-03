@@ -4,6 +4,7 @@
 {-# language FlexibleInstances #-}
 {-# language FlexibleContexts #-}
 {-# language UndecidableInstances #-}
+{-# language UndecidableSuperClasses #-}
 {-# language TypeOperators #-}
 {-# language Rank2Types #-}
 {-# language ConstraintKinds #-}
@@ -37,6 +38,14 @@ import qualified Language.Embedded.Expression     as Imp
 -- * Programs.
 --------------------------------------------------------------------------------
 
+-- | Instructions of a purely computational nature.
+type CompCMD = Imp.RefCMD :+: Imp.ControlCMD
+
+-- | Mutable references.
+newtype Ref a = Ref { unRef :: Struct (PredOf (Domain a)) Imp.Ref (Internal a) }
+
+--------------------------------------------------------------------------------
+
 type Prog expr pred = Program CompCMD (Param2 expr pred)
 
 -- | Class of monads that support lifting of computational programs.
@@ -53,28 +62,20 @@ class Monad m => MonadComp m
     liftComp :: Prog (Expr m) (Pred m) a -> m a
 
 --------------------------------------------------------------------------------
-
--- | Instructions of a purely computational nature.
-type CompCMD = Imp.RefCMD :+: Imp.ControlCMD
-
--- | Mutable references.
-newtype Ref a = Ref { unRef :: Struct (PredOf (Domain a)) Imp.Ref (Internal a) }
-
---------------------------------------------------------------------------------
 -- * Expressions.
 --------------------------------------------------------------------------------
 
 type family   ExprOf (syn :: * -> *) :: * -> *
---   instance ExprOf SDomain = SData
---   instance ExprOf SData   = SData
+--   instance ExprOf Domain = SData
+--   instance ExprOf Data   = SDomain
 
 type family   PredOf (syn :: * -> *) :: * -> Constraint
---   instance PredOf SDomain = SType
---   instance PredOf SData   = SType
+--   instance PredOf Domain = PrimType
+--   instance PredOf Data   = Type
 
 type family   TRepOf (syn :: * -> *) :: * -> *
---   instance TRepOf SDomain = SRep
---   instance TRepOf SData   = SRep
+--   instance TRepOf Domain = PrimRep ?
+--   instance TRepOf Data   = Rep
 
 --------------------------------------------------------------------------------
 
@@ -129,7 +130,7 @@ class ( -- `a` is sugared.
         -- type of `a` is representable and ..
       , Type     (Domain a) (Internal a)
       , TypeDict (Domain a)
-        -- ..
+        
       , Imp.FreeExp (ExprOf (Domain a))
 
       )
@@ -137,12 +138,23 @@ class ( -- `a` is sugared.
 
 --------------------------------------------------------------------------------
 
-class ( -- `a` can be resugared into a struct and has a representable type.
-        Syntax a
-        -- expression and predicate types associated with `a` is the same as those for `m`.
-      , ExprOf (Domain a) ~ Expr m
-      , PredOf (Domain a) ~ Pred m        
-      )
+class
+  ( -- `a` can be resugared into a struct and has a representable type.
+    Syntax a
+    -- expression and predicate types associated with `a` is the same as those for `m`.
+  , ExprOf (Domain a) ~ Expr m
+  , PredOf (Domain a) ~ Pred m
+    -- ... `Pred m` should not be `CoType m`, that would be silly.
+  , Pred m (Internal a)
+  )
+  => CoType m a
+
+instance
+  ( Syntax a
+  , ExprOf (Domain a) ~ Expr m
+  , PredOf (Domain a) ~ Pred m
+  , PredOf (Domain a) (Internal a)
+  )
   => CoType m a
 
 --------------------------------------------------------------------------------
