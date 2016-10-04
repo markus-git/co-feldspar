@@ -41,8 +41,13 @@ import qualified Language.Embedded.Expression     as Imp
 -- | Instructions of a purely computational nature.
 type CompCMD = Imp.RefCMD :+: Imp.ControlCMD
 
+--------------------------------------------------------------------------------
+
 -- | Mutable references.
 newtype Ref a = Ref { unRef :: Struct (PredOf (Domain a)) Imp.Ref (Internal a) }
+
+-- *** maps a domain to its predicate type
+type family PredOf (dom :: * -> *) :: * -> Constraint
 
 --------------------------------------------------------------------------------
 
@@ -64,7 +69,7 @@ class Monad m => MonadComp m
 --------------------------------------------------------------------------------
 -- * Expressions.
 --------------------------------------------------------------------------------
-
+{-
 type family   ExprOf (syn :: * -> *) :: * -> *
 --   instance ExprOf Domain = SData
 --   instance ExprOf Data   = SDomain
@@ -76,16 +81,26 @@ type family   PredOf (syn :: * -> *) :: * -> Constraint
 type family   TRepOf (syn :: * -> *) :: * -> *
 --   instance TRepOf Domain = PrimRep ?
 --   instance TRepOf Data   = Rep
-
+-}
 --------------------------------------------------------------------------------
 
--- | ... to internal representation ...
-construct :: Syntax a => a -> Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a)
-construct = resugar
+-- | ...
+class Expression pred expr a
+  where
+    construct :: a -> Struct pred expr (Internal a)
+    destruct  :: Struct pred expr (Internal a) -> a
 
--- | ... to sugared representation ...
-destruct  :: Syntax a => Struct (PredOf (Domain a)) (ExprOf (Domain a)) (Internal a) -> a
-destruct  = resugar
+-- Syntactic objects with a corresponding instance as structures can by cast using resugar.
+instance
+    ( Syntactic a
+    , Syntactic (Struct pred expr (Internal a))
+    , Domain    (Struct pred expr (Internal a)) ~ Domain a
+    , Internal  (Struct pred expr (Internal a)) ~ Internal a
+    )
+      => Expression pred expr a
+  where
+    construct = resugar
+    destruct  = resugar
 
 --------------------------------------------------------------------------------
 -- * Types.
@@ -104,23 +119,32 @@ data TypeRepF pred rep a
 
 --------------------------------------------------------------------------------
 
-class (Eq a, Show a, Typeable a, Inhabited a) => Type dom a
+class (Eq a, Show a, Typeable a, Inhabited a) => Type pred trep a
   where
-    typeRep :: Proxy dom -> TypeRep (PredOf dom) (TRepOf dom) a
+    typeRep :: TypeRep pred trep a
 
 -- Pairs of valid types are themselves also valid types.
-instance (Type dom a, Type dom b) => Type dom (a, b)
+instance (Type pred trep a, Type pred trep b) => Type pred trep (a, b)
   where
-    typeRep dom = Branch (typeRep dom) (typeRep dom)
+    typeRep = Branch typeRep typeRep
 
 --------------------------------------------------------------------------------
 
-class TypeDict dom
+class TypeDict pred expr
   where
-    withType :: Proxy dom -> Proxy a -> (Imp.FreePred (ExprOf dom) a => b) -> (PredOf dom a => b)
+    withType :: Proxy pred -> Proxy expr -> Proxy a -> (Imp.FreePred expr a => b) -> (pred a => b)
 
 --------------------------------------------------------------------------------
 
+class
+  ( Expression  (Pred m) (Expr m) a
+  , Type (Pred m) (TRep m) (Internal a)
+  , TypeDict (Pred m) (Expr m)
+  , Imp.FreeExp (Expr m)
+  )
+    => Syntax m a
+
+{-
 class ( -- `a` is sugared.
         Syntactic a
         -- `a` can be resugared into a `Struct`.
@@ -135,9 +159,21 @@ class ( -- `a` is sugared.
 
       )
   => Syntax a
-
+-}
 --------------------------------------------------------------------------------
 
+class
+  ( Syntax m a
+
+    -- ugh...
+  , Syntactic a
+  , PredOf (Domain a) ~ Pred m
+  )
+    => Syntax' m a
+
+instance (Syntax m a, Syntactic a, PredOf (Domain a) ~ Pred m) => Syntax' m a 
+
+{-
 class
   ( -- `a` can be resugared into a struct and has a representable type.
     Syntax a
@@ -156,5 +192,5 @@ instance
   , PredOf (Domain a) (Internal a)
   )
   => CoType m a
-
+-}
 --------------------------------------------------------------------------------
