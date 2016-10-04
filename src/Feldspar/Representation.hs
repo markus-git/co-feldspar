@@ -169,9 +169,9 @@ class
   , Syntactic a
   , PredOf (Domain a) ~ Pred m
   )
-    => Syntax' m a
+    => CoType m a
 
-instance (Syntax m a, Syntactic a, PredOf (Domain a) ~ Pred m) => Syntax' m a 
+instance (Syntax m a, Syntactic a, PredOf (Domain a) ~ Pred m) => CoType m a 
 
 {-
 class

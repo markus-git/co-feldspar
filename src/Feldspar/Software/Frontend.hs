@@ -1,6 +1,7 @@
 {-# language TypeFamilies #-}
 {-# language FlexibleInstances #-}
 {-# language FlexibleContexts #-}
+{-# language MultiParamTypeClasses #-}
 
 module Feldspar.Software.Frontend where
 
@@ -25,22 +26,23 @@ import Language.Syntactic
 --------------------------------------------------------------------------------
 -- * Software expressions.
 --------------------------------------------------------------------------------
-
+{-
 instance VAL SoftwareDomain
   where
     value = sugarSymPrimSoftware . Lit
+-}
 {-
 value :: (Syntax a, Domain a ~ SoftwareDomain, SoftwarePrimType (Internal a)) => Internal a -> a
 value = sugarSymPrimSoftware . Lit
 -}
 --------------------------------------------------------------------------------
 
-instance NUM Data
+instance NUM SoftwareType Data
   where
     plus    = sugarSymSoftware Add
-    minus   = sugarSymSoftware Sub
-    times   = sugarSymSoftware Mul
-    negate  = sugarSymSoftware Neg
+--    minus   = sugarSymSoftware Sub
+--    times   = sugarSymSoftware Mul
+--    negate  = sugarSymSoftware Neg
 
 --------------------------------------------------------------------------------
 -- * Software instructions.
