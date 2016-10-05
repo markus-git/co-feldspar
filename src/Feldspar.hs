@@ -4,12 +4,10 @@ module Feldspar
   , module Data.Word
   , Inhabited
   , Ref
-  , MonadComp
-  , Expr, ExprOf
-  , Pred, PredOf
+  , MonadComp, Expr, Pred, TRep
   , Type
   , Syntax
-  , CoType
+  , Syntax' -- todo: get rid off.
   ) where
 
 import Feldspar.Representation

@@ -13,27 +13,34 @@ import Language.Syntactic
 -- * ...
 --------------------------------------------------------------------------------
 
-adder
-  :: forall m expr
-  .  ( CoMonad m
+-- | ...
+apa :: forall m expr pred trep
+  .  ( expr ~ Expr m
+     , pred ~ Pred m
+     , trep ~ TRep m
+    
+     , CoMonad m
      , CoType  m (expr Int8)
 
-     , VAL (Domain (expr Int8)) -- ok, but needs to be put in CoType instead of CoMonad.
-
-     , Num (Internal (expr Int8)) -- hmm?
-       
-     , expr ~ Expr m
+       -- since we can't assume (Internal (expr a) ~ a),
+       -- or maybe we can... but it's not pretty.
+       -- > Say `Num a => Num (Internal (expr a))` instead?
+       --   but then we can only define fromInteger...
+     , Num (Internal (expr Int8))
      )
   => m ()
-adder = do
-  let one  = value 1 :: expr Int8
+apa = 
+  do r <- initRef one
+     setRef r (value 2)
+     v <- getRef r
+     let x = v `plus` value 1
+     setRef r x
+  where
+    one :: expr Int8
+    one = value 1
 
-  r <- initRef one
+--------------------------------------------------------------------------------
 
-  v <- getRef r
-
-  setRef r (v `plus` one)
-  
-  return ()
+-- ...
 
 --------------------------------------------------------------------------------

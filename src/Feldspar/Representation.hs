@@ -144,6 +144,19 @@ class
   )
     => Syntax m a
 
+--------------------------------------------------------------------------------
+
+class
+  ( Syntax m a, Pred m (Internal a)
+    -- ugh...
+  , Syntactic a
+  , PredOf (Domain a) ~ Pred m
+  )
+    => Syntax' m a
+
+instance (Syntax m a, Pred m (Internal a), Syntactic a, PredOf (Domain a) ~ Pred m) => Syntax' m a 
+
+--------------------------------------------------------------------------------
 {-
 class ( -- `a` is sugared.
         Syntactic a
@@ -159,21 +172,7 @@ class ( -- `a` is sugared.
 
       )
   => Syntax a
--}
---------------------------------------------------------------------------------
 
-class
-  ( Syntax m a
-
-    -- ugh...
-  , Syntactic a
-  , PredOf (Domain a) ~ Pred m
-  )
-    => CoType m a
-
-instance (Syntax m a, Syntactic a, PredOf (Domain a) ~ Pred m) => CoType m a 
-
-{-
 class
   ( -- `a` can be resugared into a struct and has a representable type.
     Syntax a
@@ -182,14 +181,6 @@ class
   , PredOf (Domain a) ~ Pred m
     -- ... `Pred m` should not be `CoType m`, that would be silly.
   , Pred m (Internal a)
-  )
-  => CoType m a
-
-instance
-  ( Syntax a
-  , ExprOf (Domain a) ~ Expr m
-  , PredOf (Domain a) ~ Pred m
-  , PredOf (Domain a) (Internal a)
   )
   => CoType m a
 -}
