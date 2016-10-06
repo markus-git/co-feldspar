@@ -107,6 +107,10 @@ type instance PredOf Data           = SoftwareType
 type instance TRepOf SoftwareDomain = SoftwarePrimTypeRep -- ?
 type instance TRepOf Data           = SoftwarePrimTypeRep
 -}
+
+-- ugh..
+type instance PredOf SoftwareDomain = SoftwarePrimType
+
 --------------------------------------------------------------------------------
 
 instance Syntactic (Data a)
@@ -237,5 +241,14 @@ softwareTypeEq _ _ = Nothing
 
 softwareTypeRep :: Struct SoftwarePrimType c a -> SoftwareTypeRep a
 softwareTypeRep = mapStruct (const softwareRep)
+
+--------------------------------------------------------------------------------
+
+instance
+  ( Syntactic a
+  , Domain a ~ SoftwareDomain
+  , Type SoftwarePrimType SoftwarePrimTypeRep (Internal a)
+  )
+    => Syntax Software a
 
 --------------------------------------------------------------------------------
