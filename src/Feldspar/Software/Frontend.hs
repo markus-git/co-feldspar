@@ -2,6 +2,11 @@
 {-# language FlexibleInstances #-}
 {-# language FlexibleContexts #-}
 {-# language MultiParamTypeClasses #-}
+{-# language ConstraintKinds #-}
+{-# language Rank2Types #-}
+
+{-# language InstanceSigs #-}
+{-# language ScopedTypeVariables #-}
 
 module Feldspar.Software.Frontend where
 
@@ -12,6 +17,9 @@ import Feldspar.Software.Primitive
 import Feldspar.Software.Representation
 
 import Data.Struct
+
+import Data.Constraint hiding (Sub)
+import Data.Proxy
 
 import qualified Control.Monad.Operational.Higher as Oper
 
@@ -24,32 +32,84 @@ import qualified Language.Embedded.Imperative.CMD as Imp
 import Language.Syntactic
 
 --------------------------------------------------------------------------------
--- * Software expressions.
+-- * Software ...
 --------------------------------------------------------------------------------
 
-instance VAL SoftwarePrimType SoftwareDomain
+--------------------------------------------------------------------------------
+-- ** Expressions.
+
+instance Value SoftwarePrimType SoftwareDomain
   where
     value = sugarSymPrimSoftware . Lit
 
-{-
-value :: (Syntax a, Domain a ~ SoftwareDomain, SoftwarePrimType (Internal a)) => Internal a -> a
-value = sugarSymPrimSoftware . Lit
--}
 --------------------------------------------------------------------------------
 
-instance NUM SoftwarePrimType Data
+instance Numerical SoftwarePrimType SExp
   where
     plus    = sugarSymPrimSoftware Add
---    minus   = sugarSymSoftware Sub
---    times   = sugarSymSoftware Mul
---    negate  = sugarSymSoftware Neg
+    minus   = sugarSymPrimSoftware Sub
+    times   = sugarSymPrimSoftware Mul
+    negate  = sugarSymPrimSoftware Neg
 
 --------------------------------------------------------------------------------
--- * Software instructions.
---------------------------------------------------------------------------------
+-- ** Instructions.
+
+-- ...
+withSType :: forall a b . Proxy a -> (Imp.FreePred SExp a => b) -> (SoftwarePrimType a => b)
+withSType _ f = case softwareDict (softwareRep :: SoftwarePrimTypeRep a) of
+  Dict -> f
+
+-- ...
+softwareDict :: SoftwarePrimTypeRep a -> Dict (Imp.FreePred SExp a)
+softwareDict rep = case rep of
+  BoolST   -> Dict
+  Int8ST   -> Dict
+  Word8ST  -> Dict
+  FloatST  -> Dict
 
 --------------------------------------------------------------------------------
--- * File handling.
+-- *** ... comp instr ...
+
+instance References Software
+  where
+    type Reference Software = Ref
+
+    initRef :: forall a . SType a => a -> Software (Ref a)
+    initRef
+        = liftComp
+        . fmap Ref
+        . mapStructA (Imp.initRef)
+        . construct
+
+    newRef :: forall a . SType a => Software (Ref a)
+    newRef
+        = liftComp
+        . fmap Ref
+        . mapStructA (const Imp.newRef)
+        $ (typeRep :: SoftwareTypeRep (Internal a))
+
+    getRef :: SType a => Ref a -> Software a
+    getRef
+        = liftComp
+        . fmap destruct
+        . mapStructA getty
+        . unRef
+      where
+        getty :: forall b . SoftwarePrimType b => Imp.Ref b -> Prog SExp SoftwarePrimType (SExp b)
+        getty = withSType (Proxy :: Proxy b) Imp.getRef
+
+    setRef :: SType a => Ref a -> a -> Software ()
+    setRef ref
+        = liftComp
+        . sequence_
+        . zipListStruct setty (unRef ref)
+        . construct
+      where
+        setty :: forall b . SoftwarePrimType b => Imp.Ref b -> SExp b -> Prog SExp SoftwarePrimType ()
+        setty = withSType (Proxy :: Proxy b) Imp.setRef
+
+--------------------------------------------------------------------------------
+-- *** File handling.
 
 -- | Open a file
 fopen :: FilePath -> IOMode -> Software Handle
@@ -60,34 +120,34 @@ fclose :: Handle -> Software ()
 fclose = Software . Imp.fclose
 
 -- | Check for end of file
-feof :: Handle -> Software (Data Bool)
+feof :: Handle -> Software (SExp Bool)
 feof = Software . Imp.feof
 
 -- | Put a primitive value to a handle
 fput :: (Formattable a, SoftwareType a)
     => Handle
     -> String  -- Prefix
-    -> Data a  -- Expression to print
+    -> SExp a  -- Expression to print
     -> String  -- Suffix
     -> Software ()
 fput h pre e post = Software $ Imp.fput h pre e post
 
 -- | Get a primitive value from a handle
-fget :: (Formattable a, SoftwareType a) => Handle -> Software (Data a)
+fget :: (Formattable a, SoftwareType a) => Handle -> Software (SExp a)
 fget = Software . Imp.fget
 
 --------------------------------------------------------------------------------
--- * Printing.
+-- *** Printing.
 
 class PrintfType r
   where
-    fprf :: Handle -> String -> [Imp.PrintfArg Data] -> r
+    fprf :: Handle -> String -> [Imp.PrintfArg SExp] -> r
 
 instance (a ~ ()) => PrintfType (Software a)
   where
     fprf h form = Software . Oper.singleInj . Imp.FPrintf h form . reverse
 
-instance (Formattable a, SoftwareType a, PrintfType r) => PrintfType (Data a -> r)
+instance (Formattable a, SoftwareType a, PrintfType r) => PrintfType (SExp a -> r)
   where
     fprf h form as = \a -> fprf h form (Imp.PrintfArg a : as)
 

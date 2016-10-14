@@ -1,7 +1,8 @@
 module Feldspar.Software
   ( module Feldspar
   , module Feldspar.Software.Frontend
-  , Data
+  , SExp
+  , SType
   , SoftwareType
   , Software
   , Length

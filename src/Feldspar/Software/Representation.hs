@@ -11,6 +11,7 @@
 
 {-# language InstanceSigs #-}
 {-# language Rank2Types #-}
+{-# language ConstraintKinds #-}
 
 module Feldspar.Software.Representation where
 
@@ -35,7 +36,7 @@ import Language.Syntactic as S
 import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
 
-import Control.Monad.Operational.Higher as O hiding ((:<:))
+import Control.Monad.Operational.Higher as Oper hiding ((:<:))
 
 import qualified Language.Embedded.Expression as Imp
 import qualified Language.Embedded.Imperative as Imp
@@ -45,12 +46,12 @@ import qualified Language.Embedded.Imperative as Imp
 --------------------------------------------------------------------------------
 
 -- | Software instructions.
-type SoftwareCMD = CompCMD O.:+: Imp.FileCMD
+type SoftwareCMD = CompCMD Oper.:+: Imp.FileCMD
 
 -- | Monad for building software programs in Feldspar.
 newtype Software a = Software { unSoftware ::
-    ProgramT SoftwareCMD (Param2 Data SoftwarePrimType)
-      (Program CompCMD (Param2 Data SoftwarePrimType))
+    ProgramT SoftwareCMD (Param2 SExp SoftwarePrimType)
+      (Program CompCMD (Param2 SExp SoftwarePrimType))
         a
   } deriving (Functor, Applicative, Monad)
 
@@ -58,11 +59,15 @@ newtype Software a = Software { unSoftware ::
 
 instance MonadComp Software
   where
-    type Expr Software = Data
+    type Expr Software = SExp
     type Pred Software = SoftwarePrimType
     type TRep Software = SoftwarePrimTypeRep
 
     liftComp = Software . lift
+
+--------------------------------------------------------------------------------
+
+newtype Ref a = Ref { unRef :: Struct SoftwarePrimType Imp.Ref (Internal a) }
 
 --------------------------------------------------------------------------------
 -- * Expression.
@@ -84,50 +89,49 @@ deriving instance Typeable (ForLoop a)
 --------------------------------------------------------------------------------
 
 -- | Software symbols.
-type SoftwareConstructs = ForLoop S.:+: SoftwarePrimConstructs
+type SoftwareConstructs = 
+        SoftwarePrimConstructs
+  S.:+: ForLoop
+  S.:+: Tuple
+  S.:+: Let
+  S.:+: BindingT
 
 -- | Software symbols tagged with their type representation.
 type SoftwareDomain = SoftwareConstructs :&: TypeRepF SoftwarePrimType SoftwarePrimTypeRep
 
 -- | Software expressions.
-newtype Data a = Data { unData :: ASTF SoftwareDomain a }
+newtype SExp a = SExp { unSExp :: ASTF SoftwareDomain a }
 
 -- | Evaluate a closed expression
 eval :: (Syntactic a, Domain a ~ SoftwareDomain) => a -> Internal a
 eval = evalClosed . desugar
 
 --------------------------------------------------------------------------------
-{-
-type instance ExprOf SoftwareDomain = Data
-type instance ExprOf Data           = SoftwareDomain
 
-type instance PredOf SoftwareDomain = SoftwarePrimType    -- ?
-type instance PredOf Data           = SoftwareType
-
-type instance TRepOf SoftwareDomain = SoftwarePrimTypeRep -- ?
-type instance TRepOf Data           = SoftwarePrimTypeRep
--}
-
--- ugh..
-type instance PredOf SoftwareDomain = SoftwarePrimType
-
---------------------------------------------------------------------------------
-
-instance Syntactic (Data a)
+instance Syntactic (SExp a)
   where
-    type Domain   (Data a) = SoftwareDomain
-    type Internal (Data a) = a
+    type Domain   (SExp a) = SoftwareDomain
+    type Internal (SExp a) = a
 
-    desugar = unData
-    sugar   = Data
+    desugar = unSExp
+    sugar   = SExp
 
-instance Syntactic (Struct SoftwarePrimType Data a)
+instance Syntactic (Struct SoftwarePrimType SExp a)
   where
-    type Domain   (Struct SoftwarePrimType Data a) = SoftwareDomain
-    type Internal (Struct SoftwarePrimType Data a) = a
+    type Domain   (Struct SoftwarePrimType SExp a) = SoftwareDomain
+    type Internal (Struct SoftwarePrimType SExp a) = a
 
-    desugar = undefined
-    sugar   = undefined
+    desugar (Node a)     = unSExp a
+    desugar (Branch a b) = sugarSymDecor (ValT $ Branch ta tb) Pair a' b'
+      where
+        a' = desugar a
+        b' = desugar b
+        ValT ta = getDecor a'
+        ValT tb = getDecor b'
+    
+    sugar a = case getDecor a of
+      ValT (Node _)       -> Node $ SExp a
+      ValT (Branch ta tb) -> Branch (sugarSymDecor (ValT ta) Fst a) (sugarSymDecor (ValT tb) Snd a)
 
 --------------------------------------------------------------------------------
 
@@ -160,14 +164,14 @@ sugarSymPrimSoftware = sugarSymDecor $ ValT $ Node softwareRep
 --------------------------------------------------------------------------------
 -- imperative-edsl instances.
 
-instance Imp.FreeExp Data
+instance Imp.FreeExp SExp
   where
-    type FreePred Data = SoftwareType
+    type FreePred SExp = SoftwareType
     constExp = sugarSymSoftware . Lit
     varExp   = sugarSymSoftware . FreeVar
 
 --------------------------------------------------------------------------------
--- syntactic isntances.
+-- syntactic instances.
 
 instance Eval ForLoop
   where
@@ -201,33 +205,11 @@ instance Type SoftwarePrimType SoftwarePrimTypeRep Float where typeRep = Node Fl
 class    (Type SoftwarePrimType SoftwarePrimTypeRep a, SoftwarePrimType a) => SoftwareType a
 instance (Type SoftwarePrimType SoftwarePrimTypeRep a, SoftwarePrimType a) => SoftwareType a
 
---------------------------------------------------------------------------------
-
+-- ... software type representation ...
 type SoftwareTypeRep = TypeRep SoftwarePrimType SoftwarePrimTypeRep
 
---------------------------------------------------------------------------------
-
---instance Type SoftwarePrimType SoftwarePrimTypeRep a => Syntax (Data a)
-
---------------------------------------------------------------------------------
-
-instance TypeDict SoftwarePrimType Data
-  where
-    withType :: forall proxy1 proxy2 proxy3 a b
-      .  proxy1 SoftwarePrimType
-      -> proxy2 Data
-      -> proxy3 a
-      -> (Imp.FreePred Data a => b)
-      -> (SoftwarePrimType  a => b)
-    withType _ pd pa f = case softwareDict (softwareRep :: SoftwarePrimTypeRep a) of
-      Dict -> f
-
-softwareDict :: SoftwarePrimTypeRep a -> Dict (Imp.FreePred Data a)
-softwareDict rep = case rep of
-  BoolST  -> Dict
-  Int8ST  -> Dict
-  Word8ST -> Dict
-  FloatST -> Dict
+-- ... software types ...
+type SType = Syntax Software
 
 --------------------------------------------------------------------------------
 
@@ -245,8 +227,12 @@ softwareTypeRep = mapStruct (const softwareRep)
 --------------------------------------------------------------------------------
 
 instance
-  ( Syntactic a
+  ( -- ...
+    Syntactic a
   , Domain a ~ SoftwareDomain
+    -- ...
+  , SoftwarePrimType (Internal a)
+    -- ...
   , Type SoftwarePrimType SoftwarePrimTypeRep (Internal a)
   )
     => Syntax Software a

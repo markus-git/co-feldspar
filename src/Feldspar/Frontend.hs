@@ -26,100 +26,48 @@ import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 
 --------------------------------------------------------------------------------
--- * Expressions.
+-- * ...
 --------------------------------------------------------------------------------
 
-class VAL pred dom | dom -> pred
+-- | Short-hand for computational monads that support ...
+type CoMonad m =
+  ( MonadComp m
+  , References m
+  , Numerical (Pred m) (Expr m)
+  )
+
+-- | Short-hand for syntactical objects that ...
+type CoType m a =
+  ( Syntax m a
+  , Value (Pred m) (Domain a)
+  )
+
+--------------------------------------------------------------------------------
+-- ** Expressions.
+
+class Value pred dom | dom -> pred
   where
     value :: (pred (Internal a), dom ~ Domain a, Syntactic a) => Internal a -> a
 
 --------------------------------------------------------------------------------
 
-class NUM pred expr | expr -> pred
+class Numerical pred expr | expr -> pred
   where
-    plus :: (pred (Internal (expr a)), Num a) => expr a -> expr a -> expr a
+    plus   :: (pred (Internal (expr a)), Num a) => expr a -> expr a -> expr a
+    minus  :: (pred (Internal (expr a)), Num a) => expr a -> expr a -> expr a
+    times  :: (pred (Internal (expr a)), Num a) => expr a -> expr a -> expr a
+    negate :: (pred (Internal (expr a)), Num a) => expr a -> expr a
 
 --------------------------------------------------------------------------------
+-- ** Commands.
 
--- | Short-hand for computational monads that support standard expressions.
-type CoMonad m   = (MonadComp m, NUM (Pred m) (Expr m))
-
-type CoType  m a = (Syntax' m a, VAL (Pred m) (Domain a))
-
---------------------------------------------------------------------------------
--- * Commands.
---------------------------------------------------------------------------------
-
-initRef :: forall m a . (MonadComp m, Syntax' m a) => a -> m (Ref a)
-initRef = liftComp
-        . fmap Ref
-        . mapStructA (Imp.initRef)
-        . cons
+class MonadComp m => References m
   where
-    cons :: forall b . Expression (Pred m) (Expr m) b => b -> Struct (Pred m) (Expr m) (Internal b)
-    cons = construct -- *** why do I need to lock expr but not pred? or, why do I need to lock at all?
+    type Reference m :: * -> *
 
-newRef  :: forall m a . (MonadComp m, Syntax' m a) => m (Ref a)
-newRef  = liftComp
-        . fmap Ref
-        . mapStructA (const Imp.newRef)
-        $ (typeRep :: TypeRep (Pred m) (TRep m) (Internal a))
+    initRef :: Syntax m a => a -> m (Reference m a)
+    newRef  :: Syntax m a => m (Reference m a)
+    getRef  :: Syntax m a => Reference m a -> m a
+    setRef  :: Syntax m a => Reference m a -> a -> m ()
 
-getRef  :: forall m a . (MonadComp m, Syntax' m a) => Ref a -> m a
-getRef  = liftComp
-        . fmap dest
-        . mapStructA getty
-        . unRef
-  where
-    dest :: forall b . Expression (Pred m) (Expr m) b => Struct (Pred m) (Expr m) (Internal b) -> b
-    dest = destruct -- *** same as initRef.
-      
-    getty :: forall b . Pred m b => Imp.Ref b -> Prog (Expr m) (Pred m) (Expr m b)
-    getty = withType (Proxy :: Proxy (Pred m)) (Proxy :: Proxy (Expr m)) (Proxy :: Proxy b) Imp.getRef    
-
-setRef :: forall m a . (MonadComp m, Syntax' m a) => Ref a -> a -> m ()
-setRef ref = liftComp
-       . sequence_
-       . (\a -> a :: [Prog (Expr m) (Pred m) ()]) -- why is this needed?
-       . zipListStruct setty (unRef ref)
-       . cons
-  where
-    cons :: forall b . Expression (Pred m) (Expr m) b => b -> Struct (Pred m) (Expr m) (Internal b)
-    cons = construct -- *** same as initRef.
-    
-    setty :: forall b . Pred m b => Imp.Ref b -> Expr m b -> Prog (Expr m) (Pred m) ()
-    setty = withType (Proxy :: Proxy (Pred m)) (Proxy :: Proxy (Expr m)) (Proxy :: Proxy b) Imp.setRef
-
-{-
-initRef :: forall m a . (MonadComp m, CoType m a) => a -> m (Ref a)
-initRef = liftComp
-       . fmap Ref
-       . mapStructA (Imp.initRef)
-       . construct
-
-newRef :: forall m a . (MonadComp m, CoType m a) => m (Ref a)
-newRef = liftComp
-       . fmap Ref
-       . mapStructA (const Imp.newRef)
-       $ typeRep (Proxy :: Proxy (Domain a))
-
-getRef :: forall m a . (MonadComp m, CoType m a) => Ref a -> m a
-getRef = liftComp
-       . fmap destruct
-       . mapStructA getty
-       . unRef
-  where
-    getty :: forall b . Pred m b => Imp.Ref b -> Prog (Expr m) (Pred m) (Expr m b)
-    getty = withType (Proxy :: Proxy (Domain a)) (Proxy :: Proxy b) Imp.getRef
-
-setRef :: forall m a . (MonadComp m, CoType m a) => Ref a -> a -> m ()
-setRef ref = liftComp
-       . sequence_
-       . (\a -> a :: [Prog (Expr m) (Pred m) ()]) -- why is this needed?
-       . zipListStruct setty (unRef ref)
-       . construct
-  where
-    setty :: forall b . Pred m b => Imp.Ref b -> Expr m b -> Prog (Expr m) (Pred m) ()
-    setty = withType (Proxy :: Proxy (Domain a)) (Proxy :: Proxy b) Imp.setRef
--}
 --------------------------------------------------------------------------------
