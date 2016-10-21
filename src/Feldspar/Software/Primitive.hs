@@ -92,8 +92,8 @@ softwarePrimWitType FloatST = Dict
 -- | Software primitive symbols.
 data SoftwarePrim sig
   where
-    FreeVar :: (SoftwarePrimType a)               => String -> SoftwarePrim (Full a)
-    Lit     :: (SoftwarePrimType a, Show a, Eq a) => a      -> SoftwarePrim (Full a)
+    FreeVar :: (SoftwarePrimType a) => String -> SoftwarePrim (Full a)
+    Lit     :: (Show a, Eq a)       => a      -> SoftwarePrim (Full a)
     -- ^ numerical operations.
     Neg     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> Full a)
     Add     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> a :-> Full a)

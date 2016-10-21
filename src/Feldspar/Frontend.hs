@@ -32,22 +32,19 @@ import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 -- | Short-hand for computational monads that support ...
 type CoMonad m =
   ( MonadComp m
+    -- ... commands ...
   , References m
+    -- ... expressions ...
+  , Value     (Pred m) (TRep m) (Expr m)
   , Numerical (Pred m) (Expr m)
-  )
-
--- | Short-hand for syntactical objects that ...
-type CoType m a =
-  ( Syntax m a
-  , Value (Pred m) (Domain a)
   )
 
 --------------------------------------------------------------------------------
 -- ** Expressions.
 
-class Value pred dom | dom -> pred
+class Value pred rep expr | expr -> pred, pred -> rep
   where
-    value :: (pred (Internal a), dom ~ Domain a, Syntactic a) => Internal a -> a
+    value :: (Type pred rep (Internal (expr a)), Expression pred expr (expr a)) => a -> expr a
 
 --------------------------------------------------------------------------------
 

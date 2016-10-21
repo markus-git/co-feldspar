@@ -49,7 +49,7 @@ type VExp = Struct HardwarePrimType Prim
 data VExp' where
   VExp' :: Struct HardwarePrimType Prim a -> VExp'
 
-newRefV :: Monad m => HardwareTypeRep a -> String -> InterT m (Struct HardwarePrimType Hard.Variable a)
+newRefV :: Monad m => HTypeRep a -> String -> InterT m (Struct HardwarePrimType Hard.Variable a)
 newRefV t base = lift $ mapStructA (const (Hard.newNamedVariable base)) t
 
 initRefV :: Monad m => String -> VExp a -> InterT m (Struct HardwarePrimType Hard.Variable a)
@@ -71,7 +71,7 @@ type Env = Map Name VExp'
 localAlias :: MonadReader Env m => Name -> VExp a -> m b -> m b
 localAlias v e = local (Map.insert v (VExp' e))
 
-lookAlias :: MonadReader Env m => HardwareTypeRep a -> Name -> m (VExp a)
+lookAlias :: MonadReader Env m => HTypeRep a -> Name -> m (VExp a)
 lookAlias t v = do
   env <- ask
   return $ case Map.lookup v env of
@@ -106,7 +106,7 @@ translateExp = goAST . unHExp
     goAST :: ASTF HardwareDomain b -> InterT m (VExp b)
     goAST = simpleMatch (\(s :&: ValT t) -> go t s)
 
-    go    :: HardwareTypeRep (DenResult sig)
+    go    :: HTypeRep (DenResult sig)
           -> HardwareConstructs sig
           -> Args (AST HardwareDomain) sig
           -> InterT m (VExp (DenResult sig))

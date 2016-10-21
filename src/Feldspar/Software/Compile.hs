@@ -46,7 +46,7 @@ type VExp = Struct SoftwarePrimType Prim
 data VExp' where
   VExp' :: Struct SoftwarePrimType Prim a -> VExp'
 
-newRefV :: Monad m => SoftwareTypeRep a -> String -> TargetT m (Struct SoftwarePrimType Imp.Ref a)
+newRefV :: Monad m => STypeRep a -> String -> TargetT m (Struct SoftwarePrimType Imp.Ref a)
 newRefV t base = lift $ mapStructA (const (Imp.newNamedRef base)) t
 
 initRefV :: Monad m => String -> VExp a -> TargetT m (Struct SoftwarePrimType Imp.Ref a)
@@ -68,7 +68,7 @@ type Env = Map Name VExp'
 localAlias :: MonadReader Env m => Name -> VExp a -> m b -> m b
 localAlias v e = local (Map.insert v (VExp' e))
 
-lookAlias :: MonadReader Env m => SoftwareTypeRep a -> Name -> m (VExp a)
+lookAlias :: MonadReader Env m => STypeRep a -> Name -> m (VExp a)
 lookAlias t v = do
   env <- ask
   return $ case Map.lookup v env of
@@ -104,7 +104,7 @@ translateExp = goAST . unSExp
     goSmallAST :: SoftwarePrimType b => S.ASTF SoftwareDomain b -> TargetT m (Prim b)
     goSmallAST = fmap extractNode . goAST
 
-    go :: SoftwareTypeRep (S.DenResult sig) 
+    go :: STypeRep (S.DenResult sig) 
        -> SoftwareConstructs sig
        -> S.Args (S.AST SoftwareDomain) sig
        -> TargetT m (VExp (S.DenResult sig))

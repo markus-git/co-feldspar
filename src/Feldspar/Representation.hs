@@ -62,11 +62,11 @@ class Monad m => MonadComp m
 --------------------------------------------------------------------------------
 
 -- | ...
-class Syntactic a => Expression pred expr a
+class Expression pred expr a
   where
     construct :: a -> Struct pred expr (Internal a)
     destruct  :: Struct pred expr (Internal a) -> a
-
+{-
 -- Every syntactical object with a corresponding syntactical instance for
 -- structures can be cast using `resugar`.
 instance
@@ -79,7 +79,7 @@ instance
   where
     construct = resugar
     destruct  = resugar
-
+-}
 --------------------------------------------------------------------------------
 -- * Types.
 --------------------------------------------------------------------------------
@@ -108,14 +108,6 @@ instance (Type pred trep a, Type pred trep b) => Type pred trep (a, b)
 
 --------------------------------------------------------------------------------
 
-class
-  ( -- expressions have a internal representation as struct's over `Pred m` and `Expr m`.
-    Expression (Pred m) (Expr m) a
-    -- types have a internal representation as struct's over `Pred m` and `TRep m`.
-  , Type (Pred m) (TRep m) (Internal a)
-    -- types are valid within language `m`.
-  , Pred m (Internal a)
-  )
-    => Syntax m a
+class (Expression (Pred m) (Expr m) a, Type (Pred m) (TRep m) (Internal a)) => Syntax m a
 
 --------------------------------------------------------------------------------

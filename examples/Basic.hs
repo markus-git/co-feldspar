@@ -20,22 +20,19 @@ import Language.Syntactic (Internal)
 
 apa :: forall m .
   ( CoMonad m
-  , CoType m (Expr m Int8)
-  , CoType m (Expr m Word8)
-       -- ugh...
-  , Num (Internal (Expr m Int8))
-  , Num (Internal (Expr m Word8))
+  , Syntax m (Expr m Int8)
+  , Syntax m (Expr m Int8, Expr m Int8)
   )
   => m ()
 apa = 
-  do r <- initRef (value 1 :: Expr m Int8)
-     w <- initRef (value 0 :: Expr m Word8)
-     
-     setRef r (value 2)
-     
+  do let x = value 1 :: Expr m Int8
+     let y = value 2 :: Expr m Int8
+
+     r <- initRef (x, y)
      v <- getRef r
-     let x = v `plus` value 1
-     setRef r x
+     setRef r (y, x)
+     
+     return ()
   -- Soft.icompile apa
   -- Hard.icompile apa
 

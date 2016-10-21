@@ -39,10 +39,6 @@ import Language.Syntactic.Functional.Tuple
 import Control.Monad.Operational.Higher as Oper hiding ((:<:))
 
 -- hardware-edsl.
-{-
-import qualified Language.Embedded.Hardware.Interface as Imp
-import qualified Language.Embedded.Hardware.Command   as Imp
--}
 import qualified Language.Embedded.Expression as Imp
 import qualified Language.Embedded.Imperative as Imp
 
@@ -122,6 +118,18 @@ instance Syntactic (Struct HardwarePrimType HExp a)
       ValT (Node _)       -> Node $ HExp a
       ValT (Branch ta tb) -> Branch (sugarSymDecor (ValT ta) Fst a) (sugarSymDecor (ValT tb) Snd a)
 
+instance
+    ( Syntax Hardware a, Domain a ~ HardwareDomain
+    , Syntax Hardware b, Domain b ~ HardwareDomain
+    )
+      => Syntactic (a, b)
+  where
+    type Domain   (a, b) = HardwareDomain
+    type Internal (a, b) = (Internal a, Internal b)
+
+    desugar (a, b) = sugarSymHardware Pair (desugar a) (desugar b)
+    sugar ab       = (sugarSymHardware Fst ab, sugarSymHardware Snd ab)
+
 --------------------------------------------------------------------------------
 
 sugarSymHardware
@@ -131,7 +139,7 @@ sugarSymHardware
        , HardwareDomain ~ SmartSym fi
        , SyntacticN f fi
        , sub :<: HardwareConstructs
-       , HardwareType (DenResult sig)
+       , Type HardwarePrimType HardwarePrimTypeRep (DenResult sig)
        )
     => sub sig -> f
 sugarSymHardware = sugarSymDecor $ ValT $ typeRep
@@ -179,35 +187,17 @@ instance Type HardwarePrimType HardwarePrimTypeRep Word8 where typeRep = Node Wo
 class    (Type HardwarePrimType HardwarePrimTypeRep a, HardwarePrimType a) => HardwareType a
 instance (Type HardwarePrimType HardwarePrimTypeRep a, HardwarePrimType a) => HardwareType a
 
--- ...
-type HardwareTypeRep = TypeRep HardwarePrimType HardwarePrimTypeRep
+--------------------------------------------------------------------------------
 
--- ...
+-- ... hardware type representation ...
+type HTypeRep = TypeRep HardwarePrimType HardwarePrimTypeRep
+
+-- ... hardware types ...
 type HType = Syntax Hardware
 
 --------------------------------------------------------------------------------
-{-
-instance TypeDict HardwarePrimType Data
-  where
-    withType :: forall proxy1 proxy2 proxy3 a b
-      .  proxy1 HardwarePrimType
-      -> proxy2 Data
-      -> proxy3 a
-      -> (Imp.FreePred Data a => b)
-      -> (HardwarePrimType  a => b)
-    withType _ pd pa f = case softwareDict (softwareRep :: HardwarePrimTypeRep a) of
-      Dict -> f
 
-softwareDict :: HardwarePrimTypeRep a -> Dict (Imp.FreePred Data a)
-softwareDict rep = case rep of
-  BoolHT  -> Dict
-  Int8HT  -> Dict
-  Word8HT -> Dict
-  FloatHT -> Dict
--}
---------------------------------------------------------------------------------
-
-hardwareTypeEq :: HardwareTypeRep a -> HardwareTypeRep b -> Maybe (Dict (a ~ b))
+hardwareTypeEq :: HTypeRep a -> HTypeRep b -> Maybe (Dict (a ~ b))
 hardwareTypeEq (Node t)       (Node u) = hardwarePrimTypeEq t u
 hardwareTypeEq (Branch t1 u1) (Branch t2 u2) = do
   Dict <- hardwareTypeEq t1 t2
@@ -215,20 +205,19 @@ hardwareTypeEq (Branch t1 u1) (Branch t2 u2) = do
   return Dict
 hardwareTypeEq _ _ = Nothing
 
-hardwareTypeRep :: Struct HardwarePrimType c a -> HardwareTypeRep a
+hardwareTypeRep :: Struct HardwarePrimType c a -> HTypeRep a
 hardwareTypeRep = mapStruct (const hardwareRep)
 
 --------------------------------------------------------------------------------
 
+instance Syntax Hardware (HExp Bool)
+instance Syntax Hardware (HExp Int8)
+instance Syntax Hardware (HExp Word8)
+
 instance
-  ( -- ...
-    Syntactic a
-  , Domain a ~ HardwareDomain
-    -- ...
-  , Type HardwarePrimType HardwarePrimTypeRep (Internal a)
-    -- ...
-  , HardwarePrimType (Internal a)
+  ( Syntax Hardware a, Domain a ~ HardwareDomain
+  , Syntax Hardware b, Domain b ~ HardwareDomain
   )
-    => Syntax Hardware a
+    => Syntax Hardware (a, b)
 
 --------------------------------------------------------------------------------

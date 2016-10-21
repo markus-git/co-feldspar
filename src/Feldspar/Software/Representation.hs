@@ -135,14 +135,48 @@ instance Syntactic (Struct SoftwarePrimType SExp a)
 
 --------------------------------------------------------------------------------
 
+instance Expression SoftwarePrimType SExp (SExp a)
+  where
+    destruct  = resugar
+    construct = resugar
+
+instance
+    ( Expression SoftwarePrimType SExp a
+    , Expression SoftwarePrimType SExp b
+    )
+      => Expression SoftwarePrimType SExp (a, b)
+  where
+    destruct (Branch a b) = undefined
+      where
+        a' = destruct a
+        b' = destruct b
+    
+    construct ab = undefined
+    
+
+{-
+instance
+    ( Syntax Software a, Domain a ~ SoftwareDomain
+    , Syntax Software b, Domain b ~ SoftwareDomain
+    )
+      => Syntactic (a, b)
+  where
+    type Domain   (a, b) = SoftwareDomain
+    type Internal (a, b) = (Internal a, Internal b)
+
+    desugar (a, b) = sugarSymSoftware Pair (desugar a) (desugar b)
+    sugar ab       = (sugarSymSoftware Fst ab, sugarSymSoftware Snd ab)
+-}
+--------------------------------------------------------------------------------
+
 sugarSymSoftware
-    :: ( Signature sig
+  :: ( Signature sig
        , fi             ~ SmartFun SoftwareDomain sig
        , sig            ~ SmartSig fi
        , SoftwareDomain ~ SmartSym fi
        , SyntacticN f fi
        , sub :<: SoftwareConstructs
-       , SoftwareType (DenResult sig)
+       , Type SoftwarePrimType SoftwarePrimTypeRep (DenResult sig)
        )
     => sub sig -> f
 sugarSymSoftware = sugarSymDecor $ ValT $ typeRep
@@ -205,15 +239,17 @@ instance Type SoftwarePrimType SoftwarePrimTypeRep Float where typeRep = Node Fl
 class    (Type SoftwarePrimType SoftwarePrimTypeRep a, SoftwarePrimType a) => SoftwareType a
 instance (Type SoftwarePrimType SoftwarePrimTypeRep a, SoftwarePrimType a) => SoftwareType a
 
+--------------------------------------------------------------------------------
+
 -- ... software type representation ...
-type SoftwareTypeRep = TypeRep SoftwarePrimType SoftwarePrimTypeRep
+type STypeRep = TypeRep SoftwarePrimType SoftwarePrimTypeRep
 
 -- ... software types ...
 type SType = Syntax Software
 
 --------------------------------------------------------------------------------
 
-softwareTypeEq :: SoftwareTypeRep a -> SoftwareTypeRep b -> Maybe (Dict (a ~ b))
+softwareTypeEq :: STypeRep a -> STypeRep b -> Maybe (Dict (a ~ b))
 softwareTypeEq (Node t)       (Node u) = softwarePrimTypeEq t u
 softwareTypeEq (Branch t1 u1) (Branch t2 u2) = do
   Dict <- softwareTypeEq t1 t2
@@ -221,20 +257,27 @@ softwareTypeEq (Branch t1 u1) (Branch t2 u2) = do
   return Dict
 softwareTypeEq _ _ = Nothing
 
-softwareTypeRep :: Struct SoftwarePrimType c a -> SoftwareTypeRep a
+softwareTypeRep :: Struct SoftwarePrimType c a -> STypeRep a
 softwareTypeRep = mapStruct (const softwareRep)
 
 --------------------------------------------------------------------------------
 
+instance Syntax Software (SExp Bool)
+instance Syntax Software (SExp Int8)
+instance Syntax Software (SExp Word8)
+instance Syntax Software (SExp Float)
+{-
 instance
-  ( -- ...
-    Syntactic a
-  , Domain a ~ SoftwareDomain
-    -- ...
-  , SoftwarePrimType (Internal a)
-    -- ...
-  , Type SoftwarePrimType SoftwarePrimTypeRep (Internal a)
+  ( Syntax Software a
+  , Syntax Software b
+
+    -- argh...
+  , Syntactic (a, b)
+  , Internal  (a, b) ~ (Internal a, Internal b)
+  , Domain    (a, b) ~ SoftwareDomain
   )
-    => Syntax Software a
+    => Syntax Software (a, b)
+-}
+-- domain constraints are there becuase of the syntactic instance for pairs.
 
 --------------------------------------------------------------------------------

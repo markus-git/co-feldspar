@@ -29,10 +29,10 @@ import qualified Language.Embedded.Hardware.Interface as Imp
 import qualified Language.Embedded.Hardware.Command   as Imp
 -}
 
+-- imperative-edsl.
 import Language.Embedded.Imperative.Frontend.General hiding (Ref, Arr, IArr)
 import qualified Language.Embedded.Imperative     as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
-
 
 -- syntactic.
 import Language.Syntactic
@@ -44,9 +44,9 @@ import Language.Syntactic
 --------------------------------------------------------------------------------
 -- ** Expressions.
 
-instance Value HardwarePrimType HardwareDomain
+instance Value HardwarePrimType HardwarePrimTypeRep HExp
   where
-    value = sugarSymPrimHardware . Lit
+    value = sugarSymHardware . Lit
 
 --------------------------------------------------------------------------------
 
@@ -91,7 +91,7 @@ instance References Hardware
         = liftComp
         . fmap Ref
         . mapStructA (const Imp.newRef)
-        $ (typeRep :: HardwareTypeRep (Internal a))
+        $ (typeRep :: HTypeRep (Internal a))
 
     getRef :: HType a => Ref a -> Hardware a
     getRef

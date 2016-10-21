@@ -38,9 +38,9 @@ import Language.Syntactic
 --------------------------------------------------------------------------------
 -- ** Expressions.
 
-instance Value SoftwarePrimType SoftwareDomain
+instance Value SoftwarePrimType SoftwarePrimTypeRep SExp
   where
-    value = sugarSymPrimSoftware . Lit
+    value = sugarSymSoftware . Lit
 
 --------------------------------------------------------------------------------
 
@@ -86,7 +86,7 @@ instance References Software
         = liftComp
         . fmap Ref
         . mapStructA (const Imp.newRef)
-        $ (typeRep :: SoftwareTypeRep (Internal a))
+        $ (typeRep :: STypeRep (Internal a))
 
     getRef :: SType a => Ref a -> Software a
     getRef
