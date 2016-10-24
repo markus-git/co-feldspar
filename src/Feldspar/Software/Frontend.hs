@@ -10,6 +10,7 @@
 
 module Feldspar.Software.Frontend where
 
+import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
 

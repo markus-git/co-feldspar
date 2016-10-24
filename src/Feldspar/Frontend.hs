@@ -11,6 +11,7 @@
 
 module Feldspar.Frontend where
 
+import Feldspar.Sugar
 import Feldspar.Representation
 
 import Data.Constraint

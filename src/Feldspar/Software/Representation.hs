@@ -15,6 +15,7 @@
 
 module Feldspar.Software.Representation where
 
+import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
 
@@ -134,39 +135,17 @@ instance Syntactic (Struct SoftwarePrimType SExp a)
       ValT (Branch ta tb) -> Branch (sugarSymDecor (ValT ta) Fst a) (sugarSymDecor (ValT tb) Snd a)
 
 --------------------------------------------------------------------------------
-
+{-
 instance Expression SoftwarePrimType SExp (SExp a)
   where
     destruct  = resugar
     construct = resugar
 
-instance
-    ( Expression SoftwarePrimType SExp a
-    , Expression SoftwarePrimType SExp b
-    )
-      => Expression SoftwarePrimType SExp (a, b)
+instance Expression SoftwarePrimType SExp (a, b)
   where
-    destruct (Branch a b) = undefined
-      where
-        a' = destruct a
-        b' = destruct b
-    
-    construct ab = undefined
-    
-
-{-
-instance
-    ( Syntax Software a, Domain a ~ SoftwareDomain
-    , Syntax Software b, Domain b ~ SoftwareDomain
-    )
-      => Syntactic (a, b)
-  where
-    type Domain   (a, b) = SoftwareDomain
-    type Internal (a, b) = (Internal a, Internal b)
-
-    desugar (a, b) = sugarSymSoftware Pair (desugar a) (desugar b)
-    sugar ab       = (sugarSymSoftware Fst ab, sugarSymSoftware Snd ab)
--}
+    destruct  = resugar
+    construct = resugar
+-}    
 --------------------------------------------------------------------------------
 
 sugarSymSoftware
@@ -266,18 +245,12 @@ instance Syntax Software (SExp Bool)
 instance Syntax Software (SExp Int8)
 instance Syntax Software (SExp Word8)
 instance Syntax Software (SExp Float)
-{-
 instance
-  ( Syntax Software a
-  , Syntax Software b
-
-    -- argh...
-  , Syntactic (a, b)
-  , Internal  (a, b) ~ (Internal a, Internal b)
-  , Domain    (a, b) ~ SoftwareDomain
+  ( Syntax Software a, Domain a ~ SoftwareDomain
+  , Syntax Software b, Domain b ~ SoftwareDomain
+  , Syntactic a
+  , Syntactic b
   )
     => Syntax Software (a, b)
--}
--- domain constraints are there becuase of the syntactic instance for pairs.
 
 --------------------------------------------------------------------------------

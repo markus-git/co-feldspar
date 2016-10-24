@@ -10,6 +10,7 @@
 
 module Feldspar.Hardware.Frontend where
 
+import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
 

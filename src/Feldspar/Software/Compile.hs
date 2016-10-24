@@ -6,6 +6,7 @@
 
 module Feldspar.Software.Compile where
 
+import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Software.Primitive
 import Feldspar.Software.Primitive.Backend

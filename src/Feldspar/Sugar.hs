@@ -48,11 +48,7 @@ class (Eq a, Show a, Typeable a) => Type pred rep a
     typeRep :: TypeRep pred rep a
 
 -- pairs of valid types are themselves also valid types.
-instance
-    ( Type pred trep a
-    , Type pred trep b
-    )
-    => Type pred trep (a, b)
+instance (Type pred trep a, Type pred trep b) => Type pred trep (a, b)
   where
     typeRep = Branch typeRep typeRep
 

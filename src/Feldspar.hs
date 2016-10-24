@@ -8,6 +8,7 @@ module Feldspar
   , Syntax
   ) where
 
+import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
 

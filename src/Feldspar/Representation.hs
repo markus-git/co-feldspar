@@ -13,6 +13,8 @@
 
 module Feldspar.Representation where
 
+import Feldspar.Sugar
+
 import Data.Struct
 import Data.Inhabited
 
@@ -66,7 +68,7 @@ class Expression pred expr a
   where
     construct :: a -> Struct pred expr (Internal a)
     destruct  :: Struct pred expr (Internal a) -> a
-{-
+
 -- Every syntactical object with a corresponding syntactical instance for
 -- structures can be cast using `resugar`.
 instance
@@ -79,11 +81,11 @@ instance
   where
     construct = resugar
     destruct  = resugar
--}
+
 --------------------------------------------------------------------------------
 -- * Types.
 --------------------------------------------------------------------------------
-
+{-
 -- | Representation of supported feldspar types as typed binary trees over
 --   primitive types.
 type TypeRep pred rep = Struct pred rep
@@ -94,9 +96,9 @@ data TypeRepF pred rep a
   where
     ValT :: TypeRep pred rep a -> TypeRepF pred rep a
     FunT :: TypeRep pred rep a -> TypeRepF pred rep b -> TypeRepF pred rep (a -> b)
-
+-}
 --------------------------------------------------------------------------------
-
+{-
 class (Eq a, Show a, Typeable a, Inhabited a) => Type pred trep a
   where
     typeRep :: TypeRep pred trep a
@@ -105,7 +107,7 @@ class (Eq a, Show a, Typeable a, Inhabited a) => Type pred trep a
 instance (Type pred trep a, Type pred trep b) => Type pred trep (a, b)
   where
     typeRep = Branch typeRep typeRep
-
+-}
 --------------------------------------------------------------------------------
 
 class (Expression (Pred m) (Expr m) a, Type (Pred m) (TRep m) (Internal a)) => Syntax m a

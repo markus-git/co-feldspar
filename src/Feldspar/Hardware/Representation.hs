@@ -15,6 +15,7 @@
 
 module Feldspar.Hardware.Representation where
 
+import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
 
@@ -118,18 +119,6 @@ instance Syntactic (Struct HardwarePrimType HExp a)
       ValT (Node _)       -> Node $ HExp a
       ValT (Branch ta tb) -> Branch (sugarSymDecor (ValT ta) Fst a) (sugarSymDecor (ValT tb) Snd a)
 
-instance
-    ( Syntax Hardware a, Domain a ~ HardwareDomain
-    , Syntax Hardware b, Domain b ~ HardwareDomain
-    )
-      => Syntactic (a, b)
-  where
-    type Domain   (a, b) = HardwareDomain
-    type Internal (a, b) = (Internal a, Internal b)
-
-    desugar (a, b) = sugarSymHardware Pair (desugar a) (desugar b)
-    sugar ab       = (sugarSymHardware Fst ab, sugarSymHardware Snd ab)
-
 --------------------------------------------------------------------------------
 
 sugarSymHardware
@@ -213,10 +202,11 @@ hardwareTypeRep = mapStruct (const hardwareRep)
 instance Syntax Hardware (HExp Bool)
 instance Syntax Hardware (HExp Int8)
 instance Syntax Hardware (HExp Word8)
-
 instance
   ( Syntax Hardware a, Domain a ~ HardwareDomain
   , Syntax Hardware b, Domain b ~ HardwareDomain
+  , Syntactic a
+  , Syntactic b
   )
     => Syntax Hardware (a, b)
 
