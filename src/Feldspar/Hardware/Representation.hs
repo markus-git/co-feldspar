@@ -205,8 +205,6 @@ instance Syntax Hardware (HExp Word8)
 instance
   ( Syntax Hardware a, Domain a ~ HardwareDomain
   , Syntax Hardware b, Domain b ~ HardwareDomain
-  , Syntactic a
-  , Syntactic b
   )
     => Syntax Hardware (a, b)
 
