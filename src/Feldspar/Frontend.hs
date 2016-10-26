@@ -9,6 +9,8 @@
 
 {-# language FunctionalDependencies #-}
 
+{-# language TypeOperators #-}
+
 module Feldspar.Frontend where
 
 import Feldspar.Sugar
@@ -27,28 +29,34 @@ import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 
 --------------------------------------------------------------------------------
--- * ...
+-- * Frontend.
 --------------------------------------------------------------------------------
 
--- | Short-hand for computational monads that support ...
+-- short-hand for computational monads that support our basic expressions and commmands.
 type CoMonad m =
   ( MonadComp m
-    -- ... commands ...
   , References m
-    -- ... expressions ...
-  , Value     (Pred m) (TRep m) (Expr m)
   , Numerical (Pred m) (Expr m)
+  )
+
+-- short-hand for syntactic objects that support lifting values.
+type CoType m a =
+  ( Syntax m a
+  , Value (Pred m) (TRep m) (Domain a)
   )
 
 --------------------------------------------------------------------------------
 -- ** Expressions.
 
-class Value pred rep expr | expr -> pred, pred -> rep
+class Value pred trep dom | dom -> pred, dom -> trep
   where
-    value :: (Type pred rep (Internal (expr a)), Expression pred expr (expr a)) => a -> expr a
+    value :: (Type pred trep (Internal a), dom ~ Domain a, Syntactic a) => Internal a -> a 
 
+-- It should be that `dom ~ (sup :&: TypeRepF pred trep)` but I guess the above
+-- constraint is easier to read.
 --------------------------------------------------------------------------------
 
+-- | Numerical expressions.
 class Numerical pred expr | expr -> pred
   where
     plus   :: (pred (Internal (expr a)), Num a) => expr a -> expr a -> expr a
@@ -59,6 +67,7 @@ class Numerical pred expr | expr -> pred
 --------------------------------------------------------------------------------
 -- ** Commands.
 
+-- | Commands for managing mutable references.
 class MonadComp m => References m
   where
     type Reference m :: * -> *

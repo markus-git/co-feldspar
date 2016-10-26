@@ -4,9 +4,9 @@
 {-# language MultiParamTypeClasses #-}
 {-# language Rank2Types #-}
 
+-- todo: I might not need these anymore.
 {-# language ScopedTypeVariables #-}
 {-# language InstanceSigs #-}
-
 
 module Feldspar.Hardware.Frontend where
 
@@ -45,7 +45,7 @@ import Language.Syntactic
 --------------------------------------------------------------------------------
 -- ** Expressions.
 
-instance Value HardwarePrimType HardwarePrimTypeRep HExp
+instance Value HardwarePrimType HardwarePrimTypeRep HardwareDomain
   where
     value = sugarSymHardware . Lit
 

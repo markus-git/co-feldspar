@@ -20,8 +20,11 @@ import Language.Syntactic (Internal)
 
 apa :: forall m .
   ( CoMonad m
-  , Syntax m (Expr m Int8)
-  , Syntax m (Expr m Int8, Expr m Int8)
+  , CoType m (Expr m Int8)
+    -- todo: it should be able to derive this.
+  , CoType m (Expr m Int8, Expr m Int8)
+    -- todo: annoying~~!
+  , Num (Internal (Expr m Int8))
   )
   => m ()
 apa = 

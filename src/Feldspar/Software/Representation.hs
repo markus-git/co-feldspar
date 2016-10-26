@@ -246,10 +246,10 @@ instance Syntax Software (SExp Int8)
 instance Syntax Software (SExp Word8)
 instance Syntax Software (SExp Float)
 instance
-  ( Syntax Software a, Domain a ~ SoftwareDomain
-  , Syntax Software b, Domain b ~ SoftwareDomain
-  , Syntactic a
-  , Syntactic b
+  ( Syntactic a, Domain a ~ SoftwareDomain
+  , Syntactic b, Domain b ~ SoftwareDomain
+  , Type SoftwarePrimType SoftwarePrimTypeRep (Internal a)
+  , Type SoftwarePrimType SoftwarePrimTypeRep (Internal b)
   )
     => Syntax Software (a, b)
 

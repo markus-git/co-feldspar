@@ -39,7 +39,7 @@ import Language.Syntactic
 --------------------------------------------------------------------------------
 -- ** Expressions.
 
-instance Value SoftwarePrimType SoftwarePrimTypeRep SExp
+instance Value SoftwarePrimType SoftwarePrimTypeRep SoftwareDomain
   where
     value = sugarSymSoftware . Lit
 
