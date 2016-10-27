@@ -92,7 +92,7 @@ instance (Type pred trep a, Type pred trep b) => Type pred trep (a, b)
 --------------------------------------------------------------------------------
 
 -- | Alternative representation of expressions to expose nesting of values.
-class Structured pred expr a
+class Syntactic a => Structured pred expr a
   where
     construct :: a -> Struct pred expr (Internal a)
     destruct  :: Struct pred expr (Internal a) -> a
@@ -113,6 +113,6 @@ instance
 --------------------------------------------------------------------------------
 
 -- short-hand for objects that are well typed and have a nesting we can inspect.
-class (Syntactic a, Structured (Pred m) (Expr m) a, Type (Pred m) (TRep m) (Internal a)) => Syntax m a
+class (Structured (Pred m) (Expr m) a, Type (Pred m) (TRep m) (Internal a)) => Syntax m a
 
 --------------------------------------------------------------------------------
