@@ -35,12 +35,30 @@ class Decorated decor a
     decorate :: decor a
 
 -- | Representable types are decorated as fully applied types in `TypeRepF`.
-instance Type pred rep a => Decorated (TypeRepF pred rep) a
+instance (Type pred a, rep ~ Rep pred) => Decorated (TypeRepF pred rep) a
   where
     decorate = ValT typeRep
 
 -- todo: functions over representable types.
 --------------------------------------------------------------------------------
+
+instance
+    ( Syntactic a
+    , Syntactic b
+    )
+    => Syntactic (a -> b)
+  where
+    type Domain   (a -> b) = Domain a
+    type Internal (a -> b) = Internal a -> Internal b
+
+    desugar = error "desugar not yet implemented for (a -> b)"
+    sugar = error "sugar not implemented for (a -> b)"
+{-
+    desugar = lamT_template varSym lamSym (desugar . f . sugar)
+      where
+        varSym v = inj (VarT v) :&: ValT typeRep
+        lamSym v = Sym (inj (LamT v) :&: FunT typeRep (getDecor b)) :$ b
+-}
 
 instance
     ( Syntactic a

@@ -37,29 +37,6 @@ import qualified Language.Embedded.Expression     as Imp
 -- ...
 
 --------------------------------------------------------------------------------
--- * Programs.
---------------------------------------------------------------------------------
-
--- | Instructions of a purely computational nature.
-type CompCMD = Imp.RefCMD :+: Imp.ControlCMD
-
--- short-hand for programs made of computational instructions.
-type Prog expr pred = Program CompCMD (Param2 expr pred)
-
--- | Class of monads that support lifting of computational programs.
-class Monad m => MonadComp m
-  where
-    -- | Expressions.
-    type Expr m :: * -> *
-    -- | Predicate.
-    type Pred m :: * -> Constraint
-    -- | Representation of types.
-    type TRep m :: * -> *
-
-    -- | Lift a computational progam.
-    liftComp :: Prog (Expr m) (Pred m) a -> m a
-
---------------------------------------------------------------------------------
 -- * Types.
 --------------------------------------------------------------------------------
 
@@ -76,16 +53,29 @@ data TypeRepF pred rep a
 
 --------------------------------------------------------------------------------
 
+-- | ...
+type family Pred (domain :: * -> *) :: * -> Constraint
+
+-- | ...
+type family Rep (pred :: * -> Constraint) :: * -> *
+
+--------------------------------------------------------------------------------
+  
 -- | Supported types, that is, types which can be represented as nested pairs of
 --   simpler values that respect `pred` and are in turn represented using `trep`.
-class (Eq a, Show a, Typeable a, Inhabited a) => Type pred trep a
+class (Eq a, Show a, Typeable a, Inhabited a) => Type pred a
   where
-    typeRep :: TypeRep pred trep a
+    typeRep :: TypeRep pred (Rep pred) a
 
--- pairs of valid types are themselves also valid types.
-instance (Type pred trep a, Type pred trep b) => Type pred trep (a, b)
+-- Pairs of valid types are themselves also valid types.
+instance (Type pred a, Type pred b) => Type pred (a, b)
   where
     typeRep = Branch typeRep typeRep
+
+--------------------------------------------------------------------------------
+
+-- | ...
+type PrimType pred a = (Type pred a, pred a)
 
 --------------------------------------------------------------------------------
 -- * Expressions.
@@ -113,6 +103,6 @@ instance
 --------------------------------------------------------------------------------
 
 -- short-hand for objects that are well typed and have a nesting we can inspect.
-class (Structured (Pred m) (Expr m) a, Type (Pred m) (TRep m) (Internal a)) => Syntax m a
+--class (Structured (Pred m) (Expr m) a, Type (Pred m) (TRep m) (Internal a)) => Syntax m a
 
 --------------------------------------------------------------------------------

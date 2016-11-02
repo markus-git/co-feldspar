@@ -47,27 +47,18 @@ import qualified Language.Embedded.Imperative as Imp
 --------------------------------------------------------------------------------
 
 -- | Software instructions.
-type SoftwareCMD = CompCMD Oper.:+: Imp.FileCMD
+type SoftwareCMD
+         = Imp.RefCMD
+  Oper.:+: Imp.ControlCMD
+  Oper.:+: Imp.FileCMD
 
 -- | Monad for building software programs in Feldspar.
-newtype Software a = Software { unSoftware ::
-    ProgramT SoftwareCMD (Param2 SExp SoftwarePrimType)
-      (Program CompCMD (Param2 SExp SoftwarePrimType))
-        a
-  } deriving (Functor, Applicative, Monad)
+newtype Software a = Software { unSoftware :: Program SoftwareCMD (Param2 SExp SoftwarePrimType) a }
+  deriving (Functor, Applicative, Monad)
 
 --------------------------------------------------------------------------------
 
-instance MonadComp Software
-  where
-    type Expr Software = SExp
-    type Pred Software = SoftwarePrimType
-    type TRep Software = SoftwarePrimTypeRep
-
-    liftComp = Software . lift
-
---------------------------------------------------------------------------------
-
+-- | Software reference.
 newtype Ref a = Ref { unRef :: Struct SoftwarePrimType Imp.Ref (Internal a) }
 
 --------------------------------------------------------------------------------
@@ -107,6 +98,9 @@ newtype SExp a = SExp { unSExp :: ASTF SoftwareDomain a }
 eval :: (Syntactic a, Domain a ~ SoftwareDomain) => a -> Internal a
 eval = evalClosed . desugar
 
+-- | ...
+type instance Pred SoftwareDomain = SoftwarePrimType
+
 --------------------------------------------------------------------------------
 
 instance Syntactic (SExp a)
@@ -135,18 +129,6 @@ instance Syntactic (Struct SoftwarePrimType SExp a)
       ValT (Branch ta tb) -> Branch (sugarSymDecor (ValT ta) Fst a) (sugarSymDecor (ValT tb) Snd a)
 
 --------------------------------------------------------------------------------
-{-
-instance Expression SoftwarePrimType SExp (SExp a)
-  where
-    destruct  = resugar
-    construct = resugar
-
-instance Expression SoftwarePrimType SExp (a, b)
-  where
-    destruct  = resugar
-    construct = resugar
--}    
---------------------------------------------------------------------------------
 
 sugarSymSoftware
   :: ( Signature sig
@@ -155,7 +137,7 @@ sugarSymSoftware
        , SoftwareDomain ~ SmartSym fi
        , SyntacticN f fi
        , sub :<: SoftwareConstructs
-       , Type SoftwarePrimType SoftwarePrimTypeRep (DenResult sig)
+       , SType (DenResult sig)
        )
     => sub sig -> f
 sugarSymSoftware = sugarSymDecor $ ValT $ typeRep
@@ -169,7 +151,7 @@ sugarSymPrimSoftware
        , SoftwareDomain ~ SmartSym fi
        , SyntacticN f fi
        , sub :<: SoftwareConstructs
-       , SoftwarePrimType (DenResult sig)
+       , SPrimType (DenResult sig)
        )
     => sub sig -> f
 sugarSymPrimSoftware = sugarSymDecor $ ValT $ Node softwareRep
@@ -179,7 +161,7 @@ sugarSymPrimSoftware = sugarSymDecor $ ValT $ Node softwareRep
 
 instance Imp.FreeExp SExp
   where
-    type FreePred SExp = SoftwareType
+    type FreePred SExp = SPrimType
     constExp = sugarSymSoftware . Lit
     varExp   = sugarSymSoftware . FreeVar
 
@@ -208,15 +190,10 @@ instance StringTree ForLoop
 -- * Types.
 --------------------------------------------------------------------------------
 
-instance Type SoftwarePrimType SoftwarePrimTypeRep Bool  where typeRep = Node BoolST
-instance Type SoftwarePrimType SoftwarePrimTypeRep Int8  where typeRep = Node Int8ST
-instance Type SoftwarePrimType SoftwarePrimTypeRep Word8 where typeRep = Node Word8ST
-instance Type SoftwarePrimType SoftwarePrimTypeRep Float where typeRep = Node FloatST
-
---------------------------------------------------------------------------------
-
-class    (Type SoftwarePrimType SoftwarePrimTypeRep a, SoftwarePrimType a) => SoftwareType a
-instance (Type SoftwarePrimType SoftwarePrimTypeRep a, SoftwarePrimType a) => SoftwareType a
+instance Type SoftwarePrimType Bool  where typeRep = Node BoolST
+instance Type SoftwarePrimType Int8  where typeRep = Node Int8ST
+instance Type SoftwarePrimType Word8 where typeRep = Node Word8ST
+instance Type SoftwarePrimType Float where typeRep = Node FloatST
 
 --------------------------------------------------------------------------------
 
@@ -224,7 +201,13 @@ instance (Type SoftwarePrimType SoftwarePrimTypeRep a, SoftwarePrimType a) => So
 type STypeRep = TypeRep SoftwarePrimType SoftwarePrimTypeRep
 
 -- ... software types ...
-type SType = Syntax Software
+type SType = Type SoftwarePrimType
+
+--------------------------------------------------------------------------------
+
+-- ... text ...
+class    (SType a, SoftwarePrimType a) => SPrimType a
+instance (SType a, SoftwarePrimType a) => SPrimType a
 
 --------------------------------------------------------------------------------
 
@@ -240,7 +223,7 @@ softwareTypeRep :: Struct SoftwarePrimType c a -> STypeRep a
 softwareTypeRep = mapStruct (const softwareRep)
 
 --------------------------------------------------------------------------------
-
+{-
 instance Syntax Software (SExp Bool)
 instance Syntax Software (SExp Int8)
 instance Syntax Software (SExp Word8)
@@ -250,5 +233,5 @@ instance
   , Syntax Software b, Domain b ~ SoftwareDomain
   )
     => Syntax Software (a, b)
-
+-}
 --------------------------------------------------------------------------------

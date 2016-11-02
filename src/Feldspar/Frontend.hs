@@ -32,43 +32,51 @@ import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 -- * Frontend.
 --------------------------------------------------------------------------------
 
--- short-hand for computational monads that support our basic expressions and commmands.
-type CoMonad m =
-  ( MonadComp m
-  , References m
-  , Numerical (Pred m) (Expr m)
-  )
-
--- short-hand for syntactic objects that support lifting values.
-type CoType m a =
-  ( Syntax m a
-  , Value (Pred m) (TRep m) (Domain a)
-  )
+-- | Short-hand for a `Syntactic` instance over typed pritmitive values from `dom`.
+type Syntax' dom a = (Syntactic a, Type (Pred dom) (Internal a), dom ~ Domain a)
 
 --------------------------------------------------------------------------------
 -- ** Expressions.
 
-class Value pred trep dom | dom -> pred, dom -> trep
+-- | Literals.
+class Value dom
   where
-    value :: (Type pred trep (Internal a), dom ~ Domain a, Syntactic a) => Internal a -> a 
+    value :: Syntax' dom a => Internal a -> a
 
--- It should be that `dom ~ (sup :&: TypeRepF pred trep)` but I guess the above
--- constraint is easier to read.
 --------------------------------------------------------------------------------
 
--- | Numerical expressions.
-class Numerical pred expr | expr -> pred
+-- | Forced evaluation.
+class Share dom
   where
-    plus   :: (pred (Internal (expr a)), Num a) => expr a -> expr a -> expr a
-    minus  :: (pred (Internal (expr a)), Num a) => expr a -> expr a -> expr a
-    times  :: (pred (Internal (expr a)), Num a) => expr a -> expr a -> expr a
-    negate :: (pred (Internal (expr a)), Num a) => expr a -> expr a
+    share :: (Syntax' dom a, Syntax' dom b)
+      => a        -- ^ Value to share.
+      -> (a -> b) -- ^ Body in which to share the value.
+      -> b
+
+--------------------------------------------------------------------------------
+
+-- | Conditional statements.
+class Boolean dom
+  where
+    bool
+      :: ( Syntax' dom a, Syntax' dom b, Internal b ~ Bool)
+      => a -- ^ true branch.
+      -> a -- ^ false branch.
+      -> b -- ^ condition.
+      -> a
+    false :: (Syntax' dom a, Internal a ~ Bool) => a
+    true  :: (Syntax' dom a, Internal a ~ Bool) => a
+
+--------------------------------------------------------------------------------
+-- ** ...
+
+
 
 --------------------------------------------------------------------------------
 -- ** Commands.
-
+{-
 -- | Commands for managing mutable references.
-class MonadComp m => References m
+class Monad m => References m
   where
     type Reference m :: * -> *
 
@@ -76,5 +84,5 @@ class MonadComp m => References m
     newRef  :: Syntax m a => m (Reference m a)
     getRef  :: Syntax m a => Reference m a -> m a
     setRef  :: Syntax m a => Reference m a -> a -> m ()
-
+-}
 --------------------------------------------------------------------------------

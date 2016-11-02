@@ -22,6 +22,10 @@ import Data.Struct
 import Data.Constraint hiding (Sub)
 import Data.Proxy
 
+-- syntactic.
+import Language.Syntactic.Functional
+
+-- operational-higher.
 import qualified Control.Monad.Operational.Higher as Oper
 
 -- imperative-edsl.
@@ -39,22 +43,23 @@ import Language.Syntactic
 --------------------------------------------------------------------------------
 -- ** Expressions.
 
-instance Value SoftwarePrimType SoftwarePrimTypeRep SoftwareDomain
+instance Value SoftwareDomain
   where
     value = sugarSymSoftware . Lit
 
---------------------------------------------------------------------------------
-
-instance Numerical SoftwarePrimType SExp
+instance Share SoftwareDomain
   where
-    plus    = sugarSymPrimSoftware Add
-    minus   = sugarSymPrimSoftware Sub
-    times   = sugarSymPrimSoftware Mul
-    negate  = sugarSymPrimSoftware Neg
+    share = sugarSymSoftware (Let "")
+
+instance Boolean SoftwareDomain
+  where
+    bool t f b = sugarSymSoftware Cond b t f
+    false = value False
+    true  = value True
 
 --------------------------------------------------------------------------------
 -- ** Instructions.
-
+{-
 -- ...
 withSType :: forall a b . Proxy a -> (Imp.FreePred SExp a => b) -> (SoftwarePrimType a => b)
 withSType _ f = case softwareDict (softwareRep :: SoftwarePrimTypeRep a) of
@@ -68,9 +73,10 @@ softwareDict rep = case rep of
   Word8ST  -> Dict
   FloatST  -> Dict
 
+-}
 --------------------------------------------------------------------------------
 -- *** ... comp instr ...
-
+{-
 instance References Software
   where
     type Reference Software = Ref
@@ -108,10 +114,10 @@ instance References Software
       where
         setty :: forall b . SoftwarePrimType b => Imp.Ref b -> SExp b -> Prog SExp SoftwarePrimType ()
         setty = withSType (Proxy :: Proxy b) Imp.setRef
-
+-}
 --------------------------------------------------------------------------------
 -- *** File handling.
-
+{-
 -- | Open a file
 fopen :: FilePath -> IOMode -> Software Handle
 fopen file = Software . Imp.fopen file
@@ -136,10 +142,10 @@ fput h pre e post = Software $ Imp.fput h pre e post
 -- | Get a primitive value from a handle
 fget :: (Formattable a, SoftwareType a) => Handle -> Software (SExp a)
 fget = Software . Imp.fget
-
+-}
 --------------------------------------------------------------------------------
 -- *** Printing.
-
+{-
 class PrintfType r
   where
     fprf :: Handle -> String -> [Imp.PrintfArg SExp] -> r
@@ -159,5 +165,5 @@ fprintf h format = fprf h format []
 -- | Print to @stdout@. Accepts a variable number of arguments.
 printf :: PrintfType r => String -> r
 printf = fprintf Imp.stdout
-
+-}
 --------------------------------------------------------------------------------

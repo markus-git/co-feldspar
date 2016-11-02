@@ -57,6 +57,9 @@ deriving instance Typeable (SoftwarePrimTypeRep a)
 
 --------------------------------------------------------------------------------
 
+-- | ...
+type instance Rep SoftwarePrimType = SoftwarePrimTypeRep
+
 -- | Class of supported software types.
 class (Eq a, Show a, Typeable a, Inhabited a) => SoftwarePrimType a
   where
@@ -94,6 +97,8 @@ data SoftwarePrim sig
   where
     FreeVar :: (SoftwarePrimType a) => String -> SoftwarePrim (Full a)
     Lit     :: (Show a, Eq a)       => a      -> SoftwarePrim (Full a)
+    -- ^ conditional.
+    Cond    :: SoftwarePrim (Bool :-> a :-> a :-> Full a)
     -- ^ numerical operations.
     Neg     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> Full a)
     Add     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> a :-> Full a)
@@ -190,6 +195,7 @@ instance Eval SoftwarePrim
   where
     evalSym (FreeVar v) = error $ "evaluating free variable " ++ show v
     evalSym (Lit a)     = a
+    evalSym Cond        = \c t f -> if c then t else f
     evalSym Neg         = negate
     evalSym Add         = (+)
     evalSym Sub         = (-)
@@ -208,6 +214,7 @@ instance Symbol SoftwarePrim
   where
     symSig (FreeVar v) = signature
     symSig (Lit a)     = signature
+    symSig Cond        = signature
     symSig Neg         = signature
     symSig Add         = signature
     symSig Sub         = signature
