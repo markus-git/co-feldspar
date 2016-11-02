@@ -20,14 +20,15 @@ import Data.Constraint hiding (Sub)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-import Control.Monad.Operational.Higher (Program)
-import qualified Control.Monad.Operational.Higher as Oper
-
 -- syntactic.
 import Language.Syntactic (AST (..), (:&:) (..), Args (..), prj)
 import Language.Syntactic.Functional hiding (Binding (..))
 import Language.Syntactic.Functional.Tuple
 import qualified Language.Syntactic as S
+
+-- operational-higher.
+import Control.Monad.Operational.Higher (Program)
+import qualified Control.Monad.Operational.Higher as Oper
 
 -- imperative-edsl.
 import Language.Embedded.Expression

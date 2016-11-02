@@ -1,13 +1,11 @@
 module Feldspar.Hardware
   ( module Feldspar
   , module Feldspar.Hardware.Frontend
-  , module Feldspar.Hardware.Compile
   , HExp
   , HType
-  , HardwareType
   , Hardware
---  , compile
---  , icompile
+  , compile
+  , icompile
   ) where
 
 import Feldspar

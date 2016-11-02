@@ -151,19 +151,19 @@ setRef' = withSType (Proxy :: Proxy b) Imp.setRef
 --------------------------------------------------------------------------------
 -- *** File handling.
 
--- | Open a file
+-- | Open a file.
 fopen :: FilePath -> IOMode -> Software Handle
 fopen file = Software . Imp.fopen file
 
--- | Close a file
+-- | Close a file.
 fclose :: Handle -> Software ()
 fclose = Software . Imp.fclose
 
--- | Check for end of file
+-- | Check for end of file.
 feof :: Handle -> Software (SExp Bool)
 feof = Software . Imp.feof
 
--- | Put a primitive value to a handle
+-- | Put a primitive value to a handle.
 fput :: (Formattable a, SType' a)
     => Handle
     -> String  -- Prefix
@@ -172,7 +172,7 @@ fput :: (Formattable a, SType' a)
     -> Software ()
 fput h pre e post = Software $ Imp.fput h pre e post
 
--- | Get a primitive value from a handle
+-- | Get a primitive value from a handle.
 fget :: (Formattable a, SType' a) => Handle -> Software (SExp a)
 fget = Software . Imp.fget
 

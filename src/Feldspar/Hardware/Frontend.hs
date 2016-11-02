@@ -29,6 +29,7 @@ import qualified Language.Syntactic as Syntactic
 import qualified Control.Monad.Operational.Higher as Oper
 
 -- hardware-edsl.
+import Language.Embedded.Hardware.Command (Signal, Ident)
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
 
@@ -144,9 +145,33 @@ setRef' = withHType (Proxy :: Proxy b) Imp.setVariable
 --------------------------------------------------------------------------------
 -- *** Singals.
 
+-- | Creates a new signal with a given initial value.
+initSignal :: HType' a => HExp a -> Hardware (Signal a)
+initSignal = Hardware . Imp.initSignal
 
+-- | Creates a new signal.
+newSignal :: HType' a => Hardware (Signal a)
+newSignal = Hardware $ Imp.newSignal
+
+-- | Get the current value of a signal.
+getSignal :: HType' a => Signal a -> Hardware (HExp a)
+getSignal = Hardware . Imp.getSignal
+
+-- | Set the current value of a signal.
+setSignal :: HType' a => Signal a -> HExp a -> Hardware ()
+setSignal s = Hardware . (Imp.setSignal s)
 
 --------------------------------------------------------------------------------
 -- *** Structural entities.
+
+entity  :: String -> Hardware () -> Hardware ()
+entity name = Hardware . (Imp.entity name) . unHardware
+
+-- *** todo : entity name should be derived from context, not explicitly stated here.
+architecture :: String -> String -> Hardware () -> Hardware ()
+architecture entity name = Hardware . (Imp.architecture entity name) . unHardware
+
+process :: [Ident] -> Hardware () -> Hardware ()
+process is = Hardware . (Imp.process is) . unHardware
 
 --------------------------------------------------------------------------------
