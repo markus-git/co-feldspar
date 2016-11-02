@@ -24,8 +24,9 @@ import Data.Constraint hiding (Sub)
 import Data.Proxy
 
 -- syntactic.
-import Language.Syntactic hiding (Equality)
+import Language.Syntactic (Syntactic(..))
 import Language.Syntactic.Functional
+import qualified Language.Syntactic as Syntactic
 
 -- operational-higher.
 import qualified Control.Monad.Operational.Higher as Oper
@@ -60,14 +61,15 @@ instance Cond SoftwareDomain
 instance Equality SoftwareDomain
   where
     (==) = sugarSymSoftware Eq
-    (/=) = error "(/=) not implemented for `SExp`"
 
 instance Ordered SoftwareDomain
   where
     (<)  = sugarSymSoftware Lt
-    (>)  = error "(>) not implemented for `SExp`"
-    (<=) = error "(<=) not implemented for `SExp`"
-    (>=) = error "(>=) not implemented for `SExp`"
+
+instance Logical SoftwareDomain
+  where
+    not  = sugarSymSoftware Not
+    (&&) = sugarSymSoftware And
 
 --------------------------------------------------------------------------------
 
@@ -89,13 +91,31 @@ instance (Num a, SType' a) => Num (SExp a)
 --------------------------------------------------------------------------------
 -- * Instructions.
 --------------------------------------------------------------------------------
-{-
--- ...
+
+desugar :: (Syntactic a, Domain a ~ SoftwareDomain) => a -> SExp (Internal a)
+desugar = SExp . Syntactic.desugar
+
+sugar   :: (Syntactic a, Domain a ~ SoftwareDomain) => SExp (Internal a) -> a
+sugar   = Syntactic.sugar . unSExp
+
+resugar
+  :: ( Syntactic a
+     , Syntactic b
+     , Internal a ~ Internal b
+     , Domain a   ~ SoftwareDomain
+     , Domain b   ~ SoftwareDomain
+     )
+  => a -> b
+resugar = Syntactic.resugar
+
+--------------------------------------------------------------------------------
+
+-- Swap a `Imp.FreePred` constraint for software expressions to a `SoftwarePrimType` one.
 withSType :: forall a b . Proxy a -> (Imp.FreePred SExp a => b) -> (SoftwarePrimType a => b)
 withSType _ f = case softwareDict (softwareRep :: SoftwarePrimTypeRep a) of
   Dict -> f
 
--- ...
+-- Proves that a type from `SoftwarePrimTypeRep` satisfies `Imp.FreePred` for software expressions.
 softwareDict :: SoftwarePrimTypeRep a -> Dict (Imp.FreePred SExp a)
 softwareDict rep = case rep of
   BoolST   -> Dict
@@ -103,51 +123,34 @@ softwareDict rep = case rep of
   Word8ST  -> Dict
   FloatST  -> Dict
 
--}
 --------------------------------------------------------------------------------
--- *** ... comp instr ...
-{-
+-- ** Genereal instructions.
+
 instance References Software
   where
     type Reference Software = Ref
 
-    initRef :: forall a . SType a => a -> Software (Ref a)
-    initRef
-        = liftComp
-        . fmap Ref
-        . mapStructA (Imp.initRef)
-        . construct
+    initRef    = Software . fmap Ref . mapStructA (Imp.initRef) . resugar
+    newRef     = Software . fmap Ref . mapStructA (const Imp.newRef) $ typeRep
+    getRef     = Software . fmap resugar . mapStructA getRef' . unRef
+    setRef ref = Software . sequence_ . zipListStruct setRef' (unRef ref) . resugar
 
-    newRef :: forall a . SType a => Software (Ref a)
-    newRef
-        = liftComp
-        . fmap Ref
-        . mapStructA (const Imp.newRef)
-        $ (typeRep :: STypeRep (Internal a))
+getRef' :: forall b . SoftwarePrimType b
+  => Imp.Ref b
+  -> Imp.Program SoftwareCMD (Imp.Param2 SExp SoftwarePrimType) (SExp b)
+getRef' = withSType (Proxy :: Proxy b) Imp.getRef
 
-    getRef :: SType a => Ref a -> Software a
-    getRef
-        = liftComp
-        . fmap destruct
-        . mapStructA getty
-        . unRef
-      where
-        getty :: forall b . SoftwarePrimType b => Imp.Ref b -> Prog SExp SoftwarePrimType (SExp b)
-        getty = withSType (Proxy :: Proxy b) Imp.getRef
+setRef' :: forall b . SoftwarePrimType b
+  => Imp.Ref b -> SExp b
+  -> Imp.Program SoftwareCMD (Imp.Param2 SExp SoftwarePrimType) ()
+setRef' = withSType (Proxy :: Proxy b) Imp.setRef
 
-    setRef :: SType a => Ref a -> a -> Software ()
-    setRef ref
-        = liftComp
-        . sequence_
-        . zipListStruct setty (unRef ref)
-        . construct
-      where
-        setty :: forall b . SoftwarePrimType b => Imp.Ref b -> SExp b -> Prog SExp SoftwarePrimType ()
-        setty = withSType (Proxy :: Proxy b) Imp.setRef
--}
+--------------------------------------------------------------------------------
+-- ** Software instructions.
+
 --------------------------------------------------------------------------------
 -- *** File handling.
-{-
+
 -- | Open a file
 fopen :: FilePath -> IOMode -> Software Handle
 fopen file = Software . Imp.fopen file
@@ -161,7 +164,7 @@ feof :: Handle -> Software (SExp Bool)
 feof = Software . Imp.feof
 
 -- | Put a primitive value to a handle
-fput :: (Formattable a, SoftwareType a)
+fput :: (Formattable a, SType' a)
     => Handle
     -> String  -- Prefix
     -> SExp a  -- Expression to print
@@ -170,12 +173,12 @@ fput :: (Formattable a, SoftwareType a)
 fput h pre e post = Software $ Imp.fput h pre e post
 
 -- | Get a primitive value from a handle
-fget :: (Formattable a, SoftwareType a) => Handle -> Software (SExp a)
+fget :: (Formattable a, SType' a) => Handle -> Software (SExp a)
 fget = Software . Imp.fget
--}
+
 --------------------------------------------------------------------------------
 -- *** Printing.
-{-
+
 class PrintfType r
   where
     fprf :: Handle -> String -> [Imp.PrintfArg SExp] -> r
@@ -184,7 +187,7 @@ instance (a ~ ()) => PrintfType (Software a)
   where
     fprf h form = Software . Oper.singleInj . Imp.FPrintf h form . reverse
 
-instance (Formattable a, SoftwareType a, PrintfType r) => PrintfType (SExp a -> r)
+instance (Formattable a, SType' a, PrintfType r) => PrintfType (SExp a -> r)
   where
     fprf h form as = \a -> fprf h form (Imp.PrintfArg a : as)
 
@@ -195,5 +198,5 @@ fprintf h format = fprf h format []
 -- | Print to @stdout@. Accepts a variable number of arguments.
 printf :: PrintfType r => String -> r
 printf = fprintf Imp.stdout
--}
+
 --------------------------------------------------------------------------------

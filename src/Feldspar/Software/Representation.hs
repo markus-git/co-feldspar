@@ -98,7 +98,10 @@ newtype SExp a = SExp { unSExp :: ASTF SoftwareDomain a }
 eval :: (Syntactic a, Domain a ~ SoftwareDomain) => a -> Internal a
 eval = evalClosed . desugar
 
--- | ...
+--------------------------------------------------------------------------------
+
+type instance Dom Software = SoftwareDomain
+
 type instance Pred SoftwareDomain = SoftwarePrimType
 
 --------------------------------------------------------------------------------

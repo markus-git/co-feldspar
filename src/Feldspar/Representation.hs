@@ -53,6 +53,9 @@ data TypeRepF pred rep a
 
 --------------------------------------------------------------------------------
 
+-- | Domain associated with a language.
+type family Dom (lang :: * -> *) :: * -> *
+
 -- | Predicate associated with a domain.
 type family Pred (domain :: * -> *) :: * -> Constraint
 

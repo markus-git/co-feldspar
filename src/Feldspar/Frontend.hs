@@ -74,31 +74,35 @@ class Cond dom
 class Equality dom
   where
     (==) :: (Syntax' dom a, Syntax' dom b, Eq (Internal a), Boolean (Internal b)) => a -> a -> b
-    (/=) :: (Syntax' dom a, Syntax' dom b, Eq (Internal a), Boolean (Internal b)) => a -> a -> b
 
-infix 4 ==, /=
+infix 4 ==
 
 -- | Ordered.
 class Equality dom => Ordered dom
   where
     (<)  :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
-    (>)  :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
-    (<=) :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
-    (>=) :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
 
-infix 4 <, >, <=, >=
+infix 4 <
 
+-- | Logical stuff.
+class Logical dom
+  where
+    not  :: (Syntax' dom a, Boolean (Internal a)) => a -> a
+    (&&) :: (Syntax' dom a, Boolean (Internal a)) => a -> a -> a
+
+infix 3 &&
+    
 --------------------------------------------------------------------------------
 -- ** Commands.
-{-
+
 -- | Commands for managing mutable references.
 class Monad m => References m
   where
     type Reference m :: * -> *
 
-    initRef :: Syntax m a => a -> m (Reference m a)
-    newRef  :: Syntax m a => m (Reference m a)
-    getRef  :: Syntax m a => Reference m a -> m a
-    setRef  :: Syntax m a => Reference m a -> a -> m ()
--}
+    initRef :: Syntax (Dom m) a => a -> m (Reference m a)
+    newRef  :: Syntax (Dom m) a => m (Reference m a)
+    getRef  :: Syntax (Dom m) a => Reference m a -> m a
+    setRef  :: Syntax (Dom m) a => Reference m a -> a -> m ()
+
 --------------------------------------------------------------------------------
