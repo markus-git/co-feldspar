@@ -53,10 +53,10 @@ data TypeRepF pred rep a
 
 --------------------------------------------------------------------------------
 
--- | ...
+-- | Predicate associated with a domain.
 type family Pred (domain :: * -> *) :: * -> Constraint
 
--- | ...
+-- | Type representation associated with a predicate.
 type family Rep (pred :: * -> Constraint) :: * -> *
 
 --------------------------------------------------------------------------------
@@ -75,7 +75,8 @@ instance (Type pred a, Type pred b) => Type pred (a, b)
 --------------------------------------------------------------------------------
 
 -- | ...
-type PrimType pred a = (Type pred a, pred a)
+class    (Type pred a, pred a) => PrimType pred a
+instance (Type pred a, pred a) => PrimType pred a
 
 --------------------------------------------------------------------------------
 -- * Expressions.

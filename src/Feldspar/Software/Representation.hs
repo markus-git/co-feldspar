@@ -151,7 +151,7 @@ sugarSymPrimSoftware
        , SoftwareDomain ~ SmartSym fi
        , SyntacticN f fi
        , sub :<: SoftwareConstructs
-       , SPrimType (DenResult sig)
+       , SType' (DenResult sig)
        )
     => sub sig -> f
 sugarSymPrimSoftware = sugarSymDecor $ ValT $ Node softwareRep
@@ -161,7 +161,7 @@ sugarSymPrimSoftware = sugarSymDecor $ ValT $ Node softwareRep
 
 instance Imp.FreeExp SExp
   where
-    type FreePred SExp = SPrimType
+    type FreePred SExp = SType'
     constExp = sugarSymSoftware . Lit
     varExp   = sugarSymSoftware . FreeVar
 
@@ -201,13 +201,10 @@ instance Type SoftwarePrimType Float where typeRep = Node FloatST
 type STypeRep = TypeRep SoftwarePrimType SoftwarePrimTypeRep
 
 -- ... software types ...
-type SType = Type SoftwarePrimType
+type SType    = Type SoftwarePrimType
 
---------------------------------------------------------------------------------
-
--- ... text ...
-class    (SType a, SoftwarePrimType a) => SPrimType a
-instance (SType a, SoftwarePrimType a) => SPrimType a
+-- ... software primitive types ...
+type SType'   = PrimType SoftwarePrimType
 
 --------------------------------------------------------------------------------
 

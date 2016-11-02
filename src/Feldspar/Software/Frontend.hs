@@ -2,6 +2,7 @@
 {-# language FlexibleInstances #-}
 {-# language FlexibleContexts #-}
 {-# language MultiParamTypeClasses #-}
+{-# language UndecidableInstances #-}
 {-# language ConstraintKinds #-}
 {-# language Rank2Types #-}
 
@@ -23,6 +24,7 @@ import Data.Constraint hiding (Sub)
 import Data.Proxy
 
 -- syntactic.
+import Language.Syntactic hiding (Equality)
 import Language.Syntactic.Functional
 
 -- operational-higher.
@@ -33,15 +35,12 @@ import Language.Embedded.Imperative.Frontend.General hiding (Ref, Arr, IArr)
 import qualified Language.Embedded.Imperative     as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
 
--- syntactic.
-import Language.Syntactic
-
 --------------------------------------------------------------------------------
--- * Software ...
+-- * Expressions.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- ** Expressions.
+-- ** General constructs.
 
 instance Value SoftwareDomain
   where
@@ -51,14 +50,45 @@ instance Share SoftwareDomain
   where
     share = sugarSymSoftware (Let "")
 
-instance Boolean SoftwareDomain
+instance Cond SoftwareDomain
   where
-    bool t f b = sugarSymSoftware Cond b t f
-    false = value False
-    true  = value True
+    cond t f b = sugarSymSoftware Cond b t f
 
 --------------------------------------------------------------------------------
--- ** Instructions.
+-- ** Primitive functions.
+
+instance Equality SoftwareDomain
+  where
+    (==) = sugarSymSoftware Eq
+    (/=) = error "(/=) not implemented for `SExp`"
+
+instance Ordered SoftwareDomain
+  where
+    (<)  = sugarSymSoftware Lt
+    (>)  = error "(>) not implemented for `SExp`"
+    (<=) = error "(<=) not implemented for `SExp`"
+    (>=) = error "(>=) not implemented for `SExp`"
+
+--------------------------------------------------------------------------------
+
+instance (Bounded a, SType a) => Bounded (SExp a)
+  where
+    minBound = value minBound
+    maxBound = value maxBound
+
+instance (Num a, SType' a) => Num (SExp a)
+  where
+    fromInteger = value . fromInteger
+    (+)         = sugarSymSoftware Add
+    (-)         = sugarSymSoftware Sub
+    (*)         = sugarSymSoftware Mul
+    negate      = sugarSymSoftware Neg
+    abs         = error "abs not implemeted for `SExp`"
+    signum      = error "signum not implemented for `SExp`"
+
+--------------------------------------------------------------------------------
+-- * Instructions.
+--------------------------------------------------------------------------------
 {-
 -- ...
 withSType :: forall a b . Proxy a -> (Imp.FreePred SExp a => b) -> (SoftwarePrimType a => b)
