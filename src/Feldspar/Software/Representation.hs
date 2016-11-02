@@ -33,12 +33,15 @@ import Data.Constraint
 
 import Control.Monad.Trans
 
+-- syntactic.
 import Language.Syntactic as S
 import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
 
+-- operational-higher.
 import Control.Monad.Operational.Higher as Oper hiding ((:<:))
 
+-- imperative-edsl.
 import qualified Language.Embedded.Expression as Imp
 import qualified Language.Embedded.Imperative as Imp
 
@@ -50,7 +53,9 @@ import qualified Language.Embedded.Imperative as Imp
 type SoftwareCMD
          = Imp.RefCMD
   Oper.:+: Imp.ControlCMD
+    -- ^ Computational instructions.
   Oper.:+: Imp.FileCMD
+    -- ^ Software specific instructions.
 
 -- | Monad for building software programs in Feldspar.
 newtype Software a = Software { unSoftware :: Program SoftwareCMD (Param2 SExp SoftwarePrimType) a }
@@ -100,9 +105,11 @@ eval = evalClosed . desugar
 
 --------------------------------------------------------------------------------
 
-type instance Dom Software = SoftwareDomain
+type instance Dom  Software         = SoftwareDomain
 
-type instance Pred SoftwareDomain = SoftwarePrimType
+type instance Pred SoftwareDomain   = SoftwarePrimType
+
+type instance Rep  SoftwarePrimType = SoftwarePrimTypeRep
 
 --------------------------------------------------------------------------------
 

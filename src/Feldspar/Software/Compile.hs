@@ -177,15 +177,7 @@ unsafeTranslateSmallExp a = do
 --------------------------------------------------------------------------------
 
 translate :: Software a -> ProgC a
-translate
-    = Oper.interpretWithMonadT Oper.singleton id
-        -- fuse the monad stack
-    . flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp
-        -- compile outer monad
-    . Oper.interpretWithMonadT Oper.singleton
-        (lift . flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp)
-        -- compile inner monad
-    . unSoftware
+translate = flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp . unSoftware
 
 --------------------------------------------------------------------------------
 

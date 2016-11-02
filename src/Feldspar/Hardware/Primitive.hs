@@ -50,9 +50,6 @@ data HardwarePrimTypeRep a
 --  Word16HT :: HardwarePrimTypeRep Word16
 --  Word32HT :: HardwarePrimTypeRep Word32
 --  Word64HT :: HardwarePrimTypeRep Word64
-    -- floating point numbers.
---  FloatHT  :: HardwarePrimTypeRep Float
---  DoulbeHT :: HardwarePrimTypeRep Double
 
 deriving instance Eq       (HardwarePrimTypeRep a)
 deriving instance Show     (HardwarePrimTypeRep a)
@@ -68,7 +65,6 @@ class (Eq a, Show a, Typeable a, Inhabited a) => HardwarePrimType a
 instance HardwarePrimType Bool  where hardwareRep = BoolHT
 instance HardwarePrimType Int8  where hardwareRep = Int8HT
 instance HardwarePrimType Word8 where hardwareRep = Word8HT
---instance HardwarePrimType Float where hardwareRep = FloatHT
 
 --------------------------------------------------------------------------------
 
@@ -76,7 +72,6 @@ hardwarePrimTypeEq :: HardwarePrimTypeRep a -> HardwarePrimTypeRep b -> Maybe (D
 hardwarePrimTypeEq (BoolHT)  (BoolHT)  = Just Dict
 hardwarePrimTypeEq (Int8HT)  (Int8HT)  = Just Dict
 hardwarePrimTypeEq (Word8HT) (Word8HT) = Just Dict
---hardwarePrimTypeEq (FloatHT) (FloatHT) = Just Dict
 hardwarePrimTypeEq _         _         = Nothing
 
 hardwarePrimTypeOf :: HardwarePrimType a => a -> HardwarePrimTypeRep a
@@ -86,7 +81,6 @@ hardwarePrimWitType :: HardwarePrimTypeRep a -> Dict (HardwarePrimType a)
 hardwarePrimWitType BoolHT  = Dict
 hardwarePrimWitType Int8HT  = Dict
 hardwarePrimWitType Word8HT = Dict
---hardwarePrimWitType FloatHT = Dict
 
 --------------------------------------------------------------------------------
 -- * ... prim ...

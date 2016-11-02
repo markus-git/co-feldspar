@@ -3,7 +3,6 @@ module Feldspar.Software
   , module Feldspar.Software.Frontend
   , SExp
   , SType
-  , SoftwareType
   , Software
   , Length
   , Index

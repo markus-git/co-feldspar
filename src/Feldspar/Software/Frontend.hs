@@ -5,8 +5,6 @@
 {-# language UndecidableInstances #-}
 {-# language ConstraintKinds #-}
 {-# language Rank2Types #-}
-
-{-# language InstanceSigs #-}
 {-# language ScopedTypeVariables #-}
 
 module Feldspar.Software.Frontend where
@@ -124,7 +122,7 @@ softwareDict rep = case rep of
   FloatST  -> Dict
 
 --------------------------------------------------------------------------------
--- ** Genereal instructions.
+-- ** General instructions.
 
 instance References Software
   where
@@ -135,14 +133,16 @@ instance References Software
     getRef     = Software . fmap resugar . mapStructA getRef' . unRef
     setRef ref = Software . sequence_ . zipListStruct setRef' (unRef ref) . resugar
 
+-- Imp.getRef specialized a software constraint.
 getRef' :: forall b . SoftwarePrimType b
   => Imp.Ref b
-  -> Imp.Program SoftwareCMD (Imp.Param2 SExp SoftwarePrimType) (SExp b)
+  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
 getRef' = withSType (Proxy :: Proxy b) Imp.getRef
 
+-- Imp.setRef specialized to a software constraint.
 setRef' :: forall b . SoftwarePrimType b
   => Imp.Ref b -> SExp b
-  -> Imp.Program SoftwareCMD (Imp.Param2 SExp SoftwarePrimType) ()
+  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
 setRef' = withSType (Proxy :: Proxy b) Imp.setRef
 
 --------------------------------------------------------------------------------

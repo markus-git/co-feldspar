@@ -33,43 +33,39 @@ import Data.Constraint
 
 import Control.Monad.Trans
 
+-- syntactic.
 import Language.Syntactic as S
 import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
 
+-- operational-higher.
 import Control.Monad.Operational.Higher as Oper hiding ((:<:))
 
 -- hardware-edsl.
-import qualified Language.Embedded.Expression as Imp
-import qualified Language.Embedded.Imperative as Imp
+import qualified Language.Embedded.Hardware.Command   as Imp
+import qualified Language.Embedded.Hardware.Interface as Imp
 
 --------------------------------------------------------------------------------
 -- * Programs.
 --------------------------------------------------------------------------------
 
 -- | Hardware instructions.
-type HardwareCMD = CompCMD -- :+: ...
+type HardwareCMD =
+           Imp.VariableCMD
+  Oper.:+: Imp.LoopCMD
+  Oper.:+: Imp.ConditionalCMD
+    -- ^ Computatonal instructions.
+  Oper.:+: Imp.SignalCMD
+  Oper.:+: Imp.StructuralCMD
+    -- ^ Hardware specific instructions.
 
 -- | Monad for building software programs in Feldspar.
-newtype Hardware a = Hardware { unHardware ::
-    ProgramT HardwareCMD (Param2 HExp HardwarePrimType)
-      (Program CompCMD (Param2 HExp HardwarePrimType))
-        a
-  } deriving (Functor, Applicative, Monad)
+newtype Hardware a = Hardware { unHardware :: Program HardwareCMD (Param2 HExp HardwarePrimType) a}
+  deriving (Functor, Applicative, Monad)
 
 --------------------------------------------------------------------------------
 
-instance MonadComp Hardware
-  where
-    type Expr Hardware = HExp
-    type Pred Hardware = HardwarePrimType
-    type TRep Hardware = HardwarePrimTypeRep
-
-    liftComp = Hardware . lift
-
---------------------------------------------------------------------------------
-
-newtype Ref a = Ref { unRef :: Struct HardwarePrimType Imp.Ref (Internal a) }
+newtype Ref a = Ref { unRef :: Struct HardwarePrimType Imp.Variable (Internal a) }
 
 --------------------------------------------------------------------------------
 -- * Expression.
@@ -91,6 +87,14 @@ newtype HExp a = HExp { unHExp :: ASTF HardwareDomain a }
 -- | Evaluate a closed expression
 eval :: (Syntactic a, Domain a ~ HardwareDomain) => a -> Internal a
 eval = evalClosed . desugar
+
+--------------------------------------------------------------------------------
+
+type instance Dom  Hardware         = HardwareDomain
+
+type instance Pred HardwareDomain   = HardwarePrimType
+
+type instance Rep  HardwarePrimType = HardwarePrimTypeRep
 
 --------------------------------------------------------------------------------
 
@@ -128,7 +132,7 @@ sugarSymHardware
        , HardwareDomain ~ SmartSym fi
        , SyntacticN f fi
        , sub :<: HardwareConstructs
-       , Type HardwarePrimType HardwarePrimTypeRep (DenResult sig)
+       , HType (DenResult sig)
        )
     => sub sig -> f
 sugarSymHardware = sugarSymDecor $ ValT $ typeRep
@@ -142,39 +146,27 @@ sugarSymPrimHardware
        , HardwareDomain ~ SmartSym fi
        , SyntacticN f fi
        , sub :<: HardwareConstructs
-       , HardwarePrimType (DenResult sig)
+       , HType' (DenResult sig)
        )
     => sub sig -> f
 sugarSymPrimHardware = sugarSymDecor $ ValT $ Node hardwareRep
 
 --------------------------------------------------------------------------------
 -- hardware-edsl instances.
-{-
+
 instance Imp.FreeExp HExp
   where
-    type PredicateExp HExp = HardwareType
+    type PredicateExp HExp = HType'
     litE = sugarSymHardware . Lit
     varE = sugarSymHardware . FreeVar
--}
-instance Imp.FreeExp HExp
-  where
-    type FreePred HExp = HardwareType
-    constExp = sugarSymHardware . Lit
-    varExp   = sugarSymHardware . FreeVar
 
 --------------------------------------------------------------------------------
 -- * Types.
 --------------------------------------------------------------------------------
 
-instance Type HardwarePrimType HardwarePrimTypeRep Bool  where typeRep = Node BoolHT
-instance Type HardwarePrimType HardwarePrimTypeRep Int8  where typeRep = Node Int8HT
-instance Type HardwarePrimType HardwarePrimTypeRep Word8 where typeRep = Node Word8HT
---instance Type HardwarePrimType HardwarePrimTypeRep Float where typeRep = Node FloatHT
-
---------------------------------------------------------------------------------
-
-class    (Type HardwarePrimType HardwarePrimTypeRep a, HardwarePrimType a) => HardwareType a
-instance (Type HardwarePrimType HardwarePrimTypeRep a, HardwarePrimType a) => HardwareType a
+instance Type HardwarePrimType Bool  where typeRep = Node BoolHT
+instance Type HardwarePrimType Int8  where typeRep = Node Int8HT
+instance Type HardwarePrimType Word8 where typeRep = Node Word8HT
 
 --------------------------------------------------------------------------------
 
@@ -182,7 +174,10 @@ instance (Type HardwarePrimType HardwarePrimTypeRep a, HardwarePrimType a) => Ha
 type HTypeRep = TypeRep HardwarePrimType HardwarePrimTypeRep
 
 -- ... hardware types ...
-type HType = Syntax Hardware
+type HType    = Type HardwarePrimType
+
+-- ... hardware primitive types ...
+type HType'   = PrimType HardwarePrimType
 
 --------------------------------------------------------------------------------
 
@@ -198,7 +193,7 @@ hardwareTypeRep :: Struct HardwarePrimType c a -> HTypeRep a
 hardwareTypeRep = mapStruct (const hardwareRep)
 
 --------------------------------------------------------------------------------
-
+{-
 instance Syntax Hardware (HExp Bool)
 instance Syntax Hardware (HExp Int8)
 instance Syntax Hardware (HExp Word8)
@@ -207,5 +202,5 @@ instance
   , Syntax Hardware b, Domain b ~ HardwareDomain
   )
     => Syntax Hardware (a, b)
-
+-}
 --------------------------------------------------------------------------------

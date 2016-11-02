@@ -57,9 +57,6 @@ deriving instance Typeable (SoftwarePrimTypeRep a)
 
 --------------------------------------------------------------------------------
 
--- | ...
-type instance Rep SoftwarePrimType = SoftwarePrimTypeRep
-
 -- | Class of supported software types.
 class (Eq a, Show a, Typeable a, Inhabited a) => SoftwarePrimType a
   where

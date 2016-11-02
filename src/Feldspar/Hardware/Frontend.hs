@@ -2,11 +2,9 @@
 {-# language FlexibleInstances #-}
 {-# language FlexibleContexts #-}
 {-# language MultiParamTypeClasses #-}
+{-# language UndecidableInstances #-}
 {-# language Rank2Types #-}
-
--- todo: I might not need these anymore.
 {-# language ScopedTypeVariables #-}
-{-# language InstanceSigs #-}
 
 module Feldspar.Hardware.Frontend where
 
@@ -22,96 +20,133 @@ import Data.Struct
 import Data.Constraint hiding (Sub)
 import Data.Proxy
 
+-- syntactic.
+import Language.Syntactic (Syntactic(..))
+import Language.Syntactic.Functional
+import qualified Language.Syntactic as Syntactic
+
+-- operational-higher.
 import qualified Control.Monad.Operational.Higher as Oper
 
 -- hardware-edsl.
-{-
-import qualified Language.Embedded.Hardware.Interface as Imp
 import qualified Language.Embedded.Hardware.Command   as Imp
--}
-
--- imperative-edsl.
-import Language.Embedded.Imperative.Frontend.General hiding (Ref, Arr, IArr)
-import qualified Language.Embedded.Imperative     as Imp
-import qualified Language.Embedded.Imperative.CMD as Imp
-
--- syntactic.
-import Language.Syntactic
+import qualified Language.Embedded.Hardware.Interface as Imp
 
 --------------------------------------------------------------------------------
--- * Hardware ...
+-- * Expressions.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- ** Expressions.
+-- ** General constructs.
 
-instance Value HardwarePrimType HardwarePrimTypeRep HardwareDomain
+instance Value HardwareDomain
   where
     value = sugarSymHardware . Lit
 
---------------------------------------------------------------------------------
-
-instance Numerical HardwarePrimType HExp
+instance Share HardwareDomain
   where
-    plus    = sugarSymPrimHardware Add
-    minus   = sugarSymPrimHardware Sub
-    times   = sugarSymPrimHardware Mul
-    negate  = sugarSymPrimHardware Neg
+    share = sugarSymHardware (Let "")
 
 --------------------------------------------------------------------------------
--- ** Instructions.
+-- ** Primitive functions.
+
+instance Equality HardwareDomain
+  where
+    (==) = sugarSymHardware Eq
+
+instance Ordered HardwareDomain
+  where
+    (<)  = sugarSymHardware Lt
+
+instance Logical HardwareDomain
+  where
+    not  = sugarSymHardware Not
+    (&&) = sugarSymHardware And
+
+--------------------------------------------------------------------------------
+
+instance (Bounded a, HType a) => Bounded (HExp a)
+  where
+    minBound = value minBound
+    maxBound = value maxBound
+
+instance (Num a, HType' a) => Num (HExp a)
+  where
+    fromInteger = value . fromInteger
+    (+)         = sugarSymHardware Add
+    (-)         = sugarSymHardware Sub
+    (*)         = sugarSymHardware Mul
+    negate      = sugarSymHardware Neg
+    abs         = error "abs not implemeted for `HExp`"
+    signum      = error "signum not implemented for `HExp`"
+
+--------------------------------------------------------------------------------
+-- * Instructions.
+--------------------------------------------------------------------------------
+
+desugar :: (Syntactic a, Domain a ~ HardwareDomain) => a -> HExp (Internal a)
+desugar = HExp . Syntactic.desugar
+
+sugar   :: (Syntactic a, Domain a ~ HardwareDomain) => HExp (Internal a) -> a
+sugar   = Syntactic.sugar . unHExp
+
+resugar
+  :: ( Syntactic a
+     , Syntactic b
+     , Internal a ~ Internal b
+     , Domain a   ~ HardwareDomain
+     , Domain b   ~ HardwareDomain
+     )
+  => a -> b
+resugar = Syntactic.resugar
+
+--------------------------------------------------------------------------------
 
 -- ...
-withHType :: forall a b . Proxy a -> (Imp.FreePred HExp a => b) -> (HardwarePrimType a => b)
+withHType :: forall a b . Proxy a -> (Imp.PredicateExp HExp a => b) -> (HardwarePrimType a => b)
 withHType _ f = case hardwareDict (hardwareRep :: HardwarePrimTypeRep a) of
   Dict -> f
 
 -- ...
-hardwareDict :: HardwarePrimTypeRep a -> Dict (Imp.FreePred HExp a)
+hardwareDict :: HardwarePrimTypeRep a -> Dict (Imp.PredicateExp HExp a)
 hardwareDict rep = case rep of
   BoolHT   -> Dict
   Int8HT   -> Dict
   Word8HT  -> Dict
 
 --------------------------------------------------------------------------------
--- *** ... comp instr ...
+-- ** General instructions.
 
 instance References Hardware
   where
     type Reference Hardware = Ref
+    
+    initRef    = Hardware . fmap Ref . mapStructA (Imp.initVariable) . resugar
+    newRef     = Hardware . fmap Ref . mapStructA (const Imp.newVariable) $ typeRep
+    getRef     = Hardware . fmap resugar . mapStructA getRef' . unRef
+    setRef ref = Hardware . sequence_ . zipListStruct setRef' (unRef ref) . resugar
 
-    initRef :: forall a . HType a => a -> Hardware (Ref a)
-    initRef
-        = liftComp
-        . fmap Ref
-        . mapStructA (Imp.initRef)
-        . construct
+-- Imp.getRef specialized a software constraint.
+getRef' :: forall b . HardwarePrimType b
+  => Imp.Variable b
+  -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
+getRef' = withHType (Proxy :: Proxy b) Imp.getVariable
 
-    newRef :: forall a . HType a => Hardware (Ref a)
-    newRef
-        = liftComp
-        . fmap Ref
-        . mapStructA (const Imp.newRef)
-        $ (typeRep :: HTypeRep (Internal a))
+-- Imp.setRef specialized to a software constraint.
+setRef' :: forall b . HardwarePrimType b
+  => Imp.Variable b -> HExp b
+  -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
+setRef' = withHType (Proxy :: Proxy b) Imp.setVariable
 
-    getRef :: HType a => Ref a -> Hardware a
-    getRef
-        = liftComp
-        . fmap destruct
-        . mapStructA getty
-        . unRef
-      where
-        getty :: forall b . HardwarePrimType b => Imp.Ref b -> Prog HExp HardwarePrimType (HExp b)
-        getty = withHType (Proxy :: Proxy b) Imp.getRef
+--------------------------------------------------------------------------------
+-- ** Hardware instructions.
 
-    setRef :: HType a => Ref a -> a -> Hardware ()
-    setRef ref
-        = liftComp
-        . sequence_
-        . zipListStruct setty (unRef ref)
-        . construct
-      where
-        setty :: forall b . HardwarePrimType b => Imp.Ref b -> HExp b -> Prog HExp HardwarePrimType ()
-        setty = withHType (Proxy :: Proxy b) Imp.setRef
+--------------------------------------------------------------------------------
+-- *** Singals.
+
+
+
+--------------------------------------------------------------------------------
+-- *** Structural entities.
 
 --------------------------------------------------------------------------------

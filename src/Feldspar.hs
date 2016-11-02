@@ -1,11 +1,9 @@
 module Feldspar
-  ( module Feldspar.Frontend
+  ( module Feldspar.Representation
+  , module Feldspar.Frontend
   , module Data.Int
   , module Data.Word
   , Inhabited
-  , MonadComp, Expr, Pred, TRep
-  , Type
-  , Syntax
   ) where
 
 import Feldspar.Sugar
