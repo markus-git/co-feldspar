@@ -105,6 +105,8 @@ eval = evalClosed . desugar
 
 --------------------------------------------------------------------------------
 
+type instance Expr Software         = SExp
+
 type instance Dom  Software         = SoftwareDomain
 
 type instance Pred SoftwareDomain   = SoftwarePrimType

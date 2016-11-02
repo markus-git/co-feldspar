@@ -90,6 +90,8 @@ eval = evalClosed . desugar
 
 --------------------------------------------------------------------------------
 
+type instance Expr Hardware         = HExp
+
 type instance Dom  Hardware         = HardwareDomain
 
 type instance Pred HardwareDomain   = HardwarePrimType

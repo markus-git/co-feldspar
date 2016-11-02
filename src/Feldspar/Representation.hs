@@ -13,8 +13,6 @@
 
 module Feldspar.Representation where
 
---import Feldspar.Sugar
-
 import Data.Struct
 import Data.Inhabited
 
@@ -23,18 +21,13 @@ import Data.Int (Int8)
 import Data.List (genericTake)
 import Data.Typeable hiding (typeRep, TypeRep)
 
+-- syntactic.
 import Language.Syntactic hiding ((:+:))
 import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
 
+-- operational-higher.
 import Control.Monad.Operational.Higher (Program, Param2, (:+:))
-
--- imperative-edsl
-import qualified Language.Embedded.Imperative.CMD as Imp (Ref, RefCMD, ControlCMD)
-import qualified Language.Embedded.Expression     as Imp
-
--- hardware-edsl
--- ...
 
 --------------------------------------------------------------------------------
 -- * Types.
@@ -52,6 +45,9 @@ data TypeRepF pred rep a
     FunT :: TypeRep pred rep a -> TypeRepF pred rep b -> TypeRepF pred rep (a -> b)
 
 --------------------------------------------------------------------------------
+
+-- | ... hmm ...
+type family Expr (lang :: * -> *) :: * -> *
 
 -- | Domain associated with a language.
 type family Dom (lang :: * -> *) :: * -> *

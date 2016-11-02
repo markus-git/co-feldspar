@@ -15,40 +15,43 @@ import qualified Feldspar.Hardware.Compile as Hard
 import Language.Syntactic (Internal)
 
 --------------------------------------------------------------------------------
--- * ...
+-- * Basic example of how our hardware software co-design works.
 --------------------------------------------------------------------------------
 
-apa :: forall m .
-  ( CoMonad m
-  , CoType m (Expr m Int8)
-    -- todo: it should be able to derive this.
-  , CoType m (Expr m Int8, Expr m Int8)
-    -- todo: annoying~~!
-  , Num (Internal (Expr m Int8))
-  )
+example
+  :: forall m dom expr
+   . ( Monad m, References m, dom ~ Dom m, expr ~ Expr m
+       -- ^ Instructions `m` support.
+     , Value dom, Share dom
+       -- ^ General constructs that `m`'s expression type supports.
+     , Equality dom, Ordered dom, Logical dom
+       -- ^ Primitive functions that `m`'s expression type supports.
+       
+     , Num (expr Int8)
+         -- *** todo : Num a => Num (expr a).
+     , Syntax dom (expr Int8)
+     , Syntax dom (expr Int8, expr Int8)
+         -- *** todo : removing ^ gives a wierd error message, I should have
+         --     specific instances for primitive values and => pairs.
+     )
   => m ()
-apa = 
-  do let x = value 1 :: Expr m Int8
-     let y = value 2 :: Expr m Int8
+example =
+  do r :: Reference m (expr Int8) <- initRef 2
+     k :: Reference m (expr Int8, expr Int8) <- newRef
 
-     r <- initRef (x, y)
-     v <- getRef r
-     setRef r (y, x)
-     
-     return ()
-  -- Soft.icompile apa
-  -- Hard.icompile apa
+     a <- getRef r
+     setRef k (a, a)
 
 --------------------------------------------------------------------------------
 
-bepa :: Software ()
-bepa = apa
+soft :: Software ()
+soft = example
   -- Soft.icompile bepa
 
 --------------------------------------------------------------------------------
 
-cepa :: Hardware ()
-cepa = apa
+hard :: Hardware ()
+hard = example
   -- Hard.icompile cepa
 
 --------------------------------------------------------------------------------

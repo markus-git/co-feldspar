@@ -20,8 +20,10 @@ import Data.Constraint
 import Data.Struct
 import Data.Proxy
 
+-- syntactci.
 import Language.Syntactic as S hiding (Equality)
 
+-- operational-higher.
 import qualified Control.Monad.Operational.Higher as Oper (Program, Param2)
 
 -- imperative-edsl
