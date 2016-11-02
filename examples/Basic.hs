@@ -20,25 +20,23 @@ import Language.Syntactic (Internal)
 
 example
   :: forall m dom expr
-   . ( Monad m, References m, dom ~ Dom m, expr ~ Expr m
-       -- ^ Instructions `m` support.
-     , Value dom, Share dom
-       -- ^ General constructs that `m`'s expression type supports.
+   . ( Comp m
+     , dom  ~ Dom  m -- for instances below, should be hidden.
+     , expr ~ Expr m -- we don't have SExp/HExp yet.
+     
      , Equality dom, Ordered dom, Logical dom
-       -- ^ Primitive functions that `m`'s expression type supports.
-       
+         -- todo : that we need to show `dom` ^ is unfortunate.
      , Num (expr Int8)
-         -- *** todo : Num a => Num (expr a).
+         -- todo : Syntax' ... a, Num (Internal a) => Num a.
      , Syntax dom (expr Int8)
      , Syntax dom (expr Int8, expr Int8)
-         -- *** todo : removing ^ gives a wierd error message, I should have
-         --     specific instances for primitive values and => pairs.
+         -- todo : removing ^ gives a wierd error message, I should have
+         -- specific instances for primitive values and that => pairs.
      )
   => m ()
 example =
   do r :: Reference m (expr Int8) <- initRef 2
      k :: Reference m (expr Int8, expr Int8) <- newRef
-
      a <- getRef r
      setRef k (a, a)
 

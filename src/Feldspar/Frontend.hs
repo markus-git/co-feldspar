@@ -40,11 +40,22 @@ type Syntax  dom a = (Syntactic a, Type (Pred dom) (Internal a), dom ~ Domain a)
 -- | Short-hand for a `Syntactic` instance over typed primitive values from `dom`.
 type Syntax' dom a = (Syntactic a, PrimType (Pred dom) (Internal a), dom ~ Domain a)
 
--- | ... hmm ...
-type Boolean a = a ~ Bool
+--------------------------------------------------------------------------------
+
+-- computational instructions.
+type Comp m
+  = ( Monad m
+    , References m
+      -- ...
+    , Value (Dom m)
+    , Share (Dom m)
+    )
 
 --------------------------------------------------------------------------------
 -- ** General constructs.
+
+-- | ... hmm ...
+type Boolean a = a ~ Bool
 
 -- | Literals.
 class Value dom
@@ -63,7 +74,7 @@ class Share dom
 class Cond dom
   where
     cond
-      :: (Syntax dom a, Syntax dom b, Internal b ~ Bool)
+      :: (Syntax dom a, Syntax dom b, Boolean (Internal b))
       => a -- ^ true branch.
       -> a -- ^ false branch.
       -> b -- ^ condition.
