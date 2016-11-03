@@ -90,13 +90,13 @@ eval = evalClosed . desugar
 
 --------------------------------------------------------------------------------
 
+-- ... hmm ...
 type instance Expr Hardware         = HExp
 
-type instance Dom  Hardware         = HardwareDomain
-
-type instance Pred HardwareDomain   = HardwarePrimType
-
-type instance Rep  HardwarePrimType = HardwarePrimTypeRep
+-- ...
+type instance DomainOf         Hardware         = HardwareDomain
+type instance PredicateOf      HardwareDomain   = HardwarePrimType
+type instance RepresentationOf HardwarePrimType = HardwarePrimTypeRep
 
 --------------------------------------------------------------------------------
 
@@ -152,6 +152,14 @@ sugarSymPrimHardware
        )
     => sub sig -> f
 sugarSymPrimHardware = sugarSymDecor $ ValT $ Node hardwareRep
+
+--------------------------------------------------------------------------------
+
+instance Tuples HardwareDomain
+  where
+    pair   = sugarSymHardware Pair
+    first  = sugarSymHardware Fst
+    second = sugarSymHardware Snd
 
 --------------------------------------------------------------------------------
 -- hardware-edsl instances.

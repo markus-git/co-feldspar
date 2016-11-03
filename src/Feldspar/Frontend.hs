@@ -35,10 +35,16 @@ import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 --------------------------------------------------------------------------------
 
 -- | Short-hand for a `Syntactic` instance over typed values from `dom`.
-type Syntax  dom a = (Syntactic a, Type (Pred dom) (Internal a), dom ~ Domain a)
+class    (Syntactic a, dom ~ Domain a, Type (PredicateOf dom) (Internal a), Tuples dom) => Syntax  dom a
+instance (Syntactic a, dom ~ Domain a, Type (PredicateOf dom) (Internal a), Tuples dom) => Syntax  dom a
 
 -- | Short-hand for a `Syntactic` instance over typed primitive values from `dom`.
-type Syntax' dom a = (Syntactic a, PrimType (Pred dom) (Internal a), dom ~ Domain a)
+type Syntax' dom a = (Syntactic a, PrimType (PredicateOf dom) (Internal a), dom ~ Domain a)
+
+--------------------------------------------------------------------------------
+
+-- | ... shord-hand for typed values in language m ...
+type SyntaxM m a = Syntax (DomainOf m) a
 
 --------------------------------------------------------------------------------
 
@@ -47,8 +53,8 @@ type Comp m
   = ( Monad m
     , References m
       -- ...
-    , Value (Dom m)
-    , Share (Dom m)
+    , Value (DomainOf m)
+    , Share (DomainOf m)
     )
 
 --------------------------------------------------------------------------------
@@ -113,9 +119,9 @@ class Monad m => References m
   where
     type Reference m :: * -> *
 
-    initRef :: Syntax (Dom m) a => a -> m (Reference m a)
-    newRef  :: Syntax (Dom m) a => m (Reference m a)
-    getRef  :: Syntax (Dom m) a => Reference m a -> m a
-    setRef  :: Syntax (Dom m) a => Reference m a -> a -> m ()
+    initRef :: SyntaxM m a => a -> m (Reference m a)
+    newRef  :: SyntaxM m a => m (Reference m a)
+    getRef  :: SyntaxM m a => Reference m a -> m a
+    setRef  :: SyntaxM m a => Reference m a -> a -> m ()
 
 --------------------------------------------------------------------------------

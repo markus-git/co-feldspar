@@ -29,17 +29,44 @@ import Language.Syntactic.Functional.Tuple
 -- * ...
 --------------------------------------------------------------------------------
 
--- | Supported domain decorations.
-class Decorated decor a
+-- | Domains that support tuple expressions.
+class Tuples dom
   where
-    decorate :: decor a
+    pair
+      :: ( Type (PredicateOf dom) a
+         , Type (PredicateOf dom) b
+         , SyntacticN f (ASTF dom a -> ASTF dom b -> ASTF dom (a, b))
+         )
+      => f
 
--- | Representable types are decorated as fully applied types in `TypeRepF`.
-instance (Type pred a, rep ~ Rep pred) => Decorated (TypeRepF pred rep) a
+    first
+      :: ( Type (PredicateOf dom) a
+         , SyntacticN f (ASTF dom (a, b) -> ASTF dom a)
+         )
+      => f
+
+    second
+      :: ( Type (PredicateOf dom) b
+         , SyntacticN f (ASTF dom (a, b) -> ASTF dom b)
+         )
+      => f
+
+--------------------------------------------------------------------------------
+
+instance
+    ( Syntactic a, Type (PredicateOf (Domain a)) (Internal a)
+    , Syntactic b, Type (PredicateOf (Domain b)) (Internal b)
+    , Domain a ~ Domain b
+    , Tuples (Domain a)
+    )
+    => Syntactic (a, b)
   where
-    decorate = ValT typeRep
+    type Domain   (a, b) = Domain a
+    type Internal (a, b) = (Internal a, Internal b)
 
--- todo: functions over representable types.
+    desugar (a, b) = pair (desugar a) (desugar b)
+    sugar   ab     = (first ab, second ab)
+
 --------------------------------------------------------------------------------
 
 instance
@@ -52,49 +79,12 @@ instance
     type Internal (a -> b) = Internal a -> Internal b
 
     desugar = error "desugar not yet implemented for (a -> b)"
-    sugar = error "sugar not implemented for (a -> b)"
+    sugar   = error "sugar not implemented for (a -> b)"
 {-
     desugar = lamT_template varSym lamSym (desugar . f . sugar)
       where
         varSym v = inj (VarT v) :&: ValT typeRep
         lamSym v = Sym (inj (LamT v) :&: FunT typeRep (getDecor b)) :$ b
 -}
-
-instance
-    ( Syntactic a
-    , Syntactic b
-    , Domain b       ~ Domain a
-    , (sup :&: info) ~ Domain a
-    , Tuple :<: sup
-      -- hmm... not that pretty.
-    , Decorated info (Internal a, Internal b)
-    , Decorated info (Internal a)
-    , Decorated info (Internal b)
-    )
-    => Syntactic (a, b)
-  where
-    type Domain   (a, b) = Domain a
-    type Internal (a, b) = (Internal a, Internal b)
-
-    desugar (a, b) = sugarSymDecorated Pair (desugar a) (desugar b)
-    sugar ab = (sugarSymDecorated Fst ab, sugarSymDecorated Snd ab)
-
--- Helper function for lifting a symbol's signature into a function:
---
--- > sugarSym... :: (Syntactic a,b,...,x , Domain a,b,...,x ~ (sup :&: info), Decorated info)
--- >   => sym (Internal a :-> Internal b :-> ... :-> Full (Internal x))
--- >   -> (a -> b -> ... -> x)
---
-sugarSymDecorated
-    :: ( Signature sig
-       , fi             ~ SmartFun (sup :&: info) sig
-       , sig            ~ SmartSig fi
-       , (sup :&: info) ~ SmartSym fi
-       , Decorated info (DenResult sig)
-       , SyntacticN f fi
-       , sub :<: sup
-       )
-    => sub sig -> f
-sugarSymDecorated = sugarSymDecor decorate
 
 --------------------------------------------------------------------------------

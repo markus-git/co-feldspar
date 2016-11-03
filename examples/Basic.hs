@@ -7,12 +7,10 @@ module Basic where
 import Feldspar
 
 import Feldspar.Software
-import qualified Feldspar.Software.Compile as Soft
+import Feldspar.Software as Soft (icompile)
 
 import Feldspar.Hardware
-import qualified Feldspar.Hardware.Compile as Hard
-
-import Language.Syntactic (Internal)
+import Feldspar.Hardware as Hard (icompile)
 
 --------------------------------------------------------------------------------
 -- * Basic example of how our hardware software co-design works.
@@ -21,35 +19,40 @@ import Language.Syntactic (Internal)
 example
   :: forall m dom expr
    . ( Comp m
-     , dom  ~ Dom  m -- for instances below, should be hidden.
-     , expr ~ Expr m -- we don't have SExp/HExp yet.
+     , dom  ~ DomainOf m -- for instances below, should be hidden.
+     , expr ~ Expr m     -- we don't have SExp/HExp yet.
      
      , Equality dom, Ordered dom, Logical dom
          -- todo : that we need to show `dom` ^ is unfortunate.
      , Num (expr Int8)
          -- todo : Syntax' ... a, Num (Internal a) => Num a.
      , Syntax dom (expr Int8)
-     , Syntax dom (expr Int8, expr Int8)
-         -- todo : removing ^ gives a wierd error message, I should have
-         -- specific instances for primitive values and that => pairs.
      )
   => m ()
 example =
   do r :: Reference m (expr Int8) <- initRef 2
      k :: Reference m (expr Int8, expr Int8) <- newRef
      a <- getRef r
-     setRef k (a, a)
+     setRef k (a, a + a)
 
+-- example compiles with:
+--   - Soft.icompile example
+--   - Hard.icompile example
+--
 --------------------------------------------------------------------------------
 
 soft :: Software ()
 soft = example
-  -- Soft.icompile bepa
 
+-- soft compiles with:
+--   - Soft.icompile soft
+--
 --------------------------------------------------------------------------------
 
 hard :: Hardware ()
 hard = example
-  -- Hard.icompile cepa
 
+-- hard compiles with:
+--   - Hard.icompile cepa
+--
 --------------------------------------------------------------------------------

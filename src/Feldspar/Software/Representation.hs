@@ -31,8 +31,6 @@ import Data.Typeable (Typeable)
 import Data.Proxy
 import Data.Constraint
 
-import Control.Monad.Trans
-
 -- syntactic.
 import Language.Syntactic as S
 import Language.Syntactic.Functional
@@ -105,13 +103,13 @@ eval = evalClosed . desugar
 
 --------------------------------------------------------------------------------
 
-type instance Expr Software         = SExp
+-- ... hmm ...
+type instance Expr Software = SExp
 
-type instance Dom  Software         = SoftwareDomain
-
-type instance Pred SoftwareDomain   = SoftwarePrimType
-
-type instance Rep  SoftwarePrimType = SoftwarePrimTypeRep
+-- ...
+type instance DomainOf         Software         = SoftwareDomain
+type instance PredicateOf      SoftwareDomain   = SoftwarePrimType
+type instance RepresentationOf SoftwarePrimType = SoftwarePrimTypeRep
 
 --------------------------------------------------------------------------------
 
@@ -167,6 +165,14 @@ sugarSymPrimSoftware
        )
     => sub sig -> f
 sugarSymPrimSoftware = sugarSymDecor $ ValT $ Node softwareRep
+
+--------------------------------------------------------------------------------
+
+instance Tuples SoftwareDomain
+  where
+    pair   = sugarSymSoftware Pair
+    first  = sugarSymSoftware Fst
+    second = sugarSymSoftware Snd
 
 --------------------------------------------------------------------------------
 -- imperative-edsl instances.

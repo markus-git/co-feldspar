@@ -50,13 +50,13 @@ data TypeRepF pred rep a
 type family Expr (lang :: * -> *) :: * -> *
 
 -- | Domain associated with a language.
-type family Dom (lang :: * -> *) :: * -> *
+type family DomainOf (lang :: * -> *) :: * -> *
 
 -- | Predicate associated with a domain.
-type family Pred (domain :: * -> *) :: * -> Constraint
+type family PredicateOf (dom :: * -> *) :: * -> Constraint
 
 -- | Type representation associated with a predicate.
-type family Rep (pred :: * -> Constraint) :: * -> *
+type family RepresentationOf (pred :: * -> Constraint) :: * -> *
 
 --------------------------------------------------------------------------------
   
@@ -64,7 +64,7 @@ type family Rep (pred :: * -> Constraint) :: * -> *
 --   simpler values that respect `pred` and are in turn represented using `trep`.
 class (Eq a, Show a, Typeable a, Inhabited a) => Type pred a
   where
-    typeRep :: TypeRep pred (Rep pred) a
+    typeRep :: TypeRep pred (RepresentationOf pred) a
 
 -- Pairs of valid types are themselves also valid types.
 instance (Type pred a, Type pred b) => Type pred (a, b)
