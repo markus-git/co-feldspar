@@ -35,8 +35,7 @@ import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 --------------------------------------------------------------------------------
 
 -- | Short-hand for a `Syntactic` instance over typed values from `dom`.
-class    (Syntactic a, dom ~ Domain a, Type (PredicateOf dom) (Internal a), Tuples dom) => Syntax  dom a
-instance (Syntactic a, dom ~ Domain a, Type (PredicateOf dom) (Internal a), Tuples dom) => Syntax  dom a
+type Syntax  dom a = (Syntactic a, dom ~ Domain a, Type (PredicateOf dom) (Internal a), Tuples dom)
 
 -- | Short-hand for a `Syntactic` instance over typed primitive values from `dom`.
 type Syntax' dom a = (Syntactic a, PrimType (PredicateOf dom) (Internal a), dom ~ Domain a)
