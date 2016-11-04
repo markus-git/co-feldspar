@@ -45,8 +45,6 @@ type Syntax' dom a = (Syntactic a, PrimType (PredicateOf dom) (Internal a), dom 
 -- | ... shord-hand for typed values in language m ...
 type SyntaxM m a = Syntax (DomainOf m) a
 
-type ValueM m = Value (DomainOf m)
-
 --------------------------------------------------------------------------------
 
 -- computational instructions.
