@@ -21,11 +21,20 @@ example
    . ( Comp m
      , dom  ~ DomainOf m -- for instances below, should be hidden.
      , expr ~ Expr m     -- we don't have SExp/HExp yet.
-     
+
+       -- ^ Supported co-feldspar expressoins.
+       -- 
+       -- todo: that we need to show `dom` is unfortunate but it is possible
+       -- to hide 'type EqualityM m = Equality (DomainOf m)', I just need to
+       -- find a prettier way of hiding `dom`.
      , Equality dom, Ordered dom, Logical dom
-         -- todo : that we need to show `dom` ^ is unfortunate.
+
+       -- ^ Supported Haskell expressions.
+       --
+       -- todo: Syntax(') m a, Num (Internal a) => Num a.
      , Num (expr Int8)
-         -- todo : Syntax' ... a, Num (Internal a) => Num a.
+
+       -- ^ Our expressions are of a know kind co-feldspar and correctly typed.
      , Syntax dom (expr Int8)
      )
   => m ()
