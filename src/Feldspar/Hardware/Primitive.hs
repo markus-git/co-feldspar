@@ -11,10 +11,6 @@
 
 module Feldspar.Hardware.Primitive where
 
-import Feldspar.Representation
-import Data.Struct
-import Data.Inhabited
-
 import Data.Int
 import Data.Word
 import Data.List (genericTake)
@@ -26,11 +22,14 @@ import Language.Syntactic
 import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
 
--- imperative-edsl.
---import Language.Embedded.Expression
-
 -- hardware-edsl.
 import Language.Embedded.Hardware.Interface
+import qualified Language.Embedded.Hardware.Command as Imp (IArray)
+
+import Data.Struct
+import Data.Inhabited
+
+import Feldspar.Representation
 
 --------------------------------------------------------------------------------
 -- * Hardware Types.
@@ -91,6 +90,8 @@ data HardwarePrim sig
   where
     FreeVar :: (HardwarePrimType a) => String -> HardwarePrim (Full a)
     Lit     :: (Show a, Eq a)       => a      -> HardwarePrim (Full a)
+    -- ^ Array indexing.
+    ArrIx   :: (HardwarePrimType a) => Imp.IArray Index a -> HardwarePrim (Index :-> Full a)
     -- ^ numerical operations.
     Neg     :: (HardwarePrimType a, Num a)        => HardwarePrim (a :-> Full a)
     Add     :: (HardwarePrimType a, Num a)        => HardwarePrim (a :-> a :-> Full a)
@@ -106,7 +107,6 @@ data HardwarePrim sig
     Eq      :: (HardwarePrimType a, Eq a)         => HardwarePrim (a :-> a :-> Full Bool)
     Lt      :: (HardwarePrimType a, Ord a)        => HardwarePrim (a :-> a :-> Full Bool)
 
-deriving instance Eq       (HardwarePrim a)
 deriving instance Show     (HardwarePrim a)
 deriving instance Typeable (HardwarePrim a)
 

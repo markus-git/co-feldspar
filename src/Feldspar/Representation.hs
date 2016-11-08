@@ -78,3 +78,9 @@ class    (Type pred a, pred a) => PrimType pred a
 instance (Type pred a, pred a) => PrimType pred a
 
 --------------------------------------------------------------------------------
+
+type Length = Int8
+
+type Index  = Int8
+
+--------------------------------------------------------------------------------

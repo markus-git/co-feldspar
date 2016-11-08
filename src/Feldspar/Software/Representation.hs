@@ -51,6 +51,7 @@ import qualified Language.Embedded.Imperative as Imp
 type SoftwareCMD
          = Imp.RefCMD
   Oper.:+: Imp.ControlCMD
+  Oper.:+: Imp.ArrCMD
     -- ^ Computational instructions.
   Oper.:+: Imp.FileCMD
     -- ^ Software specific instructions.
@@ -64,12 +65,23 @@ newtype Software a = Software { unSoftware :: Program SoftwareCMD (Param2 SExp S
 -- | Software reference.
 newtype Ref a = Ref { unRef :: Struct SoftwarePrimType Imp.Ref (Internal a) }
 
+-- | Software array.
+data Arr a = Arr
+  { arrOffset :: SExp Index
+  , arrLength :: SExp Length
+  , unArr     :: Struct SoftwarePrimType (Imp.Arr Index) (Internal a)
+  }
+
+-- | Immutable software array.
+data IArr a = IArr
+  { iarrOffset :: SExp Index
+  , iarrLength :: SExp Length
+  , unIArr     :: Struct SoftwarePrimType (Imp.IArr Index) (Internal a)
+  }
+
 --------------------------------------------------------------------------------
 -- * Expression.
 --------------------------------------------------------------------------------
-
-type Length = Int8
-type Index  = Int8
 
 -- | For loop.
 data ForLoop sig
@@ -161,7 +173,7 @@ sugarSymPrimSoftware
        , SoftwareDomain ~ SmartSym fi
        , SyntacticN f fi
        , sub :<: SoftwareConstructs
-       , SType' (DenResult sig)
+       , SoftwarePrimType (DenResult sig)
        )
     => sub sig -> f
 sugarSymPrimSoftware = sugarSymDecor $ ValT $ Node softwareRep
@@ -237,16 +249,4 @@ softwareTypeEq _ _ = Nothing
 softwareTypeRep :: Struct SoftwarePrimType c a -> STypeRep a
 softwareTypeRep = mapStruct (const softwareRep)
 
---------------------------------------------------------------------------------
-{-
-instance Syntax Software (SExp Bool)
-instance Syntax Software (SExp Int8)
-instance Syntax Software (SExp Word8)
-instance Syntax Software (SExp Float)
-instance
-  ( Syntax Software a, Domain a ~ SoftwareDomain
-  , Syntax Software b, Domain b ~ SoftwareDomain
-  )
-    => Syntax Software (a, b)
--}
 --------------------------------------------------------------------------------

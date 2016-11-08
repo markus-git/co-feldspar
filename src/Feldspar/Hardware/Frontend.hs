@@ -8,14 +8,7 @@
 
 module Feldspar.Hardware.Frontend where
 
-import Feldspar.Sugar
-import Feldspar.Representation
-import Feldspar.Frontend
-
-import Feldspar.Hardware.Primitive
-import Feldspar.Hardware.Representation
-
-import Data.Struct
+import Prelude hiding (length)
 
 import Data.Constraint hiding (Sub)
 import Data.Proxy
@@ -32,6 +25,15 @@ import qualified Control.Monad.Operational.Higher as Oper
 import Language.Embedded.Hardware.Command (Signal, Ident)
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
+
+import Data.Struct
+
+import Feldspar.Sugar
+import Feldspar.Representation
+import Feldspar.Frontend
+
+import Feldspar.Hardware.Primitive
+import Feldspar.Hardware.Representation
 
 --------------------------------------------------------------------------------
 -- * Expressions.
@@ -80,6 +82,20 @@ instance (Num a, HType' a) => Num (HExp a)
     negate      = sugarSymHardware Neg
     abs         = error "abs not implemeted for `HExp`"
     signum      = error "signum not implemented for `HExp`"
+
+--------------------------------------------------------------------------------
+
+instance Indexed HardwareDomain (HExp Index) (IArr a)
+  where
+    type Elem (IArr a) = a
+
+    (!) (IArr off len a) ix = resugar $ mapStruct index a
+      where
+        index :: HardwarePrimType b => Imp.IArray Index b -> HExp b
+        index arr = sugarSymPrimHardware (ArrIx arr) (ix + off)
+
+instance Finite (HExp Index) (Arr a)  where length = arrLength
+instance Finite (HExp Index) (IArr a) where length = iarrLength
 
 --------------------------------------------------------------------------------
 -- * Instructions.
@@ -138,6 +154,56 @@ setRef' :: forall b . HardwarePrimType b
   => Imp.Variable b -> HExp b
   -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
 setRef' = withHType (Proxy :: Proxy b) Imp.setVariable
+
+--------------------------------------------------------------------------------
+
+instance Arrays Hardware
+  where
+    type Array Hardware = Arr
+    type Ix    Hardware = HExp Index
+    
+    newArr len
+      = Hardware
+      $ fmap (Arr 0 len)
+      $ mapStructA (const (Imp.newVArray len))
+      $ typeRep
+
+    getArr arr ix
+      = Hardware
+      $ fmap resugar
+      $ mapStructA (getArr' (ix + arrOffset arr))
+      $ unArr arr
+
+    setArr arr ix a
+      = Hardware
+      $ sequence_
+      $ zipListStruct (setArr' (ix + arrOffset arr)) (resugar a)
+      $ unArr arr
+
+getArr' :: forall b . HardwarePrimType b
+  => HExp Index -> Imp.VArray Index b
+  -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
+getArr' = withHType (Proxy :: Proxy b) Imp.getVArray
+
+setArr' :: forall b . HardwarePrimType b
+  => HExp Index -> HExp b -> Imp.VArray Index b
+  -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
+setArr' = withHType (Proxy :: Proxy b) Imp.setVArray
+
+--------------------------------------------------------------------------------
+
+instance IArrays Hardware
+  where
+    type IArray Hardware = IArr
+
+    freezeArr arr
+      = Hardware
+      $ fmap (IArr (arrOffset arr) (length arr))
+      $ mapStructA (flip Imp.freezeArray (length arr))
+      $ unArr arr
+
+    thawArr iarr
+      = error "todo: thawArr for hardware"
 
 --------------------------------------------------------------------------------
 -- ** Hardware instructions.

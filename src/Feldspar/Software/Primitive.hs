@@ -11,7 +11,7 @@
 
 module Feldspar.Software.Primitive where
 
-import Feldspar.Representation
+import Data.Array ((!))
 import Data.Struct
 import Data.Inhabited
 
@@ -28,6 +28,9 @@ import Language.Syntactic.Functional.Tuple
 
 -- imperative-edsl.
 import Language.Embedded.Expression
+import qualified Language.Embedded.Imperative.CMD as Imp (IArr(..))
+
+import Feldspar.Representation
 
 --------------------------------------------------------------------------------
 -- * Software Types.
@@ -96,6 +99,8 @@ data SoftwarePrim sig
     Lit     :: (Show a, Eq a)       => a      -> SoftwarePrim (Full a)
     -- ^ conditional.
     Cond    :: SoftwarePrim (Bool :-> a :-> a :-> Full a)
+    -- ^ Array indexing.
+    ArrIx   :: (SoftwarePrimType a) => Imp.IArr Index a -> SoftwarePrim (Index :-> Full a)
     -- ^ numerical operations.
     Neg     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> Full a)
     Add     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> a :-> Full a)
@@ -115,7 +120,6 @@ data SoftwarePrim sig
     Cos     :: (SoftwarePrimType a, Floating a)   => SoftwarePrim (a :-> Full a)
     Tan     :: (SoftwarePrimType a, Floating a)   => SoftwarePrim (a :-> Full a)
 
-deriving instance Eq       (SoftwarePrim a)
 deriving instance Show     (SoftwarePrim a)
 deriving instance Typeable (SoftwarePrim a)
 
@@ -206,6 +210,8 @@ instance Eval SoftwarePrim
     evalSym Sin         = sin
     evalSym Cos         = cos
     evalSym Tan         = tan
+    evalSym (ArrIx (Imp.IArrRun arr)) = \i -> arr ! i
+    evalSym (ArrIx _)                 = error "eval of variable."
 
 instance Symbol SoftwarePrim
   where
@@ -225,6 +231,7 @@ instance Symbol SoftwarePrim
     symSig Sin         = signature
     symSig Cos         = signature
     symSig Tan         = signature
+    symSig (ArrIx a)   = signature
 
 instance Render SoftwarePrim
   where

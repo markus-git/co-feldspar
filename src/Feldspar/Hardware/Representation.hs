@@ -15,15 +15,7 @@
 
 module Feldspar.Hardware.Representation where
 
-import Feldspar.Sugar
-import Feldspar.Representation
-import Feldspar.Frontend
-
-import Feldspar.Hardware.Primitive
-
-import Data.Struct
-import Data.Inhabited
-
+import Data.Array ((!))
 import Data.Int
 import Data.Word
 import Data.List (genericTake)
@@ -45,6 +37,15 @@ import Control.Monad.Operational.Higher as Oper hiding ((:<:))
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
 
+import Data.Struct
+import Data.Inhabited
+
+import Feldspar.Sugar
+import Feldspar.Representation
+import Feldspar.Frontend
+
+import Feldspar.Hardware.Primitive
+
 --------------------------------------------------------------------------------
 -- * Programs.
 --------------------------------------------------------------------------------
@@ -52,6 +53,7 @@ import qualified Language.Embedded.Hardware.Interface as Imp
 -- | Hardware instructions.
 type HardwareCMD =
            Imp.VariableCMD
+  Oper.:+: Imp.VArrayCMD
   Oper.:+: Imp.LoopCMD
   Oper.:+: Imp.ConditionalCMD
     -- ^ Computatonal instructions.
@@ -65,7 +67,22 @@ newtype Hardware a = Hardware { unHardware :: Program HardwareCMD (Param2 HExp H
 
 --------------------------------------------------------------------------------
 
+-- | Hardware references.
 newtype Ref a = Ref { unRef :: Struct HardwarePrimType Imp.Variable (Internal a) }
+
+-- | Hardware arrays.
+data Arr a = Arr
+  { arrOffset :: HExp Index
+  , arrLength :: HExp Length
+  , unArr     :: Struct HardwarePrimType (Imp.VArray Index) (Internal a)
+  }
+
+-- | Immutable hardware arrays.
+data IArr a = IArr
+  { iarrOffset :: HExp Index
+  , iarrLength :: HExp Length
+  , unIArr     :: Struct HardwarePrimType (Imp.IArray Index) (Internal a)
+  }
 
 --------------------------------------------------------------------------------
 -- * Expression.
@@ -148,7 +165,7 @@ sugarSymPrimHardware
        , HardwareDomain ~ SmartSym fi
        , SyntacticN f fi
        , sub :<: HardwareConstructs
-       , HType' (DenResult sig)
+       , HardwarePrimType (DenResult sig)
        )
     => sub sig -> f
 sugarSymPrimHardware = sugarSymDecor $ ValT $ Node hardwareRep

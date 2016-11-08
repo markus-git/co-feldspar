@@ -19,6 +19,7 @@ import Feldspar.Representation
 import Data.Constraint
 import Data.Struct
 import Data.Proxy
+--import Data.Ix
 
 -- syntactci.
 import Language.Syntactic as S hiding (Equality)
@@ -42,8 +43,7 @@ type Syntax' dom a = (Syntactic a, PrimType (PredicateOf dom) (Internal a), dom 
 
 --------------------------------------------------------------------------------
 
--- | ... shord-hand for typed values in language m ...
-type SyntaxM m a = Syntax (DomainOf m) a
+type Boolean a = a ~ Bool
 
 --------------------------------------------------------------------------------
 
@@ -59,15 +59,10 @@ type Comp m
 --------------------------------------------------------------------------------
 -- ** General constructs.
 
--- | ... hmm ...
-type Boolean a = a ~ Bool
-
--- | Literals.
 class Value dom
   where
     value :: Syntax dom a => Internal a -> a
 
--- | Forced evaluation.
 class Share dom
   where
     share :: (Syntax dom a, Syntax dom b)
@@ -75,7 +70,6 @@ class Share dom
       -> (a -> b) -- ^ Body in which to share the value.
       -> b
 
--- | Conditional statements.
 class Cond dom
   where
     cond
@@ -88,32 +82,43 @@ class Cond dom
 --------------------------------------------------------------------------------
 -- ** Primitive functions.
 
--- | Equality.
 class Equality dom
   where
     (==) :: (Syntax' dom a, Syntax' dom b, Eq (Internal a), Boolean (Internal b)) => a -> a -> b
-
-infix 4 ==
-
--- | Ordered.
+  
 class Equality dom => Ordered dom
   where
     (<)  :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
-
-infix 4 <
-
--- | Logical stuff.
+  
 class Logical dom
   where
     not  :: (Syntax' dom a, Boolean (Internal a)) => a -> a
     (&&) :: (Syntax' dom a, Boolean (Internal a)) => a -> a -> a
 
 infix 3 &&
+infix 4 ==
+infix 4 <
+
+--------------------------------------------------------------------------------
+-- arrays.
+
+class Indexed dom ix a
+  where
+    type Elem a :: *
+
+    (!) :: Syntax dom (Elem a) => a -> ix -> Elem a
+
+class Finite ix a
+  where
+    length :: a -> ix
     
 --------------------------------------------------------------------------------
 -- ** Commands.
 
--- | Commands for managing mutable references.
+type SyntaxM m a = Syntax (DomainOf m) a
+
+--------------------------------------------------------------------------------
+
 class Monad m => References m
   where
     type Reference m :: * -> *
@@ -122,5 +127,23 @@ class Monad m => References m
     newRef  :: SyntaxM m a => m (Reference m a)
     getRef  :: SyntaxM m a => Reference m a -> m a
     setRef  :: SyntaxM m a => Reference m a -> a -> m ()
+
+--------------------------------------------------------------------------------
+-- todo: 'Ix m' could be replaced by 'SyntaxM ix, Array.Ix ix => ix' in 'Arrays'
+-- if we got rid of the hardcoded 'Data Index' in array definitions.
+
+class Monad m => Arrays m
+  where
+    type Array m :: * -> *
+    type Ix    m :: *
+    newArr :: SyntaxM m a => Ix m -> m (Array m a)
+    getArr :: SyntaxM m a => Array m a -> Ix m -> m a
+    setArr :: SyntaxM m a => Array m a -> Ix m -> a -> m ()
+
+class Arrays m => IArrays m
+  where
+    type IArray m :: * -> *
+    freezeArr :: (SyntaxM m a, Finite (Ix m) (Array  m a)) => Array  m a -> m (IArray m a)
+    thawArr   :: (SyntaxM m a, Finite (Ix m) (IArray m a)) => IArray m a -> m (Array  m a)
 
 --------------------------------------------------------------------------------

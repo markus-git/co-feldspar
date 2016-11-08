@@ -9,17 +9,11 @@
 
 module Feldspar.Software.Frontend where
 
-import Feldspar.Sugar
-import Feldspar.Representation
-import Feldspar.Frontend
-
-import Feldspar.Software.Primitive
-import Feldspar.Software.Representation
-
-import Data.Struct
+import Prelude hiding (length)
 
 import Data.Constraint hiding (Sub)
 import Data.Proxy
+--import Data.Ix
 
 -- syntactic.
 import Language.Syntactic (Syntactic(..))
@@ -33,6 +27,15 @@ import qualified Control.Monad.Operational.Higher as Oper
 import Language.Embedded.Imperative.Frontend.General hiding (Ref, Arr, IArr)
 import qualified Language.Embedded.Imperative     as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
+
+import Data.Struct
+
+import Feldspar.Sugar
+import Feldspar.Representation
+import Feldspar.Frontend
+
+import Feldspar.Software.Primitive
+import Feldspar.Software.Representation
 
 --------------------------------------------------------------------------------
 -- * Expressions.
@@ -87,6 +90,20 @@ instance (Num a, SType' a) => Num (SExp a)
     signum      = error "signum not implemented for `SExp`"
 
 --------------------------------------------------------------------------------
+
+instance Indexed SoftwareDomain (SExp Index) (IArr a)
+  where
+    type Elem (IArr a) = a
+
+    (!) (IArr off len a) ix = resugar $ mapStruct index a
+      where
+        index :: SoftwarePrimType b => Imp.IArr Index b -> SExp b
+        index arr = sugarSymPrimSoftware (ArrIx arr) (ix + off)
+
+instance Finite (SExp Index) (Arr a)  where length = arrLength
+instance Finite (SExp Index) (IArr a) where length = iarrLength
+
+--------------------------------------------------------------------------------
 -- * Instructions.
 --------------------------------------------------------------------------------
 
@@ -133,17 +150,72 @@ instance References Software
     getRef     = Software . fmap resugar . mapStructA getRef' . unRef
     setRef ref = Software . sequence_ . zipListStruct setRef' (unRef ref) . resugar
 
--- Imp.getRef specialized a software constraint.
+-- Imp.getRef specialized to software.
 getRef' :: forall b . SoftwarePrimType b
   => Imp.Ref b
   -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
 getRef' = withSType (Proxy :: Proxy b) Imp.getRef
 
--- Imp.setRef specialized to a software constraint.
+-- Imp.setRef specialized to software.
 setRef' :: forall b . SoftwarePrimType b
   => Imp.Ref b -> SExp b
   -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
 setRef' = withSType (Proxy :: Proxy b) Imp.setRef
+
+--------------------------------------------------------------------------------
+
+instance Arrays Software
+  where
+    type Array Software = Arr
+    type Ix    Software = SExp Index
+    
+    newArr len
+      = Software
+      $ fmap (Arr 0 len)
+      $ mapStructA (const (Imp.newArr len))
+      $ typeRep
+      
+    getArr arr ix
+      = Software
+      $ fmap resugar
+      $ mapStructA (flip getArr' (ix + arrOffset arr))
+      $ unArr arr
+    
+    setArr arr ix a
+      = Software
+      $ sequence_
+      $ zipListStruct (\a' arr' -> setArr' arr' (ix + arrOffset arr) a') (resugar a)
+      $ unArr arr
+
+-- Imp.getArr specialized to software.
+getArr' :: forall b . SoftwarePrimType b
+  => Imp.Arr Index b -> SExp Index
+  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
+getArr' = withSType (Proxy :: Proxy b) Imp.getArr
+
+-- Imp.setArr specialized to software.
+setArr' :: forall b . SoftwarePrimType b
+  => Imp.Arr Index b -> SExp Index -> SExp b
+  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
+setArr' = withSType (Proxy :: Proxy b) Imp.setArr
+
+--------------------------------------------------------------------------------
+
+instance IArrays Software
+  where
+    type IArray Software = IArr
+    
+    freezeArr arr
+      = Software
+      $ fmap (IArr (arrOffset arr) (length arr))
+      $ mapStructA (flip Imp.freezeArr (length arr))
+      $ unArr arr
+      
+    thawArr iarr
+      = Software
+      $ fmap (Arr (iarrOffset iarr) (length iarr))
+      $ mapStructA (flip Imp.thawArr (length iarr))
+      $ unIArr iarr
 
 --------------------------------------------------------------------------------
 -- ** Software instructions.
