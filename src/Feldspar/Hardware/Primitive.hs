@@ -11,6 +11,7 @@
 
 module Feldspar.Hardware.Primitive where
 
+import Data.Array ((!))
 import Data.Int
 import Data.Word
 import Data.List (genericTake)
@@ -24,7 +25,7 @@ import Language.Syntactic.Functional.Tuple
 
 -- hardware-edsl.
 import Language.Embedded.Hardware.Interface
-import qualified Language.Embedded.Hardware.Command as Imp (IArray)
+import qualified Language.Embedded.Hardware.Command as Imp (IArray(..))
 
 import Data.Struct
 import Data.Inhabited
@@ -193,6 +194,8 @@ instance Eval HardwarePrim
     evalSym And         = (&&)
     evalSym Eq          = (==)
     evalSym Lt          = (<=)
+    evalSym (ArrIx (Imp.IArrayE a)) = \i -> a ! i
+    evalSym (ArrIx _)               = error "eval of array variable"
 
 instance Symbol HardwarePrim
   where
@@ -208,6 +211,7 @@ instance Symbol HardwarePrim
     symSig And         = signature
     symSig Eq          = signature
     symSig Lt          = signature
+    symSig (ArrIx a)   = signature
 
 instance Render HardwarePrim
   where

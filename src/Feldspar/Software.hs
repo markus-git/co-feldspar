@@ -4,8 +4,6 @@ module Feldspar.Software
   , SExp
   , SType
   , Software
-  , Length
-  , Index
   , compile
   , icompile
   ) where
