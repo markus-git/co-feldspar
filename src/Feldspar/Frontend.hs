@@ -53,6 +53,7 @@ type Comp m
     , References m
     , Arrays m
     , IArrays m
+    , Control m
       -- todo: add control structures and loops.
     , Value (DomainOf m)
     , Share (DomainOf m)
@@ -117,7 +118,8 @@ class Finite ix a
 --------------------------------------------------------------------------------
 -- ** Commands.
 
-type SyntaxM m a = Syntax (DomainOf m) a
+type SyntaxM  m a = Syntax  (DomainOf m) a
+type SyntaxM' m a = Syntax' (DomainOf m) a
 
 --------------------------------------------------------------------------------
 
@@ -147,5 +149,13 @@ class Arrays m => IArrays m
     type IArray m :: * -> *
     freezeArr :: (SyntaxM m a, Finite (Ix m) (Array  m a)) => Array  m a -> m (IArray m a)
     thawArr   :: (SyntaxM m a, Finite (Ix m) (IArray m a)) => IArray m a -> m (Array  m a)
+
+--------------------------------------------------------------------------------
+
+class Monad m => Control m
+  where
+    iff   :: (SyntaxM m a,  Boolean  (Internal a)) => a -> m () -> m () -> m ()
+    while :: (SyntaxM m a,  Boolean  (Internal a)) => m a -> m () -> m ()
+    for   :: (SyntaxM' m a, Integral (Internal a)) => a -> (a -> m ()) -> m ()
 
 --------------------------------------------------------------------------------

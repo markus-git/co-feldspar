@@ -4,6 +4,10 @@
 
 module Basic where
 
+import Prelude hiding ((<))
+
+import Language.Syntactic (Syntactic(..))
+
 import Feldspar
 
 import Feldspar.Software
@@ -30,7 +34,14 @@ arrays
      -- *** todo: ...
      , Indexed dom (expr Index) (IArray m (expr Int8))
 
-     , Num (expr Int8)
+     -- *** todo: ...
+     , Equality dom, Ordered dom
+     , Ord (Internal (expr Int8)), Boolean (Internal (expr Bool))
+     , Syntax' dom (expr Bool)
+     , Syntax' dom (expr Int8)
+
+     -- ...
+     , Num (expr Int8)     
      , Syntax dom (expr Int8)
      )
   => m ()
@@ -43,7 +54,9 @@ arrays =
      ref :: Reference m (expr Int8) <- initRef v
 
      iarr :: IArray m (expr Int8) <- freezeArr arr
-     setArr arr 1 2
+     iff (v < 2 :: expr Bool)
+       (setArr arr 1 2)
+       (setArr arr 1 3)
      setRef ref (iarr ! (1 :: expr Index))
      
 --------------------------------------------------------------------------------

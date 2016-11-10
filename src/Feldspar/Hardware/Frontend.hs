@@ -206,6 +206,14 @@ instance IArrays Hardware
       = error "todo: thawArr for hardware"
 
 --------------------------------------------------------------------------------
+
+instance Control Hardware
+  where
+    iff c t f      = Hardware $ Imp.iff (resugar c) (unHardware t) (unHardware f)
+    while c body   = Hardware $ Imp.while (fmap resugar $ unHardware c) (unHardware body)
+    for range body = Hardware $ Imp.for (resugar range) (unHardware . body . resugar)
+
+--------------------------------------------------------------------------------
 -- ** Hardware instructions.
 
 --------------------------------------------------------------------------------

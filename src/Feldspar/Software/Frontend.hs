@@ -218,6 +218,14 @@ instance IArrays Software
       $ unIArr iarr
 
 --------------------------------------------------------------------------------
+
+instance Control Software
+  where
+    iff c t f      = Software $ Imp.iff (resugar c) (unSoftware t) (unSoftware f)
+    while c body   = Software $ Imp.while (fmap resugar $ unSoftware c) (unSoftware body)
+    for range body = Software $ Imp.for (0, 1, Imp.Excl $ resugar range) (unSoftware . body . resugar)
+
+--------------------------------------------------------------------------------
 -- ** Software instructions.
 
 --------------------------------------------------------------------------------
