@@ -100,6 +100,9 @@ translateExp = goAST . unHExp
     goAST :: ASTF HardwareDomain b -> TargetT m (VExp b)
     goAST = simpleMatch (\(s :&: ValT t) -> go t s)
 
+    goSmallAST :: HardwarePrimType b => S.ASTF HardwareDomain b -> TargetT m (Prim b)
+    goSmallAST = fmap extractNode . goAST
+
     go    :: HTypeRep (DenResult sig)
           -> HardwareConstructs sig
           -> Args (AST HardwareDomain) sig
@@ -144,6 +147,10 @@ translateExp = goAST . unHExp
       | Just And <- prj op = liftStruct2 (sugarSymPrim And) <$> goAST a <*> goAST b
       | Just Eq  <- prj op = liftStruct2 (sugarSymPrim Eq)  <$> goAST a <*> goAST b
       | Just Lt  <- prj op = liftStruct2 (sugarSymPrim Lt)  <$> goAST a <*> goAST b
+    go _ arrIx (i :* Nil)
+      | Just (ArrIx arr) <- prj arrIx
+      = do i' <- goSmallAST i
+           return $ Node $ sugarSymPrim (ArrIx arr) i'
     go _ s _ = error $ "hardware translation handling for symbol " ++ S.renderSym s ++ " is missing."
 
 --------------------------------------------------------------------------------

@@ -107,8 +107,14 @@ compPrim = simpleMatch (\(s :&: t) -> go t s) . unPrim
     go _ And (a :* b :* Nil) = compBinOp C.Land a b
     go _ Eq  (a :* b :* Nil) = compBinOp C.Eq a b
     go _ Lt  (a :* b :* Nil) = compBinOp C.Lt a b
+    
     go _ Sin args = addInclude "<tgmath.h>" >> compFun "sin" args
     go _ Cos args = addInclude "<tgmath.h>" >> compFun "cos" args
     go _ Tan args = addInclude "<tgmath.h>" >> compFun "tan" args
+
+    go _ (ArrIx arr) (i :* Nil) =
+      do i' <- compPrim $ Prim i
+         touchVar arr
+         return [cexp| $id:arr[$i'] |]
 
 --------------------------------------------------------------------------------

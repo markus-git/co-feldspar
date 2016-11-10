@@ -51,6 +51,8 @@ type Boolean a = a ~ Bool
 type Comp m
   = ( Monad m
     , References m
+    , Arrays m
+    , IArrays m
       -- todo: add control structures and loops.
     , Value (DomainOf m)
     , Share (DomainOf m)

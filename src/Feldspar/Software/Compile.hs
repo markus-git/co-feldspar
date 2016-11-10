@@ -166,6 +166,10 @@ translateExp = goAST . unSExp
             s' <- localAlias iv (Node i) $ localAlias sv s $ goAST body
             setRefV state s'
           unsafeFreezeRefV state
+    go _ arrIx (i :* Nil)
+      | Just (ArrIx arr) <- prj arrIx = do
+          i' <- goSmallAST i
+          return $ Node $ sugarSymPrim (ArrIx arr) i'
     go _ s _ = error $ "software translation handling for symbol " ++ S.renderSym s ++ " is missing."
 
 --------------------------------------------------------------------------------

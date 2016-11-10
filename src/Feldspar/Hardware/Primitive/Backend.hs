@@ -17,6 +17,7 @@ import Language.Syntactic
 import Language.Embedded.Hardware
 import Language.Embedded.Hardware.Expression.Represent
 import Language.Embedded.Hardware.Expression.Hoist (lift, Kind)
+import Language.Embedded.Hardware.Command.CMD (IArray(..))
 import qualified Language.Embedded.Hardware.Expression.Hoist as Hoist
 
 import Language.Embedded.VHDL (VHDL)
@@ -102,6 +103,10 @@ compKind = simpleMatch (\(s :&: t) -> go t s)
     go _ And (a :* b :* Nil) = compExpr   [a, b] VHDL.and
     go _ Eq  (a :* b :* Nil) = compRel    [a, b] (two VHDL.eq)
     go _ Lt  (a :* b :* Nil) = compRel    [a, b] (two VHDL.lt)
+
+    go _ (ArrIx (IArrayC arr)) (i :* Nil) =
+      do i' <- compPrim $ Prim i
+         return $ Hoist.P $ VHDL.name $ VHDL.indexed (VHDL.Ident arr) (lift i')
 
     one :: (a -> b) -> ([a] -> b)
     one f = \[a] -> f a
