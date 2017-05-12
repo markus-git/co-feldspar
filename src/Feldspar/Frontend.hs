@@ -140,7 +140,7 @@ class Bitwise dom
          , Syntax' dom b, Word (Internal b))
       => a -> b -> a
 
-bitSize :: forall a. FiniteBits (Internal a) => a -> Length
+bitSize :: forall a. FiniteBits (Internal a) => a -> Word64
 bitSize _ = fromIntegral $ Bits.finiteBitSize (a :: Internal a)
   where a = error "Bits.finiteBitSize evaluated its argument"
 
