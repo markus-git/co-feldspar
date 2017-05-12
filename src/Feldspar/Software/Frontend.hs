@@ -13,6 +13,7 @@ import Prelude hiding (length)
 
 import Data.Constraint hiding (Sub)
 import Data.Proxy
+import Data.List (genericLength)
 --import Data.Ix
 
 -- syntactic.
@@ -100,6 +101,14 @@ instance Indexed SoftwareDomain (SExp Index) (IArr a)
         index :: SoftwarePrimType b => Imp.IArr Index b -> SExp b
         index arr = sugarSymPrimSoftware (ArrIx arr) (ix + off)
 
+instance Slicable (SExp Index) (Arr a)
+  where
+    slice from len (Arr o l arr) = Arr (o+from) len arr
+
+instance Slicable (SExp Index) (IArr a)
+  where
+    slice from len (IArr o l arr) = IArr (o+from) len arr
+
 instance Finite (SExp Index) (Arr a)  where length = arrLength
 instance Finite (SExp Index) (IArr a) where length = iarrLength
 
@@ -174,6 +183,12 @@ instance Arrays Software
       $ fmap (Arr 0 len)
       $ mapStructA (const (Imp.newArr len))
       $ typeRep
+
+    initArr elems
+      = Software
+      $ fmap (Arr 0 len . Node)
+      $ Imp.constArr elems
+      where len = value $ genericLength elems
       
     getArr arr ix
       = Software
@@ -186,6 +201,14 @@ instance Arrays Software
       $ sequence_
       $ zipListStruct (\a' arr' -> setArr' arr' (ix + arrOffset arr) a') (resugar a)
       $ unArr arr
+
+    copyArr arr brr
+      = Software
+      $ sequence_
+      $ zipListStruct (\a b ->
+          Imp.copyArr (a, arrOffset arr) (b, arrOffset brr) (length brr))
+        (unArr arr)
+        (unArr brr)
 
 -- Imp.getArr specialized to software.
 getArr' :: forall b . SoftwarePrimType b
@@ -205,16 +228,16 @@ instance IArrays Software
   where
     type IArray Software = IArr
     
-    freezeArr arr
+    unsafeFreezeArr arr
       = Software
       $ fmap (IArr (arrOffset arr) (length arr))
-      $ mapStructA (flip Imp.freezeArr (length arr))
+      $ mapStructA (Imp.unsafeFreezeArr)
       $ unArr arr
-      
-    thawArr iarr
+
+    unsafeThawArr iarr
       = Software
       $ fmap (Arr (iarrOffset iarr) (length iarr))
-      $ mapStructA (flip Imp.thawArr (length iarr))
+      $ mapStructA (Imp.unsafeThawArr)
       $ unIArr iarr
 
 --------------------------------------------------------------------------------

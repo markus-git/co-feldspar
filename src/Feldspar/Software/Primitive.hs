@@ -42,14 +42,14 @@ data SoftwarePrimTypeRep a
     BoolST   :: SoftwarePrimTypeRep Bool
     -- signed numbers.
     Int8ST   :: SoftwarePrimTypeRep Int8
---  Int16ST  :: SoftwarePrimTypeRep Int16
---  Int32ST  :: SoftwarePrimTypeRep Int32
---  Int64ST  :: SoftwarePrimTypeRep Int64
+    Int16ST  :: SoftwarePrimTypeRep Int16
+    Int32ST  :: SoftwarePrimTypeRep Int32
+    Int64ST  :: SoftwarePrimTypeRep Int64
     -- unsigned numbers.
     Word8ST  :: SoftwarePrimTypeRep Word8
---  Word16ST :: SoftwarePrimTypeRep Word16
---  Word32ST :: SoftwarePrimTypeRep Word32
---  Word64ST :: SoftwarePrimTypeRep Word64
+    Word16ST :: SoftwarePrimTypeRep Word16
+    Word32ST :: SoftwarePrimTypeRep Word32
+    Word64ST :: SoftwarePrimTypeRep Word64
     -- floating point numbers.
     FloatST  :: SoftwarePrimTypeRep Float
 --  DoulbeST :: SoftwarePrimTypeRep Double
@@ -65,28 +65,46 @@ class (Eq a, Show a, Typeable a, Inhabited a) => SoftwarePrimType a
   where
     softwareRep :: SoftwarePrimTypeRep a
 
-instance SoftwarePrimType Bool  where softwareRep = BoolST
-instance SoftwarePrimType Int8  where softwareRep = Int8ST
-instance SoftwarePrimType Word8 where softwareRep = Word8ST
-instance SoftwarePrimType Float where softwareRep = FloatST
+instance SoftwarePrimType Bool   where softwareRep = BoolST
+instance SoftwarePrimType Int8   where softwareRep = Int8ST
+instance SoftwarePrimType Int16  where softwareRep = Int16ST
+instance SoftwarePrimType Int32  where softwareRep = Int32ST
+instance SoftwarePrimType Int64  where softwareRep = Int64ST
+instance SoftwarePrimType Word8  where softwareRep = Word8ST
+instance SoftwarePrimType Word16 where softwareRep = Word16ST
+instance SoftwarePrimType Word32 where softwareRep = Word32ST
+instance SoftwarePrimType Word64 where softwareRep = Word64ST
+instance SoftwarePrimType Float  where softwareRep = FloatST
 
 --------------------------------------------------------------------------------
 
 softwarePrimTypeEq :: SoftwarePrimTypeRep a -> SoftwarePrimTypeRep b -> Maybe (Dict (a ~ b))
-softwarePrimTypeEq (BoolST)  (BoolST)  = Just Dict
-softwarePrimTypeEq (Int8ST)  (Int8ST)  = Just Dict
-softwarePrimTypeEq (Word8ST) (Word8ST) = Just Dict
-softwarePrimTypeEq (FloatST) (FloatST) = Just Dict
-softwarePrimTypeEq _         _         = Nothing
+softwarePrimTypeEq (BoolST)   (BoolST)   = Just Dict
+softwarePrimTypeEq (Int8ST)   (Int8ST)   = Just Dict
+softwarePrimTypeEq (Int16ST)  (Int16ST)  = Just Dict
+softwarePrimTypeEq (Int32ST)  (Int32ST)  = Just Dict
+softwarePrimTypeEq (Int64ST)  (Int64ST)  = Just Dict
+softwarePrimTypeEq (Word8ST)  (Word8ST)  = Just Dict
+softwarePrimTypeEq (Word16ST) (Word16ST) = Just Dict
+softwarePrimTypeEq (Word32ST) (Word32ST) = Just Dict
+softwarePrimTypeEq (Word64ST) (Word64ST) = Just Dict
+softwarePrimTypeEq (FloatST)  (FloatST)  = Just Dict
+softwarePrimTypeEq _          _          = Nothing
 
 softwarePrimTypeOf :: SoftwarePrimType a => a -> SoftwarePrimTypeRep a
 softwarePrimTypeOf _ = softwareRep
 
 softwarePrimWitType :: SoftwarePrimTypeRep a -> Dict (SoftwarePrimType a)
-softwarePrimWitType BoolST  = Dict
-softwarePrimWitType Int8ST  = Dict
-softwarePrimWitType Word8ST = Dict
-softwarePrimWitType FloatST = Dict
+softwarePrimWitType BoolST   = Dict
+softwarePrimWitType Int8ST   = Dict
+softwarePrimWitType Int16ST  = Dict
+softwarePrimWitType Int32ST  = Dict
+softwarePrimWitType Int64ST  = Dict
+softwarePrimWitType Word8ST  = Dict
+softwarePrimWitType Word16ST = Dict
+softwarePrimWitType Word32ST = Dict
+softwarePrimWitType Word64ST = Dict
+softwarePrimWitType FloatST  = Dict
 
 --------------------------------------------------------------------------------
 -- * ... prim ...

@@ -191,9 +191,15 @@ instance Imp.FreeExp HExp
 -- * Types.
 --------------------------------------------------------------------------------
 
-instance Type HardwarePrimType Bool  where typeRep = Node BoolHT
-instance Type HardwarePrimType Int8  where typeRep = Node Int8HT
-instance Type HardwarePrimType Word8 where typeRep = Node Word8HT
+instance Type HardwarePrimType Bool   where typeRep = Node BoolHT
+instance Type HardwarePrimType Int8   where typeRep = Node Int8HT
+instance Type HardwarePrimType Int16  where typeRep = Node Int16HT
+instance Type HardwarePrimType Int32  where typeRep = Node Int32HT
+instance Type HardwarePrimType Int64  where typeRep = Node Int64HT
+instance Type HardwarePrimType Word8  where typeRep = Node Word8HT
+instance Type HardwarePrimType Word16 where typeRep = Node Word16HT
+instance Type HardwarePrimType Word32 where typeRep = Node Word32HT
+instance Type HardwarePrimType Word64 where typeRep = Node Word64HT
 
 --------------------------------------------------------------------------------
 

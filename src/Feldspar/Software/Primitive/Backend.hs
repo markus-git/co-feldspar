@@ -34,18 +34,30 @@ viewLitPrim _                   = Nothing
 instance CompTypeClass SoftwarePrimType
   where
     compType _ (_ :: proxy a) = case softwareRep :: SoftwarePrimTypeRep a of
-      BoolST  -> addInclude "<stdbool.h>" >> return [cty| typename bool |]
-      Int8ST  -> addInclude "<stdint.h>"  >> return [cty| typename int8_t |]
-      Word8ST -> addInclude "<stdint.h>"  >> return [cty| typename uint8_t |]
-      FloatST -> return [cty| float |]
+      BoolST   -> addInclude "<stdbool.h>" >> return [cty| typename bool |]
+      Int8ST   -> addInclude "<stdint.h>"  >> return [cty| typename int8_t |]
+      Int16ST  -> addInclude "<stdint.h>"  >> return [cty| typename int16_t |]
+      Int32ST  -> addInclude "<stdint.h>"  >> return [cty| typename int32_t |]
+      Int64ST  -> addInclude "<stdint.h>"  >> return [cty| typename int64_t |]
+      Word8ST  -> addInclude "<stdint.h>"  >> return [cty| typename uint8_t |]
+      Word16ST -> addInclude "<stdint.h>"  >> return [cty| typename uint16_t |]
+      Word32ST -> addInclude "<stdint.h>"  >> return [cty| typename uint32_t |]
+      Word64ST -> addInclude "<stdint.h>"  >> return [cty| typename uint64_t |]
+      FloatST  -> return [cty| float |]
 
     compLit _ a = case softwarePrimTypeOf a of
       BoolST  ->
         do addInclude "<stdbool.h>"
            return $ if a then [cexp| true |] else [cexp| false |]
-      Int8ST  -> return [cexp| $a |]
-      Word8ST -> return [cexp| $a |]
-      FloatST -> return [cexp| $a |]
+      Int8ST   -> return [cexp| $a |]
+      Int16ST  -> return [cexp| $a |]
+      Int32ST  -> return [cexp| $a |]
+      Int64ST  -> return [cexp| $a |]
+      Word8ST  -> return [cexp| $a |]
+      Word16ST -> return [cexp| $a |]
+      Word32ST -> return [cexp| $a |]
+      Word64ST -> return [cexp| $a |]
+      FloatST  -> return [cexp| $a |]
 
 --------------------------------------------------------------------------------
 

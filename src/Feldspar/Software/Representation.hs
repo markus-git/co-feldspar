@@ -220,10 +220,16 @@ instance StringTree ForLoop
 -- * Types.
 --------------------------------------------------------------------------------
 
-instance Type SoftwarePrimType Bool  where typeRep = Node BoolST
-instance Type SoftwarePrimType Int8  where typeRep = Node Int8ST
-instance Type SoftwarePrimType Word8 where typeRep = Node Word8ST
-instance Type SoftwarePrimType Float where typeRep = Node FloatST
+instance Type SoftwarePrimType Bool   where typeRep = Node BoolST
+instance Type SoftwarePrimType Int8   where typeRep = Node Int8ST
+instance Type SoftwarePrimType Int16  where typeRep = Node Int16ST
+instance Type SoftwarePrimType Int32  where typeRep = Node Int32ST
+instance Type SoftwarePrimType Int64  where typeRep = Node Int64ST
+instance Type SoftwarePrimType Word8  where typeRep = Node Word8ST
+instance Type SoftwarePrimType Word16 where typeRep = Node Word16ST
+instance Type SoftwarePrimType Word32 where typeRep = Node Word32ST
+instance Type SoftwarePrimType Word64 where typeRep = Node Word64ST
+instance Type SoftwarePrimType Float  where typeRep = Node FloatST
 
 --------------------------------------------------------------------------------
 

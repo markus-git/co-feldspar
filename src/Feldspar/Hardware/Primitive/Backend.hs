@@ -37,14 +37,26 @@ viewLitPrim _                    = Nothing
 instance CompileType HardwarePrimType
   where
     compileType _ (v :: proxy a) = case hardwareRep :: HardwarePrimTypeRep a of
-      BoolHT  -> declare v
-      Int8HT  -> declare v
-      Word8HT -> declare v
+      BoolHT   -> declare v
+      Int8HT   -> declare v
+      Int16HT  -> declare v
+      Int32HT  -> declare v
+      Int64HT  -> declare v
+      Word8HT  -> declare v
+      Word16HT -> declare v
+      Word32HT -> declare v
+      Word64HT -> declare v
     
     compileLit _ a = case hardwarePrimTypeOf a of
-      BoolHT  -> literal a
-      Int8HT  -> literal a
-      Word8HT -> literal a
+      BoolHT   -> literal a
+      Int8HT   -> literal a
+      Int16HT  -> literal a
+      Int32HT  -> literal a
+      Int64HT  -> literal a
+      Word8HT  -> literal a
+      Word16HT -> literal a
+      Word32HT -> literal a
+      Word64HT -> literal a
 
 --------------------------------------------------------------------------------
 

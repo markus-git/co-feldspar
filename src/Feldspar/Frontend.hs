@@ -31,6 +31,8 @@ import qualified Control.Monad.Operational.Higher as Oper (Program, Param2)
 import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 
+import Prelude hiding (length)
+
 --------------------------------------------------------------------------------
 -- * Expressions.
 --------------------------------------------------------------------------------
@@ -111,6 +113,10 @@ class Indexed dom ix a
 
     (!) :: Syntax dom (Elem a) => a -> ix -> Elem a
 
+class Slicable ix a
+  where
+    slice :: ix -> ix -> a -> a
+
 class Finite ix a
   where
     length :: a -> ix
@@ -140,15 +146,44 @@ class Monad m => Arrays m
   where
     type Array m :: * -> *
     type Ix    m :: *
-    newArr :: SyntaxM m a => Ix m -> m (Array m a)
-    getArr :: SyntaxM m a => Array m a -> Ix m -> m a
-    setArr :: SyntaxM m a => Array m a -> Ix m -> a -> m ()
+    newArr  :: SyntaxM  m a => Ix m -> m (Array m a)
+    initArr :: SyntaxM' m a => [Internal a] -> m (Array m a)
+    getArr  :: SyntaxM  m a => Array m a -> Ix m -> m a
+    setArr  :: SyntaxM  m a => Array m a -> Ix m -> a -> m ()
+    copyArr :: SyntaxM  m a => Array m a -> Array m a -> m ()
 
 class Arrays m => IArrays m
   where
     type IArray m :: * -> *
-    freezeArr :: (SyntaxM m a, Finite (Ix m) (Array  m a)) => Array  m a -> m (IArray m a)
-    thawArr   :: (SyntaxM m a, Finite (Ix m) (IArray m a)) => IArray m a -> m (Array  m a)
+    unsafeFreezeArr :: (SyntaxM m a, Finite (Ix m) (Array  m a))
+      => Array  m a -> m (IArray m a)
+    unsafeThawArr   :: (SyntaxM m a, Finite (Ix m) (IArray m a))
+      => IArray m a -> m (Array  m a)
+
+freezeArr
+  :: ( Arrays m
+     , IArrays m
+     , SyntaxM m a
+     , Finite (Ix m) (Array  m a)
+     )
+  => Array  m a -> m (IArray m a)
+freezeArr arr =
+  do iarr <- newArr (length arr)
+     copyArr iarr arr
+     unsafeFreezeArr iarr
+
+thawArr
+  :: ( Arrays m
+     , IArrays m
+     , SyntaxM m a
+     , Finite (Ix m) (IArray m a)
+     )
+  => IArray m a -> m (Array  m a)
+thawArr iarr =
+  do brr <- unsafeThawArr iarr -- hahah
+     arr <- newArr (length iarr)
+     copyArr arr brr
+     return arr
 
 --------------------------------------------------------------------------------
 

@@ -168,6 +168,9 @@ instance Arrays Hardware
       $ mapStructA (const (Imp.newVArray len))
       $ typeRep
 
+    initArr as
+      = error "todo: initArr for hardware"
+
     getArr arr ix
       = Hardware
       $ fmap resugar
@@ -179,6 +182,9 @@ instance Arrays Hardware
       $ sequence_
       $ zipListStruct (setArr' (ix + arrOffset arr)) (resugar a)
       $ unArr arr
+
+    copyArr arr brr
+      = error "todo: copyArr for hardware"
 
 getArr' :: forall b . HardwarePrimType b
   => HExp Index -> Imp.VArray Index b
@@ -196,13 +202,10 @@ instance IArrays Hardware
   where
     type IArray Hardware = IArr
 
-    freezeArr arr
-      = Hardware
-      $ fmap (IArr (arrOffset arr) (length arr))
-      $ mapStructA (flip Imp.freezeArray (length arr))
-      $ unArr arr
+    unsafeFreezeArr arr
+      = error "todo: freezeArr for hardware"
 
-    thawArr iarr
+    unsafeThawArr iarr
       = error "todo: thawArr for hardware"
 
 --------------------------------------------------------------------------------

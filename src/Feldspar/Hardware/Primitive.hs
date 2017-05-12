@@ -42,14 +42,14 @@ data HardwarePrimTypeRep a
     BoolHT   :: HardwarePrimTypeRep Bool
     -- signed numbers.
     Int8HT   :: HardwarePrimTypeRep Int8
---  Int16HT  :: HardwarePrimTypeRep Int16
---  Int32HT  :: HardwarePrimTypeRep Int32
---  Int64HT  :: HardwarePrimTypeRep Int64
+    Int16HT  :: HardwarePrimTypeRep Int16
+    Int32HT  :: HardwarePrimTypeRep Int32
+    Int64HT  :: HardwarePrimTypeRep Int64
     -- unsigned numbers.
     Word8HT  :: HardwarePrimTypeRep Word8
---  Word16HT :: HardwarePrimTypeRep Word16
---  Word32HT :: HardwarePrimTypeRep Word32
---  Word64HT :: HardwarePrimTypeRep Word64
+    Word16HT :: HardwarePrimTypeRep Word16
+    Word32HT :: HardwarePrimTypeRep Word32
+    Word64HT :: HardwarePrimTypeRep Word64
 
 deriving instance Eq       (HardwarePrimTypeRep a)
 deriving instance Show     (HardwarePrimTypeRep a)
@@ -62,25 +62,43 @@ class (Eq a, Show a, Typeable a, Inhabited a) => HardwarePrimType a
   where
     hardwareRep :: HardwarePrimTypeRep a
 
-instance HardwarePrimType Bool  where hardwareRep = BoolHT
-instance HardwarePrimType Int8  where hardwareRep = Int8HT
-instance HardwarePrimType Word8 where hardwareRep = Word8HT
+instance HardwarePrimType Bool   where hardwareRep = BoolHT
+instance HardwarePrimType Int8   where hardwareRep = Int8HT
+instance HardwarePrimType Int16  where hardwareRep = Int16HT
+instance HardwarePrimType Int32  where hardwareRep = Int32HT
+instance HardwarePrimType Int64  where hardwareRep = Int64HT
+instance HardwarePrimType Word8  where hardwareRep = Word8HT
+instance HardwarePrimType Word16 where hardwareRep = Word16HT
+instance HardwarePrimType Word32 where hardwareRep = Word32HT
+instance HardwarePrimType Word64 where hardwareRep = Word64HT
 
 --------------------------------------------------------------------------------
 
 hardwarePrimTypeEq :: HardwarePrimTypeRep a -> HardwarePrimTypeRep b -> Maybe (Dict (a ~ b))
-hardwarePrimTypeEq (BoolHT)  (BoolHT)  = Just Dict
-hardwarePrimTypeEq (Int8HT)  (Int8HT)  = Just Dict
-hardwarePrimTypeEq (Word8HT) (Word8HT) = Just Dict
-hardwarePrimTypeEq _         _         = Nothing
+hardwarePrimTypeEq (BoolHT)   (BoolHT)   = Just Dict
+hardwarePrimTypeEq (Int8HT)   (Int8HT)   = Just Dict
+hardwarePrimTypeEq (Int16HT)  (Int16HT)  = Just Dict
+hardwarePrimTypeEq (Int32HT)  (Int32HT)  = Just Dict
+hardwarePrimTypeEq (Int64HT)  (Int64HT)  = Just Dict
+hardwarePrimTypeEq (Word8HT)  (Word8HT)  = Just Dict
+hardwarePrimTypeEq (Word16HT) (Word16HT) = Just Dict
+hardwarePrimTypeEq (Word32HT) (Word32HT) = Just Dict
+hardwarePrimTypeEq (Word64HT) (Word64HT) = Just Dict
+hardwarePrimTypeEq _          _          = Nothing
 
 hardwarePrimTypeOf :: HardwarePrimType a => a -> HardwarePrimTypeRep a
 hardwarePrimTypeOf _ = hardwareRep
 
 hardwarePrimWitType :: HardwarePrimTypeRep a -> Dict (HardwarePrimType a)
-hardwarePrimWitType BoolHT  = Dict
-hardwarePrimWitType Int8HT  = Dict
-hardwarePrimWitType Word8HT = Dict
+hardwarePrimWitType BoolHT   = Dict
+hardwarePrimWitType Int8HT   = Dict
+hardwarePrimWitType Int16HT  = Dict
+hardwarePrimWitType Int32HT  = Dict
+hardwarePrimWitType Int64HT  = Dict
+hardwarePrimWitType Word8HT  = Dict
+hardwarePrimWitType Word16HT = Dict
+hardwarePrimWitType Word32HT = Dict
+hardwarePrimWitType Word64HT = Dict
 
 --------------------------------------------------------------------------------
 -- * ... prim ...
