@@ -135,6 +135,12 @@ data SoftwarePrim sig
     -- ^ integral operations.
     Div :: (SoftwarePrimType a, Integral a) => SoftwarePrim (a :-> a :-> Full a)
     Mod :: (SoftwarePrimType a, Integral a) => SoftwarePrim (a :-> a :-> Full a)
+
+    -- ^ type casting.
+    I2N :: ( SoftwarePrimType a, Integral a
+           , SoftwarePrimType b, Num b
+           )
+        => SoftwarePrim (a :-> Full b)
     
     -- ^ logical operations.
     Not     :: SoftwarePrim (Bool :-> Full Bool)
@@ -244,6 +250,7 @@ instance Eval SoftwarePrim
     evalSym Mul         = (*)
     evalSym Div         = div
     evalSym Mod         = mod
+    evalSym I2N         = fromIntegral
     evalSym Not         = not
     evalSym And         = (&&)
     evalSym BitAnd      = (Bits..&.)
@@ -271,6 +278,7 @@ instance Symbol SoftwarePrim
     symSig Mul         = signature
     symSig Div         = signature
     symSig Mod         = signature
+    symSig I2N         = signature
     symSig Not         = signature
     symSig And         = signature
     symSig BitAnd      = signature

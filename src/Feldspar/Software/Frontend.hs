@@ -86,6 +86,10 @@ instance Bitwise SoftwareDomain
     shiftL = sugarSymSoftware ShiftL
     shiftR = sugarSymSoftware ShiftR
 
+instance Casting SoftwareDomain
+  where
+    i2n = sugarSymSoftware I2N
+
 --------------------------------------------------------------------------------
 
 instance (Bounded a, SType a) => Bounded (SExp a)

@@ -87,6 +87,18 @@ compBinOp op a b = do
   b' <- compPrim $ Prim b
   return $ C.BinOp op a' b' mempty  
 
+compCast
+  :: MonadC m
+  => SoftwarePrimTypeRep a
+  -> ASTF SoftwarePrimDomain b
+  -> m C.Exp
+compCast t a = do
+  p <- compPrim $ Prim a
+  case softwarePrimWitType t of
+    Dict -> do
+      typ <- compType (Proxy :: Proxy SoftwarePrimType) t
+      return [cexp|($ty:typ) $p|]
+      
 compFun
   :: MonadC m
   => String
@@ -117,6 +129,8 @@ compPrim = simpleMatch (\(s :&: t) -> go t s) . unPrim
     go _ Mul (a :* b :* Nil) = compBinOp C.Mul a b
     go _ Div (a :* b :* Nil) = compBinOp C.Div a b
     go _ Mod (a :* b :* Nil) = compBinOp C.Mod a b
+
+    go t I2N (a :* Nil) = compCast t a
     
     go _ Not (a :* Nil)      = compUnOp  C.Lnot a
     go _ And (a :* b :* Nil) = compBinOp C.Land a b

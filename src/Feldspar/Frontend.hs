@@ -101,8 +101,6 @@ class Equality dom
          => a -> a -> b
 
 infix 4 ==
-
-----------------------------------------
   
 class Equality dom => Ordered dom
   where
@@ -112,8 +110,6 @@ class Equality dom => Ordered dom
         => a -> a -> b
 
 infix 4 <
-
-----------------------------------------
     
 class Logical dom
   where
@@ -121,8 +117,6 @@ class Logical dom
     (&&) :: (Syntax' dom a, Boolean (Internal a)) => a -> a -> a
 
 infix 3 &&
-
-----------------------------------------
 
 class Bitwise dom
   where
@@ -149,6 +143,13 @@ infixl 7 .&.
 infixl 6 `xor`
 infixl 5 .|.
 
+class Casting dom
+  where
+    i2n :: ( Syntax' dom a, Integral (Internal a)
+           , Syntax' dom b, Num      (Internal b)
+           )
+        => a -> b
+  
 --------------------------------------------------------------------------------
 -- arrays.
 
