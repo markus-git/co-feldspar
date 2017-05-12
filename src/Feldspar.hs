@@ -4,6 +4,7 @@ module Feldspar
   , module Data.Int
   , module Data.Word
   , Inhabited
+  , module Language.Syntactic
   ) where
 
 import Feldspar.Sugar
@@ -14,3 +15,5 @@ import Data.Inhabited
 
 import Data.Int
 import Data.Word hiding (Word)
+
+import Language.Syntactic (Syntactic, Domain, Internal)

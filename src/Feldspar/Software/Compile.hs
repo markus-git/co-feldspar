@@ -145,6 +145,9 @@ translateExp = goAST . unSExp
       | Just Sin <- prj op = liftStruct (sugarSymPrim Sin) <$> goAST a
       | Just Cos <- prj op = liftStruct (sugarSymPrim Cos) <$> goAST a
       | Just Tan <- prj op = liftStruct (sugarSymPrim Tan) <$> goAST a
+      | Just I2N <- prj op = liftStruct (sugarSymPrim I2N) <$> goAST a
+      | Just BitCompl <- prj op =
+          liftStruct (sugarSymPrim BitCompl) <$> goAST a
     go _ op (a :* b :* Nil)
       | Just Add <- prj op = liftStruct2 (sugarSymPrim Add) <$> goAST a <*> goAST b
       | Just Sub <- prj op = liftStruct2 (sugarSymPrim Sub) <$> goAST a <*> goAST b
@@ -153,6 +156,16 @@ translateExp = goAST . unSExp
       | Just Mod <- prj op = liftStruct2 (sugarSymPrim Mod) <$> goAST a <*> goAST b
       | Just Eq  <- prj op = liftStruct2 (sugarSymPrim Eq)  <$> goAST a <*> goAST b
       | Just Lt  <- prj op = liftStruct2 (sugarSymPrim Lt)  <$> goAST a <*> goAST b
+      | Just BitAnd <- prj op =
+          liftStruct2 (sugarSymPrim BitAnd) <$> goAST a <*> goAST b
+      | Just BitOr  <- prj op =
+          liftStruct2 (sugarSymPrim BitOr) <$> goAST a <*> goAST b
+      | Just BitXor <- prj op =
+          liftStruct2 (sugarSymPrim BitXor) <$> goAST a <*> goAST b
+      | Just ShiftL <- prj op =
+          liftStruct2 (sugarSymPrim ShiftL) <$> goAST a <*> goAST b
+      | Just ShiftR <- prj op =
+          liftStruct2 (sugarSymPrim ShiftR) <$> goAST a <*> goAST b
     go t loop (len :* init :* (lami :$ (lams :$ body)) :* Nil)
       | Just ForLoop   <- prj loop
       , Just (LamT iv) <- prj lami
