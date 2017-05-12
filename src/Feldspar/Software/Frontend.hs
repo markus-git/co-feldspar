@@ -11,9 +11,11 @@ module Feldspar.Software.Frontend where
 
 import Prelude hiding (length)
 
+import Data.Bits (Bits)
 import Data.Constraint hiding (Sub)
 import Data.Proxy
 import Data.List (genericLength)
+import Data.Word hiding (Word)
 --import Data.Ix
 
 -- syntactic.
@@ -37,6 +39,8 @@ import Feldspar.Frontend
 
 import Feldspar.Software.Primitive
 import Feldspar.Software.Representation
+
+import Prelude hiding (length, Word)
 
 --------------------------------------------------------------------------------
 -- * Expressions.
@@ -72,6 +76,15 @@ instance Logical SoftwareDomain
   where
     not  = sugarSymSoftware Not
     (&&) = sugarSymSoftware And
+
+instance Bitwise SoftwareDomain
+  where
+    (.&.)  = sugarSymSoftware BitAnd
+    (.|.)  = sugarSymSoftware BitOr
+    xor    = sugarSymSoftware BitXor
+    complement = sugarSymSoftware BitCompl
+    shiftL = sugarSymSoftware ShiftL
+    shiftR = sugarSymSoftware ShiftR
 
 --------------------------------------------------------------------------------
 
@@ -244,9 +257,23 @@ instance IArrays Software
 
 instance Control Software
   where
-    iff c t f      = Software $ Imp.iff (resugar c) (unSoftware t) (unSoftware f)
-    while c body   = Software $ Imp.while (fmap resugar $ unSoftware c) (unSoftware body)
-    for range body = Software $ Imp.for (0, 1, Imp.Excl $ resugar range) (unSoftware . body . resugar)
+    iff c t f
+      = Software
+      $ Imp.iff (resugar c)
+          (unSoftware t)
+          (unSoftware f)
+      
+    while c body
+      = Software
+      $ Imp.while
+          (fmap resugar $ unSoftware c)
+          (unSoftware body)
+
+    for lower upper body
+      = Software
+      $ Imp.for
+          (resugar lower, 1, Imp.Incl $ resugar upper)
+          (unSoftware . body . resugar)
 
 --------------------------------------------------------------------------------
 -- ** Software instructions.

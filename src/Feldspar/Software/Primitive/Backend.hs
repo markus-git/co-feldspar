@@ -108,17 +108,27 @@ compPrim = simpleMatch (\(s :&: t) -> go t s) . unPrim
        -> Args (AST SoftwarePrimDomain) sig
        -> m C.Exp
     go _ (FreeVar v) Nil = touchVar v >> return [cexp| $id:v |]
-    go t (Lit a)     Nil | Dict <- softwarePrimWitType t = compLit (Proxy :: Proxy SoftwarePrimType) a
+    go t (Lit a)     Nil | Dict <- softwarePrimWitType t
+                         = compLit (Proxy :: Proxy SoftwarePrimType) a
+                         
     go _ Neg (a :* Nil)      = compUnOp  C.Negate a
     go _ Add (a :* b :* Nil) = compBinOp C.Add a b
     go _ Sub (a :* b :* Nil) = compBinOp C.Sub a b
     go _ Mul (a :* b :* Nil) = compBinOp C.Mul a b
     go _ Div (a :* b :* Nil) = compBinOp C.Div a b
     go _ Mod (a :* b :* Nil) = compBinOp C.Mod a b
+    
     go _ Not (a :* Nil)      = compUnOp  C.Lnot a
     go _ And (a :* b :* Nil) = compBinOp C.Land a b
     go _ Eq  (a :* b :* Nil) = compBinOp C.Eq a b
     go _ Lt  (a :* b :* Nil) = compBinOp C.Lt a b
+
+    go _ BitAnd   (a :* b :* Nil) = compBinOp C.And a b
+    go _ BitOr    (a :* b :* Nil) = compBinOp C.Or a b
+    go _ BitXor   (a :* b :* Nil) = compBinOp C.Xor a b
+    go _ BitCompl (a :* Nil)      = compUnOp C.Not a
+    go _ ShiftL   (a :* b :* Nil) = compBinOp C.Lsh a b
+    go _ ShiftR   (a :* b :* Nil) = compBinOp C.Rsh a b
     
     go _ Sin args = addInclude "<tgmath.h>" >> compFun "sin" args
     go _ Cos args = addInclude "<tgmath.h>" >> compFun "cos" args

@@ -12,6 +12,7 @@
 module Feldspar.Software.Primitive where
 
 import Data.Array ((!))
+import Data.Bits (Bits)
 import Data.Struct
 import Data.Inhabited
 
@@ -20,6 +21,8 @@ import Data.Word
 import Data.List (genericTake)
 import Data.Typeable hiding (TypeRep)
 import Data.Constraint hiding (Sub)
+
+import qualified Data.Bits as Bits
 
 -- syntactic.
 import Language.Syntactic
@@ -115,28 +118,48 @@ data SoftwarePrim sig
   where
     FreeVar :: (SoftwarePrimType a) => String -> SoftwarePrim (Full a)
     Lit     :: (Show a, Eq a)       => a      -> SoftwarePrim (Full a)
+    
     -- ^ conditional.
-    Cond    :: SoftwarePrim (Bool :-> a :-> a :-> Full a)
+    Cond :: SoftwarePrim (Bool :-> a :-> a :-> Full a)
+    
     -- ^ Array indexing.
-    ArrIx   :: (SoftwarePrimType a) => Imp.IArr Index a -> SoftwarePrim (Index :-> Full a)
+    ArrIx :: (SoftwarePrimType a) => Imp.IArr Index a
+          -> SoftwarePrim (Index :-> Full a)
+          
     -- ^ numerical operations.
-    Neg     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> Full a)
-    Add     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> a :-> Full a)
-    Sub     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> a :-> Full a)
-    Mul     :: (SoftwarePrimType a, Num a)        => SoftwarePrim (a :-> a :-> Full a)
+    Neg :: (SoftwarePrimType a, Num a) => SoftwarePrim (a :-> Full a)
+    Add :: (SoftwarePrimType a, Num a) => SoftwarePrim (a :-> a :-> Full a)
+    Sub :: (SoftwarePrimType a, Num a) => SoftwarePrim (a :-> a :-> Full a)
+    Mul :: (SoftwarePrimType a, Num a) => SoftwarePrim (a :-> a :-> Full a)
+    
     -- ^ integral operations.
-    Div     :: (SoftwarePrimType a, Integral a)   => SoftwarePrim (a :-> a :-> Full a)
-    Mod     :: (SoftwarePrimType a, Integral a)   => SoftwarePrim (a :-> a :-> Full a)
+    Div :: (SoftwarePrimType a, Integral a) => SoftwarePrim (a :-> a :-> Full a)
+    Mod :: (SoftwarePrimType a, Integral a) => SoftwarePrim (a :-> a :-> Full a)
+    
     -- ^ logical operations.
-    Not     ::                                       SoftwarePrim (Bool :-> Full Bool)
-    And     ::                                       SoftwarePrim (Bool :-> Bool :-> Full Bool)
+    Not     :: SoftwarePrim (Bool :-> Full Bool)
+    And     :: SoftwarePrim (Bool :-> Bool :-> Full Bool)
+    
+    -- ^ bitwise logical operations.
+    BitAnd   :: (SoftwarePrimType a, Bits a) => SoftwarePrim (a :-> a :-> Full a)
+    BitOr    :: (SoftwarePrimType a, Bits a) => SoftwarePrim (a :-> a :-> Full a)
+    BitXor   :: (SoftwarePrimType a, Bits a) => SoftwarePrim (a :-> a :-> Full a)
+    BitCompl :: (SoftwarePrimType a, Bits a) => SoftwarePrim (a :-> Full a)
+    ShiftL   :: ( SoftwarePrimType a, Bits a
+                , SoftwarePrimType b, Integral b)
+             => SoftwarePrim (a :-> b :-> Full a)
+    ShiftR   :: ( SoftwarePrimType a, Bits a
+                , SoftwarePrimType b, Integral b)
+             => SoftwarePrim (a :-> b :-> Full a)
+             
     -- ^ relational operations.
-    Eq      :: (SoftwarePrimType a, Eq a)         => SoftwarePrim (a :-> a :-> Full Bool)
-    Lt      :: (SoftwarePrimType a, Ord a)        => SoftwarePrim (a :-> a :-> Full Bool)
+    Eq :: (SoftwarePrimType a, Eq a)  => SoftwarePrim (a :-> a :-> Full Bool)
+    Lt :: (SoftwarePrimType a, Ord a) => SoftwarePrim (a :-> a :-> Full Bool)
+    
     -- ^ geometrical operators.
-    Sin     :: (SoftwarePrimType a, Floating a)   => SoftwarePrim (a :-> Full a)
-    Cos     :: (SoftwarePrimType a, Floating a)   => SoftwarePrim (a :-> Full a)
-    Tan     :: (SoftwarePrimType a, Floating a)   => SoftwarePrim (a :-> Full a)
+    Sin :: (SoftwarePrimType a, Floating a) => SoftwarePrim (a :-> Full a)
+    Cos :: (SoftwarePrimType a, Floating a) => SoftwarePrim (a :-> Full a)
+    Tan :: (SoftwarePrimType a, Floating a) => SoftwarePrim (a :-> Full a)
 
 deriving instance Show     (SoftwarePrim a)
 deriving instance Typeable (SoftwarePrim a)
@@ -223,6 +246,12 @@ instance Eval SoftwarePrim
     evalSym Mod         = mod
     evalSym Not         = not
     evalSym And         = (&&)
+    evalSym BitAnd      = (Bits..&.)
+    evalSym BitOr       = (Bits..|.)
+    evalSym BitXor      = Bits.xor
+    evalSym BitCompl    = Bits.complement
+    evalSym ShiftL      = \b i -> Bits.shiftL b (fromIntegral i)
+    evalSym ShiftR      = \b i -> Bits.shiftR b (fromIntegral i)
     evalSym Eq          = (==)
     evalSym Lt          = (<=)
     evalSym Sin         = sin
@@ -244,6 +273,12 @@ instance Symbol SoftwarePrim
     symSig Mod         = signature
     symSig Not         = signature
     symSig And         = signature
+    symSig BitAnd      = signature
+    symSig BitOr       = signature
+    symSig BitXor      = signature
+    symSig BitCompl    = signature
+    symSig ShiftL      = signature
+    symSig ShiftR      = signature
     symSig Eq          = signature
     symSig Lt          = signature
     symSig Sin         = signature

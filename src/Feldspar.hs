@@ -13,4 +13,4 @@ import Feldspar.Frontend
 import Data.Inhabited
 
 import Data.Int
-import Data.Word
+import Data.Word hiding (Word)

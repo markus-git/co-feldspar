@@ -16,10 +16,14 @@ module Feldspar.Frontend where
 import Feldspar.Sugar
 import Feldspar.Representation
 
+import Data.Bits (Bits, FiniteBits)
 import Data.Constraint
 import Data.Struct
 import Data.Proxy
+import Data.Word hiding (Word)
 --import Data.Ix
+
+import qualified Data.Bits as Bits
 
 -- syntactci.
 import Language.Syntactic as S hiding (Equality)
@@ -28,10 +32,10 @@ import Language.Syntactic as S hiding (Equality)
 import qualified Control.Monad.Operational.Higher as Oper (Program, Param2)
 
 -- imperative-edsl
-import qualified Language.Embedded.Imperative as Imp
+import qualified Language.Embedded.Imperative     as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 
-import Prelude hiding (length)
+import Prelude hiding (length, Word)
 
 --------------------------------------------------------------------------------
 -- * Expressions.
@@ -46,6 +50,8 @@ type Syntax' dom a = (Syntactic a, PrimType (PredicateOf dom) (Internal a), dom 
 --------------------------------------------------------------------------------
 
 type Boolean a = a ~ Bool
+
+type Word a = a ~ Word32
 
 --------------------------------------------------------------------------------
 
@@ -89,20 +95,59 @@ class Cond dom
 
 class Equality dom
   where
-    (==) :: (Syntax' dom a, Syntax' dom b, Eq (Internal a), Boolean (Internal b)) => a -> a -> b
+    (==) :: ( Syntax' dom a, Eq      (Internal a)
+            , Syntax' dom b, Boolean (Internal b)
+            )
+         => a -> a -> b
+
+infix 4 ==
+
+----------------------------------------
   
 class Equality dom => Ordered dom
   where
-    (<)  :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
-  
+    (<) :: ( Syntax' dom a, Ord     (Internal a)
+           , Syntax' dom b, Boolean (Internal b)
+           )
+        => a -> a -> b
+
+infix 4 <
+
+----------------------------------------
+    
 class Logical dom
   where
     not  :: (Syntax' dom a, Boolean (Internal a)) => a -> a
     (&&) :: (Syntax' dom a, Boolean (Internal a)) => a -> a -> a
 
 infix 3 &&
-infix 4 ==
-infix 4 <
+
+----------------------------------------
+
+class Bitwise dom
+  where
+    (.&.) :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
+    (.|.) :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
+    xor   :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
+    complement
+      :: (Syntax' dom a, Bits (Internal a)) => a -> a
+    shiftL
+      :: ( Syntax' dom a, Bits (Internal a)
+         , Syntax' dom b, Word (Internal b))
+      => a -> b -> a
+    shiftR
+      :: ( Syntax' dom a, Bits (Internal a)
+         , Syntax' dom b, Word (Internal b))
+      => a -> b -> a
+
+bitSize :: forall a. FiniteBits (Internal a) => a -> Length
+bitSize _ = fromIntegral $ Bits.finiteBitSize (a :: Internal a)
+  where a = error "Bits.finiteBitSize evaluated its argument"
+
+infixl 8 `shiftL`, `shiftR`
+infixl 7 .&.
+infixl 6 `xor`
+infixl 5 .|.
 
 --------------------------------------------------------------------------------
 -- arrays.
@@ -189,8 +234,19 @@ thawArr iarr =
 
 class Monad m => Control m
   where
-    iff   :: (SyntaxM m a,  Boolean  (Internal a)) => a -> m () -> m () -> m ()
-    while :: (SyntaxM m a,  Boolean  (Internal a)) => m a -> m () -> m ()
-    for   :: (SyntaxM' m a, Integral (Internal a)) => a -> (a -> m ()) -> m ()
+    iff   :: (SyntaxM  m a, Boolean  (Internal a))
+      => a    -- ^ condition
+      -> m () -- ^ true branch
+      -> m () -- ^ false branch
+      -> m ()
+    while :: (SyntaxM  m a, Boolean  (Internal a))
+      => m a  -- ^ check
+      -> m () -- ^ body
+      -> m ()
+    for   :: (SyntaxM' m a, Integral (Internal a))
+      => a    -- ^ lower bound (inclusive)
+      -> a    -- ^ upper bound (inclusive)
+      -> (a -> m ()) -- ^ step function
+      -> m ()
 
 --------------------------------------------------------------------------------

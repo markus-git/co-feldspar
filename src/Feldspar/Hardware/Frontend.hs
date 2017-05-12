@@ -212,10 +212,20 @@ instance IArrays Hardware
 
 instance Control Hardware
   where
-    iff c t f      = Hardware $ Imp.iff (resugar c) (unHardware t) (unHardware f)
-    while c body   = Hardware $ Imp.while (fmap resugar $ unHardware c) (unHardware body)
-    for range body = Hardware $ Imp.for (resugar range) (unHardware . body . resugar)
+    iff c t f
+      = Hardware
+      $ Imp.iff (resugar c) (unHardware t) (unHardware f)
 
+    while c body
+      = Hardware
+      $ Imp.while (fmap resugar $ unHardware c) (unHardware body)
+
+    for lower upper body
+      = error "todo: for-loop for hardware"
+{-   
+      = Hardware
+      $ Imp.for (resugar upper) (unHardware . body . resugar)
+-}
 --------------------------------------------------------------------------------
 -- ** Hardware instructions.
 
