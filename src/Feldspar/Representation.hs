@@ -17,7 +17,7 @@ import Data.Struct
 import Data.Inhabited
 
 import Data.Constraint
-import Data.Int (Int8)
+import Data.Word (Word8)
 import Data.List (genericTake)
 import Data.Typeable hiding (typeRep, TypeRep)
 
@@ -79,8 +79,8 @@ instance (Type pred a, pred a) => PrimType pred a
 
 --------------------------------------------------------------------------------
 
-type Length = Int8
+type Length = Word8
 
-type Index  = Int8
+type Index  = Word8
 
 --------------------------------------------------------------------------------
