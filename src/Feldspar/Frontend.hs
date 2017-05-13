@@ -182,7 +182,10 @@ class Monad m => References m
     getRef  :: SyntaxM m a => Reference m a -> m a
     setRef  :: SyntaxM m a => Reference m a -> a -> m ()
     unsafeFreezeRef
-            :: SyntaxM' m a => Reference m a -> m a
+            :: SyntaxM m a => Reference m a -> m a
+
+shareM :: (SyntaxM m a, References m) => a -> m a
+shareM a = initRef a >>= unsafeFreezeRef
 
 --------------------------------------------------------------------------------
 -- todo: 'Ix m' could be replaced by 'SyntaxM ix, Array.Ix ix => ix' in 'Arrays'
