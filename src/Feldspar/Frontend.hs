@@ -47,11 +47,10 @@ type Syntax  dom a = (Syntactic a, dom ~ Domain a, Type (PredicateOf dom) (Inter
 -- | Short-hand for a `Syntactic` instance over typed primitive values from `dom`.
 type Syntax' dom a = (Syntactic a, PrimType (PredicateOf dom) (Internal a), dom ~ Domain a)
 
---------------------------------------------------------------------------------
+----------------------------------------
 
 type Boolean a = a ~ Bool
-
-type Word a = a ~ Word32
+type Word a    = a ~ Word32
 
 --------------------------------------------------------------------------------
 
@@ -178,11 +177,12 @@ type SyntaxM' m a = Syntax' (DomainOf m) a
 class Monad m => References m
   where
     type Reference m :: * -> *
-
     initRef :: SyntaxM m a => a -> m (Reference m a)
     newRef  :: SyntaxM m a => m (Reference m a)
     getRef  :: SyntaxM m a => Reference m a -> m a
     setRef  :: SyntaxM m a => Reference m a -> a -> m ()
+    unsafeFreezeRef
+            :: SyntaxM' m a => Reference m a -> m a
 
 --------------------------------------------------------------------------------
 -- todo: 'Ix m' could be replaced by 'SyntaxM ix, Array.Ix ix => ix' in 'Arrays'
@@ -206,24 +206,14 @@ class Arrays m => IArrays m
     unsafeThawArr   :: (SyntaxM m a, Finite (Ix m) (IArray m a))
       => IArray m a -> m (Array  m a)
 
-freezeArr
-  :: ( Arrays m
-     , IArrays m
-     , SyntaxM m a
-     , Finite (Ix m) (Array  m a)
-     )
+freezeArr :: (IArrays m, SyntaxM m a, Finite (Ix m) (Array m a))
   => Array  m a -> m (IArray m a)
 freezeArr arr =
   do iarr <- newArr (length arr)
      copyArr iarr arr
      unsafeFreezeArr iarr
 
-thawArr
-  :: ( Arrays m
-     , IArrays m
-     , SyntaxM m a
-     , Finite (Ix m) (IArray m a)
-     )
+thawArr :: (IArrays m, SyntaxM m a, Finite (Ix m) (IArray m a))
   => IArray m a -> m (Array  m a)
 thawArr iarr =
   do brr <- unsafeThawArr iarr -- hahah

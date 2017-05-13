@@ -7,6 +7,8 @@
 {-# language Rank2Types #-}
 {-# language ScopedTypeVariables #-}
 
+{-# language InstanceSigs #-}
+
 module Feldspar.Software.Frontend where
 
 import Prelude hiding (length)
@@ -170,11 +172,20 @@ softwareDict rep = case rep of
 instance References Software
   where
     type Reference Software = Ref
-
-    initRef    = Software . fmap Ref . mapStructA (Imp.initRef) . resugar
-    newRef     = Software . fmap Ref . mapStructA (const Imp.newRef) $ typeRep
-    getRef     = Software . fmap resugar . mapStructA getRef' . unRef
-    setRef ref = Software . sequence_ . zipListStruct setRef' (unRef ref) . resugar
+    
+    initRef = Software . fmap Ref . mapStructA (Imp.initRef) . resugar
+    newRef  = Software . fmap Ref . mapStructA (const Imp.newRef) $ typeRep
+    getRef  = Software . fmap resugar . mapStructA getRef' . unRef
+    setRef ref
+      = Software
+      . sequence_
+      . zipListStruct setRef' (unRef ref)
+      . resugar
+    unsafeFreezeRef
+      = Software
+      . fmap resugar
+      . mapStructA freezeRef'
+      . unRef
 
 -- Imp.getRef specialized to software.
 getRef' :: forall b . SoftwarePrimType b
@@ -188,6 +199,11 @@ setRef' :: forall b . SoftwarePrimType b
   -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
 setRef' = withSType (Proxy :: Proxy b) Imp.setRef
 
+freezeRef' :: forall b . SoftwarePrimType b
+  => Imp.Ref b
+  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
+freezeRef' = withSType (Proxy :: Proxy b) Imp.unsafeFreezeRef
+
 --------------------------------------------------------------------------------
 
 instance Arrays Software
@@ -200,25 +216,23 @@ instance Arrays Software
       $ fmap (Arr 0 len)
       $ mapStructA (const (Imp.newArr len))
       $ typeRep
-
     initArr elems
       = Software
       $ fmap (Arr 0 len . Node)
       $ Imp.constArr elems
-      where len = value $ genericLength elems
-      
+      where len = value $ genericLength elems      
     getArr arr ix
       = Software
       $ fmap resugar
       $ mapStructA (flip getArr' (ix + arrOffset arr))
-      $ unArr arr
-    
+      $ unArr arr    
     setArr arr ix a
       = Software
       $ sequence_
-      $ zipListStruct (\a' arr' -> setArr' arr' (ix + arrOffset arr) a') (resugar a)
+      $ zipListStruct
+         (\a' arr' -> setArr' arr' (ix + arrOffset arr) a')
+         (resugar a)
       $ unArr arr
-
     copyArr arr brr
       = Software
       $ sequence_
