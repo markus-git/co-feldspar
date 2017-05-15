@@ -73,6 +73,9 @@ instance Equality SoftwareDomain
 instance Ordered SoftwareDomain
   where
     (<)  = sugarSymSoftware Lt
+    (<=) = sugarSymSoftware Lte
+    (>)  = sugarSymSoftware Gt
+    (>=) = sugarSymSoftware Gte
 
 instance Logical SoftwareDomain
   where

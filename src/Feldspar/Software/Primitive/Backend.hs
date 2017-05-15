@@ -152,6 +152,9 @@ compPrim = simpleMatch (\(s :&: t) -> go t s) . unPrim
     go _ And (a :* b :* Nil) = compBinOp C.Land a b
     go _ Eq  (a :* b :* Nil) = compBinOp C.Eq   a b
     go _ Lt  (a :* b :* Nil) = compBinOp C.Lt   a b
+    go _ Lte (a :* b :* Nil) = compBinOp C.Le   a b
+    go _ Gt  (a :* b :* Nil) = compBinOp C.Gt   a b
+    go _ Gte (a :* b :* Nil) = compBinOp C.Ge   a b
 
     go _ BitAnd   (a :* b :* Nil) = compBinOp C.And a b
     go _ BitOr    (a :* b :* Nil) = compBinOp C.Or  a b

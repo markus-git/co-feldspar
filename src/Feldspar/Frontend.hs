@@ -118,12 +118,20 @@ infix 4 ==
   
 class Equality dom => Ordered dom
   where
-    (<) :: ( Syntax' dom a, Ord     (Internal a)
-           , Syntax' dom b, Boolean (Internal b)
-           )
-        => a -> a -> b
+    (<)  :: ( Syntax' dom a, Ord     (Internal a)
+            , Syntax' dom b, Boolean (Internal b)
+            ) => a -> a -> b
+    (<=) :: ( Syntax' dom a, Ord     (Internal a)
+            , Syntax' dom b, Boolean (Internal b)
+            ) => a -> a -> b
+    (>)  :: ( Syntax' dom a, Ord     (Internal a)
+            , Syntax' dom b, Boolean (Internal b)
+            ) => a -> a -> b
+    (>=) :: ( Syntax' dom a, Ord     (Internal a)
+            , Syntax' dom b, Boolean (Internal b)
+            ) => a -> a -> b
 
-infix 4 <
+infix 4 <, >, <=, >=
     
 class Logical dom
   where

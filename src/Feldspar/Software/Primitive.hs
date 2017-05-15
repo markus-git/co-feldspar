@@ -165,8 +165,11 @@ data SoftwarePrim sig
              => SoftwarePrim (a :-> b :-> Full a)
              
     -- ^ relational operations.
-    Eq :: (SoftwarePrimType a, Eq a)  => SoftwarePrim (a :-> a :-> Full Bool)
-    Lt :: (SoftwarePrimType a, Ord a) => SoftwarePrim (a :-> a :-> Full Bool)
+    Eq  :: (SoftwarePrimType a, Eq a)  => SoftwarePrim (a :-> a :-> Full Bool)
+    Lt  :: (SoftwarePrimType a, Ord a) => SoftwarePrim (a :-> a :-> Full Bool)
+    Lte :: (SoftwarePrimType a, Ord a) => SoftwarePrim (a :-> a :-> Full Bool)
+    Gt  :: (SoftwarePrimType a, Ord a) => SoftwarePrim (a :-> a :-> Full Bool)
+    Gte :: (SoftwarePrimType a, Ord a) => SoftwarePrim (a :-> a :-> Full Bool)
     
     -- ^ geometrical operators.
     Sin :: (SoftwarePrimType a, Floating a) => SoftwarePrim (a :-> Full a)
@@ -268,7 +271,10 @@ instance Eval SoftwarePrim
     evalSym RotateL     = \b i -> Bits.rotateL b (fromIntegral i)
     evalSym RotateR     = \b i -> Bits.rotateR b (fromIntegral i)
     evalSym Eq          = (==)
-    evalSym Lt          = (<=)
+    evalSym Lt          = (<)
+    evalSym Lte         = (<=)
+    evalSym Gt          = (>)
+    evalSym Gte         = (>=)
     evalSym Sin         = sin
     evalSym Cos         = cos
     evalSym Tan         = tan
@@ -299,6 +305,9 @@ instance Symbol SoftwarePrim
     symSig RotateR     = signature
     symSig Eq          = signature
     symSig Lt          = signature
+    symSig Lte         = signature
+    symSig Gt          = signature
+    symSig Gte         = signature
     symSig Sin         = signature
     symSig Cos         = signature
     symSig Tan         = signature
