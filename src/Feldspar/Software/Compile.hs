@@ -166,6 +166,10 @@ translateExp = goAST . unSExp
           liftStruct2 (sugarSymPrim ShiftL) <$> goAST a <*> goAST b
       | Just ShiftR <- prj op =
           liftStruct2 (sugarSymPrim ShiftR) <$> goAST a <*> goAST b
+      | Just RotateL <- prj op =
+          liftStruct2 (sugarSymPrim RotateL) <$> goAST a <*> goAST b
+      | Just RotateR <- prj op =
+          liftStruct2 (sugarSymPrim RotateR) <$> goAST a <*> goAST b
     go t loop (len :* init :* (lami :$ (lams :$ body)) :* Nil)
       | Just ForLoop   <- prj loop
       , Just (LamT iv) <- prj lami
