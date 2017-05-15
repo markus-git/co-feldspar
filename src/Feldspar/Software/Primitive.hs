@@ -157,6 +157,12 @@ data SoftwarePrim sig
     ShiftR   :: ( SoftwarePrimType a, Bits a
                 , SoftwarePrimType b, Integral b)
              => SoftwarePrim (a :-> b :-> Full a)
+    RotateL  :: ( SoftwarePrimType a, Bits a
+                , SoftwarePrimType b, Integral b)
+             => SoftwarePrim (a :-> b :-> Full a)
+    RotateR  :: ( SoftwarePrimType a, Bits a
+                , SoftwarePrimType b, Integral b)
+             => SoftwarePrim (a :-> b :-> Full a)
              
     -- ^ relational operations.
     Eq :: (SoftwarePrimType a, Eq a)  => SoftwarePrim (a :-> a :-> Full Bool)
@@ -257,8 +263,10 @@ instance Eval SoftwarePrim
     evalSym BitOr       = (Bits..|.)
     evalSym BitXor      = Bits.xor
     evalSym BitCompl    = Bits.complement
-    evalSym ShiftL      = \b i -> Bits.shiftL b (fromIntegral i)
-    evalSym ShiftR      = \b i -> Bits.shiftR b (fromIntegral i)
+    evalSym ShiftL      = \b i -> Bits.shiftL  b (fromIntegral i)
+    evalSym ShiftR      = \b i -> Bits.shiftR  b (fromIntegral i)
+    evalSym RotateL     = \b i -> Bits.rotateL b (fromIntegral i)
+    evalSym RotateR     = \b i -> Bits.rotateR b (fromIntegral i)
     evalSym Eq          = (==)
     evalSym Lt          = (<=)
     evalSym Sin         = sin
@@ -287,6 +295,8 @@ instance Symbol SoftwarePrim
     symSig BitCompl    = signature
     symSig ShiftL      = signature
     symSig ShiftR      = signature
+    symSig RotateL     = signature
+    symSig RotateR     = signature
     symSig Eq          = signature
     symSig Lt          = signature
     symSig Sin         = signature

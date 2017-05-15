@@ -108,6 +108,22 @@ compFun fun args = do
   as <- sequence $ listArgs (compPrim . Prim) args
   return [cexp| $id:fun($args:as) |]
 
+compRotateL_def = [cedecl|
+unsigned int feld_rotl(const unsigned int value, int shift) {
+    if ((shift &= sizeof(value)*8 - 1) == 0)
+      return value;
+    return (value << shift) | (value >> (sizeof(value)*8 - shift));
+}
+|]
+
+compRotateR_def = [cedecl|
+unsigned int feld_rotr(const unsigned int value, int shift) {
+    if ((shift &= sizeof(value)*8 - 1) == 0)
+      return value;
+    return (value >> shift) | (value << (sizeof(value)*8 - shift));
+}
+|]
+    
 --------------------------------------------------------------------------------
 
 compPrim :: MonadC m => Prim a -> m C.Exp
@@ -134,15 +150,26 @@ compPrim = simpleMatch (\(s :&: t) -> go t s) . unPrim
     
     go _ Not (a :* Nil)      = compUnOp  C.Lnot a
     go _ And (a :* b :* Nil) = compBinOp C.Land a b
-    go _ Eq  (a :* b :* Nil) = compBinOp C.Eq a b
-    go _ Lt  (a :* b :* Nil) = compBinOp C.Lt a b
+    go _ Eq  (a :* b :* Nil) = compBinOp C.Eq   a b
+    go _ Lt  (a :* b :* Nil) = compBinOp C.Lt   a b
 
     go _ BitAnd   (a :* b :* Nil) = compBinOp C.And a b
-    go _ BitOr    (a :* b :* Nil) = compBinOp C.Or a b
+    go _ BitOr    (a :* b :* Nil) = compBinOp C.Or  a b
     go _ BitXor   (a :* b :* Nil) = compBinOp C.Xor a b
-    go _ BitCompl (a :* Nil)      = compUnOp C.Not a
+    go _ BitCompl (a :* Nil)      = compUnOp  C.Not a
     go _ ShiftL   (a :* b :* Nil) = compBinOp C.Lsh a b
     go _ ShiftR   (a :* b :* Nil) = compBinOp C.Rsh a b
+    
+    go _ RotateL  (a :* b :* Nil) = do
+      addGlobal compRotateL_def
+      a' <- compPrim $ Prim a
+      b' <- compPrim $ Prim b
+      return [cexp| feld_rotl($a', $b') |]
+    go _ RotateR  (a :* b :* Nil) = do
+      addGlobal compRotateR_def
+      a' <- compPrim $ Prim a
+      b' <- compPrim $ Prim b
+      return [cexp| feld_rotr($a', $b') |]
     
     go _ Sin args = addInclude "<tgmath.h>" >> compFun "sin" args
     go _ Cos args = addInclude "<tgmath.h>" >> compFun "cos" args

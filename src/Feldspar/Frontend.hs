@@ -132,12 +132,20 @@ class Bitwise dom
       :: ( Syntax' dom a, Bits (Internal a)
          , Syntax' dom b, Word (Internal b))
       => a -> b -> a
+    rotateL
+      :: ( Syntax' dom a, Bits (Internal a)
+         , Syntax' dom b, Word (Internal b))
+      => a -> b -> a
+    rotateR
+      :: ( Syntax' dom a, Bits (Internal a)
+         , Syntax' dom b, Word (Internal b))
+      => a -> b -> a
 
 bitSize :: forall a. FiniteBits (Internal a) => a -> Word64
 bitSize _ = fromIntegral $ Bits.finiteBitSize (a :: Internal a)
   where a = error "Bits.finiteBitSize evaluated its argument"
 
-infixl 8 `shiftL`, `shiftR`
+infixl 8 `shiftL`, `shiftR`, `rotateL`, `rotateR`
 infixl 7 .&.
 infixl 6 `xor`
 infixl 5 .|.

@@ -81,12 +81,14 @@ instance Logical SoftwareDomain
 
 instance Bitwise SoftwareDomain
   where
-    (.&.)  = sugarSymSoftware BitAnd
-    (.|.)  = sugarSymSoftware BitOr
-    xor    = sugarSymSoftware BitXor
+    (.&.)      = sugarSymSoftware BitAnd
+    (.|.)      = sugarSymSoftware BitOr
+    xor        = sugarSymSoftware BitXor
     complement = sugarSymSoftware BitCompl
-    shiftL = sugarSymSoftware ShiftL
-    shiftR = sugarSymSoftware ShiftR
+    shiftL     = sugarSymSoftware ShiftL
+    shiftR     = sugarSymSoftware ShiftR
+    rotateL    = sugarSymSoftware RotateL
+    rotateR    = sugarSymSoftware RotateR
 
 instance Casting SoftwareDomain
   where
