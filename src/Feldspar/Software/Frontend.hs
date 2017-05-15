@@ -82,6 +82,10 @@ instance Logical SoftwareDomain
     not  = sugarSymSoftware Not
     (&&) = sugarSymSoftware And
 
+instance Multiplicative SoftwareDomain
+  where
+    div = sugarSymSoftware Div
+
 instance Bitwise SoftwareDomain
   where
     (.&.)      = sugarSymSoftware BitAnd
@@ -111,8 +115,8 @@ instance (Num a, SType' a) => Num (SExp a)
     (-)         = sugarSymSoftware Sub
     (*)         = sugarSymSoftware Mul
     negate      = sugarSymSoftware Neg
-    abs         = error "abs not implemeted for `SExp`"
-    signum      = error "signum not implemented for `SExp`"
+    abs         = error "todo: abs not implemeted for `SExp`"
+    signum      = error "todo: signum not implemented for `SExp`"
 
 --------------------------------------------------------------------------------
 

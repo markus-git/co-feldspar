@@ -142,6 +142,10 @@ class Logical dom
 
 infix 3 &&
 
+class Multiplicative dom
+  where
+    div :: (Syntax' dom a, Integral (Internal a)) => a -> a -> a
+  
 class Bitwise dom
   where
     (.&.) :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
