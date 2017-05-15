@@ -84,10 +84,25 @@ class Cond dom
   where
     cond
       :: (Syntax dom a, Syntax dom b, Boolean (Internal b))
-      => a -- ^ true branch.
+      => b -- ^ condition.
+      -> a -- ^ true branch.
       -> a -- ^ false branch.
-      -> b -- ^ condition.
       -> a
+
+-- | Condition operator; use as follows:
+--
+-- @
+-- cond1 `?` a $
+-- cond2 `?` b $
+-- cond3 `?` c $
+--         default
+-- @
+(?) :: (Cond dom, Syntax dom a, Syntax dom b, Boolean (Internal b))
+    => b  -- ^ Condition
+    -> a  -- ^ True branch
+    -> a  -- ^ False branch
+    -> a
+(?) = cond
 
 --------------------------------------------------------------------------------
 -- ** Primitive functions.
