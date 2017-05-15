@@ -139,6 +139,15 @@ translateExp = goAST . unSExp
       | Just Snd <- prj sel = do
           Branch _ b <- goAST ab
           return b
+    go ty cond (b :* t :* f :* Nil)
+      | Just Cond <- prj cond = do
+          env <- ask
+          res <- newRefV ty "b"
+          b'  <- goSmallAST b
+          ReaderT $ \env -> iff b'
+            (flip runReaderT env $ setRefV res =<< goAST t)
+            (flip runReaderT env $ setRefV res =<< goAST f)
+          unsafeFreezeRefV res
     go _ op (a :* Nil)
       | Just Neg <- prj op = liftStruct (sugarSymPrim Neg) <$> goAST a
       | Just Not <- prj op = liftStruct (sugarSymPrim Not) <$> goAST a
@@ -155,6 +164,7 @@ translateExp = goAST . unSExp
       | Just Div <- prj op = liftStruct2 (sugarSymPrim Div) <$> goAST a <*> goAST b
       | Just Mod <- prj op = liftStruct2 (sugarSymPrim Mod) <$> goAST a <*> goAST b
       | Just Eq  <- prj op = liftStruct2 (sugarSymPrim Eq)  <$> goAST a <*> goAST b
+      | Just And <- prj op = liftStruct2 (sugarSymPrim And) <$> goAST a <*> goAST b
       | Just Lt  <- prj op = liftStruct2 (sugarSymPrim Lt)  <$> goAST a <*> goAST b
       | Just Lte <- prj op = liftStruct2 (sugarSymPrim Lte) <$> goAST a <*> goAST b
       | Just Gt  <- prj op = liftStruct2 (sugarSymPrim Gt)  <$> goAST a <*> goAST b
