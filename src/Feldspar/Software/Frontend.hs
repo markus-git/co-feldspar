@@ -61,7 +61,7 @@ instance Share SoftwareDomain
 
 instance Cond SoftwareDomain
   where
-    cond b t f = sugarSymSoftware Cond b t f
+    cond = sugarSymSoftware Cond
 
 --------------------------------------------------------------------------------
 -- ** Primitive functions.

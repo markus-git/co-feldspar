@@ -122,7 +122,7 @@ data SoftwarePrim sig
     -- ^ conditional.
     Cond :: SoftwarePrim (Bool :-> a :-> a :-> Full a)
     
-    -- ^ Array indexing.
+    -- ^ array indexing.
     ArrIx :: (SoftwarePrimType a) => Imp.IArr Index a
           -> SoftwarePrim (Index :-> Full a)
           
