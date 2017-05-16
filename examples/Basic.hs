@@ -65,3 +65,38 @@ hard = example
 --   - Hard.icompile cepa
 --
 --------------------------------------------------------------------------------
+-- * Type casting.
+--------------------------------------------------------------------------------
+
+casting
+  :: forall m
+   . ( Comp m
+     , SyntaxM m (Expr m Word8)
+     , SyntaxM m (Expr m Word32)
+     , Num (Expr m Word8)
+     , Num (Expr m Word32)
+
+     , Casting (DomainOf m)
+     
+     -- I should probably get rid of these.
+     , PredicateOf (DomainOf m) Word8
+     , PredicateOf (DomainOf m) Word32
+     , Internal (Expr m Word8)  ~ Word8
+     , Internal (Expr m Word32) ~ Word32
+     )
+  => m ()
+casting =
+  do a :: Reference m (Expr m Word8)  <- initRef 200
+     b :: Reference m (Expr m Word32) <- initRef 500
+
+     va <- getRef a
+     vb <- getRef b
+
+     setRef a (i2n vb)
+     setRef b (i2n va)
+
+-- example compiles with:
+--   - Soft.icompile example
+--   - Hard.icompile example
+--
+--------------------------------------------------------------------------------
