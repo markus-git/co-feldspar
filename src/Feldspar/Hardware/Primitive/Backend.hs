@@ -68,6 +68,7 @@ compTypeSize Word32HT = VHDL.lit $ show (32 :: Int)
 compTypeSize Word64HT = VHDL.lit $ show (64 :: Int)
 
 compTypeSign :: forall a. HardwarePrimTypeRep a -> VHDL VHDL.Type
+compTypeSign BoolHT   = declare (Proxy :: Proxy a)
 compTypeSign Int8HT   = declare (Proxy :: Proxy a)
 compTypeSign Int16HT  = declare (Proxy :: Proxy a)
 compTypeSign Int32HT  = declare (Proxy :: Proxy a)
