@@ -141,7 +141,6 @@ translateExp = goAST . unSExp
           return b
     go ty cond (b :* t :* f :* Nil)
       | Just Cond <- prj cond = do
-          env <- ask
           res <- newRefV ty "b"
           b'  <- goSmallAST b
           ReaderT $ \env -> iff b'

@@ -127,26 +127,55 @@ translateExp = goAST . unHExp
            a' <- unsafeFreezeRefV r
            localAlias v a' $ goAST body
     go t tup (a :* b :* Nil)
-      | Just Pair <- prj tup
-      = Branch <$> goAST a <*> goAST b
+      | Just Pair <- prj tup =
+          Branch <$> goAST a <*> goAST b
     go t sel (ab :* Nil)
-      | Just Fst <- prj sel
-      = do Branch a _ <- goAST ab
-           return a
-      | Just Snd <- prj sel
-      = do Branch _ b <- goAST ab
-           return b
+      | Just Fst <- prj sel = do
+          Branch a _ <- goAST ab
+          return a
+      | Just Snd <- prj sel = do
+          Branch _ b <- goAST ab
+          return b
+    go ty cond (b :* t :* f :* Nil)
+      | Just Cond <- prj cond = do
+          res <- newRefV ty "b"
+          b'  <- goSmallAST b
+          ReaderT $ \env -> iff b'
+            (flip runReaderT env $ setRefV res =<< goAST t)
+            (flip runReaderT env $ setRefV res =<< goAST f)
+          unsafeFreezeRefV res
     go t op (a :* Nil)
       | Just Neg <- prj op = liftStruct (sugarSymPrim Neg) <$> goAST a
       | Just Not <- prj op = liftStruct (sugarSymPrim Not) <$> goAST a
+      | Just I2N <- prj op = liftStruct (sugarSymPrim I2N) <$> goAST a
+      | Just BitCompl <- prj op =
+          liftStruct (sugarSymPrim BitCompl) <$> goAST a
     go t op (a :* b :* Nil)
       | Just Add <- prj op = liftStruct2 (sugarSymPrim Add) <$> goAST a <*> goAST b
       | Just Sub <- prj op = liftStruct2 (sugarSymPrim Sub) <$> goAST a <*> goAST b
       | Just Mul <- prj op = liftStruct2 (sugarSymPrim Mul) <$> goAST a <*> goAST b
       | Just Div <- prj op = liftStruct2 (sugarSymPrim Div) <$> goAST a <*> goAST b
-      | Just And <- prj op = liftStruct2 (sugarSymPrim And) <$> goAST a <*> goAST b
+      | Just Mod <- prj op = liftStruct2 (sugarSymPrim Mod) <$> goAST a <*> goAST b
       | Just Eq  <- prj op = liftStruct2 (sugarSymPrim Eq)  <$> goAST a <*> goAST b
+      | Just And <- prj op = liftStruct2 (sugarSymPrim And) <$> goAST a <*> goAST b
       | Just Lt  <- prj op = liftStruct2 (sugarSymPrim Lt)  <$> goAST a <*> goAST b
+      | Just Lte <- prj op = liftStruct2 (sugarSymPrim Lte) <$> goAST a <*> goAST b
+      | Just Gt  <- prj op = liftStruct2 (sugarSymPrim Gt)  <$> goAST a <*> goAST b
+      | Just Gte <- prj op = liftStruct2 (sugarSymPrim Gte) <$> goAST a <*> goAST b
+      | Just BitAnd <- prj op =
+          liftStruct2 (sugarSymPrim BitAnd) <$> goAST a <*> goAST b
+      | Just BitOr  <- prj op =
+          liftStruct2 (sugarSymPrim BitOr) <$> goAST a <*> goAST b
+      | Just BitXor <- prj op =
+          liftStruct2 (sugarSymPrim BitXor) <$> goAST a <*> goAST b
+      | Just ShiftL <- prj op =
+          liftStruct2 (sugarSymPrim ShiftL) <$> goAST a <*> goAST b
+      | Just ShiftR <- prj op =
+          liftStruct2 (sugarSymPrim ShiftR) <$> goAST a <*> goAST b          
+      | Just RotateL <- prj op =
+          liftStruct2 (sugarSymPrim RotateL) <$> goAST a <*> goAST b
+      | Just RotateR <- prj op =
+          liftStruct2 (sugarSymPrim RotateR) <$> goAST a <*> goAST b
     go _ arrIx (i :* Nil)
       | Just (ArrIx arr) <- prj arrIx
       = do i' <- goSmallAST i

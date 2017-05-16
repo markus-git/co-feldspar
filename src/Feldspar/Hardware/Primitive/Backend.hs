@@ -36,17 +36,8 @@ viewLitPrim _                    = Nothing
 
 instance CompileType HardwarePrimType
   where
-    compileType _ (v :: proxy a) = case hardwareRep :: HardwarePrimTypeRep a of
-      BoolHT   -> declare v
-      Int8HT   -> declare v
-      Int16HT  -> declare v
-      Int32HT  -> declare v
-      Int64HT  -> declare v
-      Word8HT  -> declare v
-      Word16HT -> declare v
-      Word32HT -> declare v
-      Word64HT -> declare v
-    
+    compileType _ (v :: proxy a) =
+      compTypeSign (hardwareRep :: HardwarePrimTypeRep a)    
     compileLit _ a = case hardwarePrimTypeOf a of
       BoolHT   -> literal a
       Int8HT   -> literal a
@@ -66,6 +57,28 @@ instance CompileExp Prim
 
 --------------------------------------------------------------------------------
 
+compTypeSize :: forall a . HardwarePrimTypeRep a -> VHDL.Primary
+compTypeSize Int8HT   = VHDL.lit $ show (8  :: Int)
+compTypeSize Int16HT  = VHDL.lit $ show (16 :: Int)
+compTypeSize Int32HT  = VHDL.lit $ show (32 :: Int)
+compTypeSize Int64HT  = VHDL.lit $ show (64 :: Int)
+compTypeSize Word8HT  = VHDL.lit $ show (8  :: Int)
+compTypeSize Word16HT = VHDL.lit $ show (16 :: Int)
+compTypeSize Word32HT = VHDL.lit $ show (32 :: Int)
+compTypeSize Word64HT = VHDL.lit $ show (64 :: Int)
+
+compTypeSign :: forall a. HardwarePrimTypeRep a -> VHDL VHDL.Type
+compTypeSign Int8HT   = declare (Proxy :: Proxy a)
+compTypeSign Int16HT  = declare (Proxy :: Proxy a)
+compTypeSign Int32HT  = declare (Proxy :: Proxy a)
+compTypeSign Int64HT  = declare (Proxy :: Proxy a)
+compTypeSign Word8HT  = declare (Proxy :: Proxy a)
+compTypeSign Word16HT = declare (Proxy :: Proxy a)
+compTypeSign Word32HT = declare (Proxy :: Proxy a)
+compTypeSign Word64HT = declare (Proxy :: Proxy a)
+
+--------------------------------------------------------------------------------
+
 compExpr   :: [ASTF HardwarePrimDomain a] -> ([VHDL.Relation] -> VHDL.Expression) -> VHDL Kind
 compExpr as f = do
   as' <- mapM compKind as
@@ -75,6 +88,12 @@ compRel    :: [ASTF HardwarePrimDomain a] -> ([VHDL.ShiftExpression] -> VHDL.Rel
 compRel as f = do
   as' <- mapM compKind as
   return $ Hoist.R $ f $ map lift as'
+
+compShift :: ASTF HardwarePrimDomain a -> ASTF HardwarePrimDomain b -> (VHDL.SimpleExpression -> VHDL.SimpleExpression -> VHDL.ShiftExpression) -> VHDL Kind
+compShift a b f = do
+  a' <- compKind a
+  b' <- compKind b
+  return $ Hoist.Sh $ f (lift a') (lift b')
 
 compSimple :: [ASTF HardwarePrimDomain a] -> ([VHDL.Term] -> VHDL.SimpleExpression) -> VHDL Kind
 compSimple as f = do
@@ -91,9 +110,15 @@ compFactor as f = do
   as' <- mapM compKind as
   return $ Hoist.F $ f $ map lift as'
 
-compCast :: HardwarePrimTypeRep a -> ASTF HardwarePrimDomain b -> VHDL Kind
+compCast :: forall a b . HardwarePrimTypeRep a -> ASTF HardwarePrimDomain b -> VHDL Kind
 compCast t a = do
-  error "todo: compCast for hardware."
+  let size = compTypeSize t
+  t1   <- compTypeSign $ t
+  t2   <- compTypeSign $ getDecor a
+  a'   <- compKind a
+  return $ Hoist.P $ VHDL.cast t1 $ lift $
+    VHDL.resize (lift $ VHDL.cast t2 $ lift a')
+                (lift size)
 
 --------------------------------------------------------------------------------
 
@@ -120,23 +145,22 @@ compKind = simpleMatch (\(s :&: t) -> go t s)
     go t I2N (a :* Nil) = compCast t a
     
     go _ Not (a :* Nil)      = compFactor [a]    (one VHDL.not)
-    go _ And (a :* b :* Nil) = compExpr   [a, b] VHDL.and
+    go _ And (a :* b :* Nil) = compExpr   [a, b] (    VHDL.and)
     go _ Eq  (a :* b :* Nil) = compRel    [a, b] (two VHDL.eq)
     go _ Lt  (a :* b :* Nil) = compRel    [a, b] (two VHDL.lt)
     go _ Lte (a :* b :* Nil) = compRel    [a, b] (two VHDL.lte)
     go _ Gt  (a :* b :* Nil) = compRel    [a, b] (two VHDL.gt)
     go _ Gte (a :* b :* Nil) = compRel    [a, b] (two VHDL.gte)
 
-    go _ BitAnd   (a :* b :* Nil) = undefined
-    go _ BitOr    (a :* b :* Nil) = undefined
-    go _ BitXor   (a :* b :* Nil) = undefined
-    go _ BitCompl (a :* Nil)      = undefined
+    go _ BitAnd   (a :* b :* Nil) = compExpr   [a, b] (    VHDL.and)
+    go _ BitOr    (a :* b :* Nil) = compExpr   [a, b] (    VHDL.or)
+    go _ BitXor   (a :* b :* Nil) = compExpr   [a, b] (    VHDL.xor)
+    go _ BitCompl (a :* Nil)      = compFactor [a]    (one VHDL.not)
     
-    go _ ShiftL (a :* b :* Nil) = undefined
-    go _ ShiftR (a :* b :* Nil) = undefined
-
-    go _ RotateL (a :* b :* Nil) = undefined
-    go _ RotateR (a :* b :* Nil) = undefined
+    go _ ShiftL  (a :* b :* Nil) = compShift a b VHDL.sll
+    go _ ShiftR  (a :* b :* Nil) = compShift a b VHDL.srl
+    go _ RotateL (a :* b :* Nil) = compShift a b VHDL.rol
+    go _ RotateR (a :* b :* Nil) = compShift a b VHDL.ror
 
     go _ (ArrIx (IArrayC arr)) (i :* Nil) =
       do i' <- compPrim $ Prim i
