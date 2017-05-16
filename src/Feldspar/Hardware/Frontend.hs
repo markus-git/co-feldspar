@@ -324,7 +324,6 @@ setSignal s = Hardware . (Imp.setSignal s)
 entity  :: String -> Hardware () -> Hardware ()
 entity name = Hardware . (Imp.entity name) . unHardware
 
--- *** todo : entity name should be derived from context, not explicitly stated here.
 architecture :: String -> String -> Hardware () -> Hardware ()
 architecture entity name = Hardware . (Imp.architecture entity name) . unHardware
 

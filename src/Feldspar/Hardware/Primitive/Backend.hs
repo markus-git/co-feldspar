@@ -91,6 +91,10 @@ compFactor as f = do
   as' <- mapM compKind as
   return $ Hoist.F $ f $ map lift as'
 
+compCast :: HardwarePrimTypeRep a -> ASTF HardwarePrimDomain b -> VHDL Kind
+compCast t a = do
+  error "todo: compCast for hardware."
+
 --------------------------------------------------------------------------------
 
 compKind :: ASTF HardwarePrimDomain a -> VHDL Kind
@@ -105,16 +109,34 @@ compKind = simpleMatch (\(s :&: t) -> go t s)
       return $ Hoist.P $ VHDL.name $ VHDL.NSimple $ VHDL.Ident v
     go t (Lit a)     Nil | Dict <- hardwarePrimWitType t =
       fmap Hoist.E $ compileLit (Proxy :: Proxy HardwarePrimType) a
+      
     go _ Neg (a :* Nil)      = compSimple [a]    (one VHDL.neg)
     go _ Add (a :* b :* Nil) = compSimple [a, b] VHDL.add
     go _ Sub (a :* b :* Nil) = compSimple [a, b] VHDL.sub
     go _ Mul (a :* b :* Nil) = compTerm   [a, b] VHDL.mul
     go _ Div (a :* b :* Nil) = compTerm   [a, b] VHDL.div
     go _ Mod (a :* b :* Nil) = compTerm   [a, b] VHDL.mod
+
+    go t I2N (a :* Nil) = compCast t a
+    
     go _ Not (a :* Nil)      = compFactor [a]    (one VHDL.not)
     go _ And (a :* b :* Nil) = compExpr   [a, b] VHDL.and
     go _ Eq  (a :* b :* Nil) = compRel    [a, b] (two VHDL.eq)
     go _ Lt  (a :* b :* Nil) = compRel    [a, b] (two VHDL.lt)
+    go _ Lte (a :* b :* Nil) = compRel    [a, b] (two VHDL.lte)
+    go _ Gt  (a :* b :* Nil) = compRel    [a, b] (two VHDL.gt)
+    go _ Gte (a :* b :* Nil) = compRel    [a, b] (two VHDL.gte)
+
+    go _ BitAnd   (a :* b :* Nil) = undefined
+    go _ BitOr    (a :* b :* Nil) = undefined
+    go _ BitXor   (a :* b :* Nil) = undefined
+    go _ BitCompl (a :* Nil)      = undefined
+    
+    go _ ShiftL (a :* b :* Nil) = undefined
+    go _ ShiftR (a :* b :* Nil) = undefined
+
+    go _ RotateL (a :* b :* Nil) = undefined
+    go _ RotateR (a :* b :* Nil) = undefined
 
     go _ (ArrIx (IArrayC arr)) (i :* Nil) =
       do i' <- compPrim $ Prim i
