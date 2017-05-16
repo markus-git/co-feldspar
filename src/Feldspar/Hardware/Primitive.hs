@@ -12,11 +12,14 @@
 module Feldspar.Hardware.Primitive where
 
 import Data.Array ((!))
+import Data.Bits (Bits)
 import Data.Int
 import Data.Word
 import Data.List (genericTake)
 import Data.Typeable hiding (TypeRep)
 import Data.Constraint hiding (Sub)
+
+import qualified Data.Bits as Bits
 
 -- syntactic.
 import Language.Syntactic
@@ -109,22 +112,57 @@ data HardwarePrim sig
   where
     FreeVar :: (HardwarePrimType a) => String -> HardwarePrim (Full a)
     Lit     :: (Show a, Eq a)       => a      -> HardwarePrim (Full a)
-    -- ^ Array indexing.
-    ArrIx   :: (HardwarePrimType a) => Imp.IArray Index a -> HardwarePrim (Index :-> Full a)
+
+    -- ^ conditional
+    Cond :: HardwarePrim (Bool :-> a :-> a :-> Full a)
+    
+    -- ^ array indexing.
+    ArrIx :: (HardwarePrimType a) => Imp.IArray Index a
+          -> HardwarePrim (Index :-> Full a)
+            
     -- ^ numerical operations.
-    Neg     :: (HardwarePrimType a, Num a)        => HardwarePrim (a :-> Full a)
-    Add     :: (HardwarePrimType a, Num a)        => HardwarePrim (a :-> a :-> Full a)
-    Sub     :: (HardwarePrimType a, Num a)        => HardwarePrim (a :-> a :-> Full a)
-    Mul     :: (HardwarePrimType a, Num a)        => HardwarePrim (a :-> a :-> Full a)
+    Neg :: (HardwarePrimType a, Num a) => HardwarePrim (a :-> Full a)
+    Add :: (HardwarePrimType a, Num a) => HardwarePrim (a :-> a :-> Full a)
+    Sub :: (HardwarePrimType a, Num a) => HardwarePrim (a :-> a :-> Full a)
+    Mul :: (HardwarePrimType a, Num a) => HardwarePrim (a :-> a :-> Full a)
+
     -- ^ integral operations.
-    Div     :: (HardwarePrimType a, Integral a)   => HardwarePrim (a :-> a :-> Full a)
-    Mod     :: (HardwarePrimType a, Integral a)   => HardwarePrim (a :-> a :-> Full a)
+    Div :: (HardwarePrimType a, Integral a) => HardwarePrim (a :-> a :-> Full a)
+    Mod :: (HardwarePrimType a, Integral a) => HardwarePrim (a :-> a :-> Full a)
+
+    -- ^ type casting.
+    I2N :: ( HardwarePrimType a, Integral a
+           , HardwarePrimType b, Num b
+           ) => HardwarePrim (a :-> Full b)
+    
     -- ^ logical operations.
-    Not     ::                                       HardwarePrim (Bool :-> Full Bool)
-    And     ::                                       HardwarePrim (Bool :-> Bool :-> Full Bool)
+    Not :: HardwarePrim (Bool :-> Full Bool)
+    And :: HardwarePrim (Bool :-> Bool :-> Full Bool)
+
+    -- ^ bitwise logical operations.
+    BitAnd   :: (HardwarePrimType a, Bits a) => HardwarePrim (a :-> a :-> Full a)
+    BitOr    :: (HardwarePrimType a, Bits a) => HardwarePrim (a :-> a :-> Full a)
+    BitXor   :: (HardwarePrimType a, Bits a) => HardwarePrim (a :-> a :-> Full a)
+    BitCompl :: (HardwarePrimType a, Bits a) => HardwarePrim (a :-> Full a)
+    ShiftL   :: ( HardwarePrimType a, Bits a
+                , HardwarePrimType b, Integral b)
+             => HardwarePrim (a :-> b :-> Full a)
+    ShiftR   :: ( HardwarePrimType a, Bits a
+                , HardwarePrimType b, Integral b)
+             => HardwarePrim (a :-> b :-> Full a)
+    RotateL  :: ( HardwarePrimType a, Bits a
+                , HardwarePrimType b, Integral b)
+             => HardwarePrim (a :-> b :-> Full a)
+    RotateR  :: ( HardwarePrimType a, Bits a
+                , HardwarePrimType b, Integral b)
+             => HardwarePrim (a :-> b :-> Full a)
+    
     -- ^ relational operations.
-    Eq      :: (HardwarePrimType a, Eq a)         => HardwarePrim (a :-> a :-> Full Bool)
-    Lt      :: (HardwarePrimType a, Ord a)        => HardwarePrim (a :-> a :-> Full Bool)
+    Eq  :: (HardwarePrimType a, Eq a)  => HardwarePrim (a :-> a :-> Full Bool)
+    Lt  :: (HardwarePrimType a, Ord a) => HardwarePrim (a :-> a :-> Full Bool)
+    Lte :: (HardwarePrimType a, Ord a) => HardwarePrim (a :-> a :-> Full Bool)
+    Gt  :: (HardwarePrimType a, Ord a) => HardwarePrim (a :-> a :-> Full Bool)
+    Gte :: (HardwarePrimType a, Ord a) => HardwarePrim (a :-> a :-> Full Bool)
 
 deriving instance Show     (HardwarePrim a)
 deriving instance Typeable (HardwarePrim a)
@@ -202,16 +240,29 @@ instance Eval HardwarePrim
   where
     evalSym (FreeVar v) = error $ "evaluating free variable " ++ show v
     evalSym (Lit a)     = a
+    evalSym Cond        = \c t f -> if c then t else f
     evalSym Neg         = negate
     evalSym Add         = (+)
     evalSym Sub         = (-)
     evalSym Mul         = (*)
     evalSym Div         = div
     evalSym Mod         = mod
+    evalSym I2N         = fromIntegral
     evalSym Not         = not
     evalSym And         = (&&)
+    evalSym BitAnd      = (Bits..&.)
+    evalSym BitOr       = (Bits..|.)
+    evalSym BitXor      = Bits.xor
+    evalSym BitCompl    = Bits.complement
+    evalSym ShiftL      = \b i -> Bits.shiftL  b (fromIntegral i)
+    evalSym ShiftR      = \b i -> Bits.shiftR  b (fromIntegral i)
+    evalSym RotateL     = \b i -> Bits.rotateL b (fromIntegral i)
+    evalSym RotateR     = \b i -> Bits.rotateR b (fromIntegral i)
     evalSym Eq          = (==)
-    evalSym Lt          = (<=)
+    evalSym Lt          = (<)
+    evalSym Lte         = (<=)
+    evalSym Gt          = (>)
+    evalSym Gte         = (>=)
     evalSym (ArrIx (Imp.IArrayE a)) = \i -> a ! i
     evalSym (ArrIx _)               = error "eval of array variable"
 
@@ -219,16 +270,29 @@ instance Symbol HardwarePrim
   where
     symSig (FreeVar v) = signature
     symSig (Lit a)     = signature
+    symSig Cond        = signature
     symSig Neg         = signature
     symSig Add         = signature
     symSig Sub         = signature
     symSig Mul         = signature
     symSig Div         = signature
     symSig Mod         = signature
+    symSig I2N         = signature
     symSig Not         = signature
     symSig And         = signature
+    symSig BitAnd      = signature
+    symSig BitOr       = signature
+    symSig BitXor      = signature
+    symSig BitCompl    = signature
+    symSig ShiftL      = signature
+    symSig ShiftR      = signature
+    symSig RotateL     = signature
+    symSig RotateR     = signature
     symSig Eq          = signature
     symSig Lt          = signature
+    symSig Lte         = signature
+    symSig Gt          = signature
+    symSig Gte         = signature
     symSig (ArrIx a)   = signature
 
 instance Render HardwarePrim

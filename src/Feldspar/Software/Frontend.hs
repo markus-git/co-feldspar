@@ -162,12 +162,12 @@ resugar = Syntactic.resugar
 
 --------------------------------------------------------------------------------
 
--- Swap a `Imp.FreePred` constraint for software expressions to a `SoftwarePrimType` one.
+-- Swap an `Imp.FreePred` constraint with a `SoftwarePrimType` one.
 withSType :: forall a b . Proxy a -> (Imp.FreePred SExp a => b) -> (SoftwarePrimType a => b)
 withSType _ f = case softwareDict (softwareRep :: SoftwarePrimTypeRep a) of
   Dict -> f
 
--- Proves that a type from `SoftwarePrimTypeRep` satisfies `Imp.FreePred` for software expressions.
+-- Proves that a type from `SoftwarePrimTypeRep` satisfies `Imp.FreePred`.
 softwareDict :: SoftwarePrimTypeRep a -> Dict (Imp.FreePred SExp a)
 softwareDict rep = case rep of
   BoolST   -> Dict
@@ -214,6 +214,7 @@ setRef' :: forall b . SoftwarePrimType b
   -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
 setRef' = withSType (Proxy :: Proxy b) Imp.setRef
 
+-- 'Imp.unsafeFreezeRef' specialized to software.
 freezeRef' :: forall b . SoftwarePrimType b
   => Imp.Ref b
   -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
@@ -256,13 +257,13 @@ instance Arrays Software
         (unArr arr)
         (unArr brr)
 
--- Imp.getArr specialized to software.
+-- 'Imp.getArr' specialized to software.
 getArr' :: forall b . SoftwarePrimType b
   => Imp.Arr Index b -> SExp Index
   -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
 getArr' = withSType (Proxy :: Proxy b) Imp.getArr
 
--- Imp.setArr specialized to software.
+-- 'Imp.setArr' specialized to software.
 setArr' :: forall b . SoftwarePrimType b
   => Imp.Arr Index b -> SExp Index -> SExp b
   -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
@@ -279,7 +280,6 @@ instance IArrays Software
       $ fmap (IArr (arrOffset arr) (length arr))
       $ mapStructA (Imp.unsafeFreezeArr)
       $ unArr arr
-
     unsafeThawArr iarr
       = Software
       $ fmap (Arr (iarrOffset iarr) (length iarr))
@@ -294,14 +294,12 @@ instance Control Software
       = Software
       $ Imp.iff (resugar c)
           (unSoftware t)
-          (unSoftware f)
-      
+          (unSoftware f)      
     while c body
       = Software
       $ Imp.while
           (fmap resugar $ unSoftware c)
           (unSoftware body)
-
     for lower upper body
       = Software
       $ Imp.for

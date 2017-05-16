@@ -11,6 +11,7 @@ module Feldspar.Hardware.Frontend where
 import Prelude hiding (length)
 
 import Data.Constraint hiding (Sub)
+import Data.List (genericLength)
 import Data.Proxy
 
 -- syntactic.
@@ -50,6 +51,10 @@ instance Share HardwareDomain
   where
     share = sugarSymHardware (Let "")
 
+instance Cond HardwareDomain
+  where
+    cond = sugarSymHardware Cond
+
 --------------------------------------------------------------------------------
 -- ** Primitive functions.
 
@@ -60,11 +65,33 @@ instance Equality HardwareDomain
 instance Ordered HardwareDomain
   where
     (<)  = sugarSymHardware Lt
+    (<=) = sugarSymHardware Lte
+    (>)  = sugarSymHardware Gt
+    (>=) = sugarSymHardware Gte
 
 instance Logical HardwareDomain
   where
     not  = sugarSymHardware Not
     (&&) = sugarSymHardware And
+
+instance Multiplicative HardwareDomain
+  where
+    div = sugarSymHardware Div
+
+instance Bitwise HardwareDomain
+  where
+    (.&.)      = sugarSymHardware BitAnd
+    (.|.)      = sugarSymHardware BitOr
+    xor        = sugarSymHardware BitXor
+    complement = sugarSymHardware BitCompl
+    shiftL     = sugarSymHardware ShiftL
+    shiftR     = sugarSymHardware ShiftR
+    rotateL    = sugarSymHardware RotateL
+    rotateR    = sugarSymHardware RotateR
+
+instance Casting HardwareDomain
+  where
+    i2n = sugarSymHardware I2N
 
 --------------------------------------------------------------------------------
 
@@ -94,6 +121,14 @@ instance Indexed HardwareDomain (HExp Index) (IArr a)
         index :: HardwarePrimType b => Imp.IArray Index b -> HExp b
         index arr = sugarSymPrimHardware (ArrIx arr) (ix + off)
 
+instance Slicable (HExp Index) (Arr a)
+  where
+    slice from len (Arr o l arr) = Arr (o+from) len arr
+
+instance Slicable (HExp Index) (IArr a)
+  where
+    slice from len (IArr o l arr) = IArr (o+from) len arr
+
 instance Finite (HExp Index) (Arr a)  where length = arrLength
 instance Finite (HExp Index) (IArr a) where length = iarrLength
 
@@ -119,17 +154,23 @@ resugar = Syntactic.resugar
 
 --------------------------------------------------------------------------------
 
--- ...
+-- Swap an `Imp.FreePred` constraint with a `HardwarePrimType` one.
 withHType :: forall a b . Proxy a -> (Imp.PredicateExp HExp a => b) -> (HardwarePrimType a => b)
 withHType _ f = case hardwareDict (hardwareRep :: HardwarePrimTypeRep a) of
   Dict -> f
 
--- ...
+-- Proves that a `HardwarePrimTypeRep a` type satisfies `Imp.FreePred`.
 hardwareDict :: HardwarePrimTypeRep a -> Dict (Imp.PredicateExp HExp a)
 hardwareDict rep = case rep of
   BoolHT   -> Dict
   Int8HT   -> Dict
+  Int16HT  -> Dict
+  Int32HT  -> Dict
+  Int64HT  -> Dict
   Word8HT  -> Dict
+  Word16HT -> Dict
+  Word32HT -> Dict
+  Word64HT -> Dict
 
 --------------------------------------------------------------------------------
 -- ** General instructions.
@@ -141,19 +182,34 @@ instance References Hardware
     initRef    = Hardware . fmap Ref . mapStructA (Imp.initVariable) . resugar
     newRef     = Hardware . fmap Ref . mapStructA (const Imp.newVariable) $ typeRep
     getRef     = Hardware . fmap resugar . mapStructA getRef' . unRef
-    setRef ref = Hardware . sequence_ . zipListStruct setRef' (unRef ref) . resugar
+    setRef ref
+      = Hardware
+      . sequence_
+      . zipListStruct setRef' (unRef ref)
+      . resugar
+    unsafeFreezeRef
+      = Hardware
+      . fmap resugar
+      . mapStructA freezeRef'
+      . unRef
 
--- Imp.getRef specialized a software constraint.
+-- 'Imp.getRef' specialized hardware.
 getRef' :: forall b . HardwarePrimType b
   => Imp.Variable b
   -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
 getRef' = withHType (Proxy :: Proxy b) Imp.getVariable
 
--- Imp.setRef specialized to a software constraint.
+-- 'Imp.setRef' specialized to hardware.
 setRef' :: forall b . HardwarePrimType b
   => Imp.Variable b -> HExp b
   -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
 setRef' = withHType (Proxy :: Proxy b) Imp.setVariable
+
+-- 'Imp.unsafeFreezeRef' specialized to hardware.
+freezeRef' :: forall b . HardwarePrimType b
+  => Imp.Variable b
+  -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
+freezeRef' = withHType (Proxy :: Proxy b) Imp.unsafeFreezeVariable
 
 --------------------------------------------------------------------------------
 
@@ -167,30 +223,36 @@ instance Arrays Hardware
       $ fmap (Arr 0 len)
       $ mapStructA (const (Imp.newVArray len))
       $ typeRep
-
     initArr as
-      = error "todo: initArr for hardware"
-
+      = Hardware
+      $ fmap (Arr 0 len . Node)
+      $ Imp.initVArray as
+      where len = value $ genericLength as
     getArr arr ix
       = Hardware
       $ fmap resugar
       $ mapStructA (getArr' (ix + arrOffset arr))
       $ unArr arr
-
     setArr arr ix a
       = Hardware
       $ sequence_
       $ zipListStruct (setArr' (ix + arrOffset arr)) (resugar a)
       $ unArr arr
-
     copyArr arr brr
-      = error "todo: copyArr for hardware"
-
+      = Hardware
+      $ sequence_
+      $ zipListStruct (\a b ->
+          Imp.copyVArray (a, arrOffset arr) (b, arrOffset brr) (length brr))
+        (unArr arr)
+        (unArr brr)
+      
+-- 'Imp.getVArr' specialized to hardware.
 getArr' :: forall b . HardwarePrimType b
   => HExp Index -> Imp.VArray Index b
   -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
 getArr' = withHType (Proxy :: Proxy b) Imp.getVArray
 
+-- 'Imp.setVArr' specialized to hardware.
 setArr' :: forall b . HardwarePrimType b
   => HExp Index -> HExp b -> Imp.VArray Index b
   -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
@@ -203,10 +265,15 @@ instance IArrays Hardware
     type IArray Hardware = IArr
 
     unsafeFreezeArr arr
-      = error "todo: freezeArr for hardware"
-
+      = Hardware
+      $ fmap (IArr (arrOffset arr) (length arr))
+      $ mapStructA (Imp.unsafeFreezeVArray)
+      $ unArr arr
     unsafeThawArr iarr
-      = error "todo: thawArr for hardware"
+      = Hardware
+      $ fmap (Arr (iarrOffset iarr) (length iarr))
+      $ mapStructA (Imp.unsafeThawVArray)
+      $ unIArr iarr
 
 --------------------------------------------------------------------------------
 
@@ -214,18 +281,21 @@ instance Control Hardware
   where
     iff c t f
       = Hardware
-      $ Imp.iff (resugar c) (unHardware t) (unHardware f)
-
+      $ Imp.iff (resugar c)
+          (unHardware t)
+          (unHardware f)
     while c body
       = Hardware
-      $ Imp.while (fmap resugar $ unHardware c) (unHardware body)
-
+      $ Imp.while
+          (fmap resugar $ unHardware c)
+          (unHardware body)
     for lower upper body
-      = error "todo: for-loop for hardware"
-{-   
       = Hardware
-      $ Imp.for (resugar upper) (unHardware . body . resugar)
--}
+      $ Imp.for
+          (resugar lower)
+          (resugar upper)
+          (unHardware . body . resugar)
+
 --------------------------------------------------------------------------------
 -- ** Hardware instructions.
 
