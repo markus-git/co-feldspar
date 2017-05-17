@@ -42,17 +42,19 @@ import Feldspar.Representation
 data HardwarePrimTypeRep a
   where
     -- booleans
-    BoolHT   :: HardwarePrimTypeRep Bool
+    BoolHT    :: HardwarePrimTypeRep Bool
+    -- integers
+    IntegerHT :: HardwarePrimTypeRep Integer
     -- signed numbers.
-    Int8HT   :: HardwarePrimTypeRep Int8
-    Int16HT  :: HardwarePrimTypeRep Int16
-    Int32HT  :: HardwarePrimTypeRep Int32
-    Int64HT  :: HardwarePrimTypeRep Int64
+    Int8HT    :: HardwarePrimTypeRep Int8
+    Int16HT   :: HardwarePrimTypeRep Int16
+    Int32HT   :: HardwarePrimTypeRep Int32
+    Int64HT   :: HardwarePrimTypeRep Int64
     -- unsigned numbers.
-    Word8HT  :: HardwarePrimTypeRep Word8
-    Word16HT :: HardwarePrimTypeRep Word16
-    Word32HT :: HardwarePrimTypeRep Word32
-    Word64HT :: HardwarePrimTypeRep Word64
+    Word8HT   :: HardwarePrimTypeRep Word8
+    Word16HT  :: HardwarePrimTypeRep Word16
+    Word32HT  :: HardwarePrimTypeRep Word32
+    Word64HT  :: HardwarePrimTypeRep Word64
 
 deriving instance Eq       (HardwarePrimTypeRep a)
 deriving instance Show     (HardwarePrimTypeRep a)
@@ -65,43 +67,46 @@ class (Eq a, Show a, Typeable a, Inhabited a) => HardwarePrimType a
   where
     hardwareRep :: HardwarePrimTypeRep a
 
-instance HardwarePrimType Bool   where hardwareRep = BoolHT
-instance HardwarePrimType Int8   where hardwareRep = Int8HT
-instance HardwarePrimType Int16  where hardwareRep = Int16HT
-instance HardwarePrimType Int32  where hardwareRep = Int32HT
-instance HardwarePrimType Int64  where hardwareRep = Int64HT
-instance HardwarePrimType Word8  where hardwareRep = Word8HT
-instance HardwarePrimType Word16 where hardwareRep = Word16HT
-instance HardwarePrimType Word32 where hardwareRep = Word32HT
-instance HardwarePrimType Word64 where hardwareRep = Word64HT
+instance HardwarePrimType Bool    where hardwareRep = BoolHT
+instance HardwarePrimType Integer where hardwareRep = IntegerHT
+instance HardwarePrimType Int8    where hardwareRep = Int8HT
+instance HardwarePrimType Int16   where hardwareRep = Int16HT
+instance HardwarePrimType Int32   where hardwareRep = Int32HT
+instance HardwarePrimType Int64   where hardwareRep = Int64HT
+instance HardwarePrimType Word8   where hardwareRep = Word8HT
+instance HardwarePrimType Word16  where hardwareRep = Word16HT
+instance HardwarePrimType Word32  where hardwareRep = Word32HT
+instance HardwarePrimType Word64  where hardwareRep = Word64HT
 
 --------------------------------------------------------------------------------
 
 hardwarePrimTypeEq :: HardwarePrimTypeRep a -> HardwarePrimTypeRep b -> Maybe (Dict (a ~ b))
-hardwarePrimTypeEq (BoolHT)   (BoolHT)   = Just Dict
-hardwarePrimTypeEq (Int8HT)   (Int8HT)   = Just Dict
-hardwarePrimTypeEq (Int16HT)  (Int16HT)  = Just Dict
-hardwarePrimTypeEq (Int32HT)  (Int32HT)  = Just Dict
-hardwarePrimTypeEq (Int64HT)  (Int64HT)  = Just Dict
-hardwarePrimTypeEq (Word8HT)  (Word8HT)  = Just Dict
-hardwarePrimTypeEq (Word16HT) (Word16HT) = Just Dict
-hardwarePrimTypeEq (Word32HT) (Word32HT) = Just Dict
-hardwarePrimTypeEq (Word64HT) (Word64HT) = Just Dict
-hardwarePrimTypeEq _          _          = Nothing
+hardwarePrimTypeEq (BoolHT)    (BoolHT)    = Just Dict
+hardwarePrimTypeEq (IntegerHT) (IntegerHT) = Just Dict
+hardwarePrimTypeEq (Int8HT)    (Int8HT)    = Just Dict
+hardwarePrimTypeEq (Int16HT)   (Int16HT)   = Just Dict
+hardwarePrimTypeEq (Int32HT)   (Int32HT)   = Just Dict
+hardwarePrimTypeEq (Int64HT)   (Int64HT)   = Just Dict
+hardwarePrimTypeEq (Word8HT)   (Word8HT)   = Just Dict
+hardwarePrimTypeEq (Word16HT)  (Word16HT)  = Just Dict
+hardwarePrimTypeEq (Word32HT)  (Word32HT)  = Just Dict
+hardwarePrimTypeEq (Word64HT)  (Word64HT)  = Just Dict
+hardwarePrimTypeEq _           _           = Nothing
 
 hardwarePrimTypeOf :: HardwarePrimType a => a -> HardwarePrimTypeRep a
 hardwarePrimTypeOf _ = hardwareRep
 
 hardwarePrimWitType :: HardwarePrimTypeRep a -> Dict (HardwarePrimType a)
-hardwarePrimWitType BoolHT   = Dict
-hardwarePrimWitType Int8HT   = Dict
-hardwarePrimWitType Int16HT  = Dict
-hardwarePrimWitType Int32HT  = Dict
-hardwarePrimWitType Int64HT  = Dict
-hardwarePrimWitType Word8HT  = Dict
-hardwarePrimWitType Word16HT = Dict
-hardwarePrimWitType Word32HT = Dict
-hardwarePrimWitType Word64HT = Dict
+hardwarePrimWitType BoolHT    = Dict
+hardwarePrimWitType IntegerHT = Dict
+hardwarePrimWitType Int8HT    = Dict
+hardwarePrimWitType Int16HT   = Dict
+hardwarePrimWitType Int32HT   = Dict
+hardwarePrimWitType Int64HT   = Dict
+hardwarePrimWitType Word8HT   = Dict
+hardwarePrimWitType Word16HT  = Dict
+hardwarePrimWitType Word32HT  = Dict
+hardwarePrimWitType Word64HT  = Dict
 
 --------------------------------------------------------------------------------
 -- * ... prim ...
@@ -117,8 +122,7 @@ data HardwarePrim sig
     Cond :: HardwarePrim (Bool :-> a :-> a :-> Full a)
     
     -- ^ array indexing.
-    ArrIx :: (HardwarePrimType a) => Imp.IArray Index a
-          -> HardwarePrim (Index :-> Full a)
+    ArrIx :: (HardwarePrimType a) => Imp.IArray a -> HardwarePrim (Integer :-> Full a)
             
     -- ^ numerical operations.
     Neg :: (HardwarePrimType a, Num a) => HardwarePrim (a :-> Full a)
@@ -131,9 +135,7 @@ data HardwarePrim sig
     Mod :: (HardwarePrimType a, Integral a) => HardwarePrim (a :-> a :-> Full a)
 
     -- ^ type casting.
-    I2N :: ( HardwarePrimType a, Integral a
-           , HardwarePrimType b, Num b
-           ) => HardwarePrim (a :-> Full b)
+    I2N :: (HardwarePrimType a, Integral a, HardwarePrimType b, Num b) => HardwarePrim (a :-> Full b)
     
     -- ^ logical operations.
     Not :: HardwarePrim (Bool :-> Full Bool)
@@ -144,18 +146,10 @@ data HardwarePrim sig
     BitOr    :: (HardwarePrimType a, Bits a) => HardwarePrim (a :-> a :-> Full a)
     BitXor   :: (HardwarePrimType a, Bits a) => HardwarePrim (a :-> a :-> Full a)
     BitCompl :: (HardwarePrimType a, Bits a) => HardwarePrim (a :-> Full a)
-    ShiftL   :: ( HardwarePrimType a, Bits a
-                , HardwarePrimType b, Integral b)
-             => HardwarePrim (a :-> b :-> Full a)
-    ShiftR   :: ( HardwarePrimType a, Bits a
-                , HardwarePrimType b, Integral b)
-             => HardwarePrim (a :-> b :-> Full a)
-    RotateL  :: ( HardwarePrimType a, Bits a
-                , HardwarePrimType b, Integral b)
-             => HardwarePrim (a :-> b :-> Full a)
-    RotateR  :: ( HardwarePrimType a, Bits a
-                , HardwarePrimType b, Integral b)
-             => HardwarePrim (a :-> b :-> Full a)
+    ShiftL   :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b) => HardwarePrim (a :-> b :-> Full a)
+    ShiftR   :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b) => HardwarePrim (a :-> b :-> Full a)
+    RotateL  :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b) => HardwarePrim (a :-> b :-> Full a)
+    RotateR  :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b) => HardwarePrim (a :-> b :-> Full a)
     
     -- ^ relational operations.
     Eq  :: (HardwarePrimType a, Eq a)  => HardwarePrim (a :-> a :-> Full Bool)

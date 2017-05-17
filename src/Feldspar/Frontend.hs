@@ -47,7 +47,7 @@ type Syntax  dom a = (Syntactic a, dom ~ Domain a, Type (PredicateOf dom) (Inter
 -- | Short-hand for a `Syntactic` instance over typed primitive values from `dom`.
 type Syntax' dom a = (Syntactic a, PrimType (PredicateOf dom) (Internal a), dom ~ Domain a)
 
-----------------------------------------
+--------------------------------------------------------------------------------
 
 type Boolean a = a ~ Bool
 type Word a    = a ~ Word32
@@ -68,6 +68,7 @@ type Comp m
 
 --------------------------------------------------------------------------------
 -- ** General constructs.
+--------------------------------------------------------------------------------
 
 class Value dom
   where
@@ -108,6 +109,7 @@ infixl 1 ?
 
 --------------------------------------------------------------------------------
 -- ** Primitive functions.
+--------------------------------------------------------------------------------
 
 class Equality dom
   where
@@ -265,7 +267,7 @@ thawArr iarr =
 
 class Monad m => Control m
   where
-    iff   :: (SyntaxM  m a, Boolean  (Internal a))
+    iff :: (SyntaxM  m a, Boolean  (Internal a))
       => a    -- ^ condition
       -> m () -- ^ true branch
       -> m () -- ^ false branch
@@ -274,7 +276,7 @@ class Monad m => Control m
       => m a  -- ^ check
       -> m () -- ^ body
       -> m ()
-    for   :: (SyntaxM' m a, Integral (Internal a))
+    for :: (SyntaxM' m a, Integral (Internal a))
       => a    -- ^ lower bound (inclusive)
       -> a    -- ^ upper bound (inclusive)
       -> (a -> m ()) -- ^ step function

@@ -123,7 +123,6 @@ instance (Num a, SType' a) => Num (SExp a)
 instance Indexed SoftwareDomain (SExp Index) (IArr a)
   where
     type Elem (IArr a) = a
-
     (!) (IArr off len a) ix = resugar $ mapStruct index a
       where
         index :: SoftwarePrimType b => Imp.IArr Index b -> SExp b
@@ -186,8 +185,7 @@ softwareDict rep = case rep of
 
 instance References Software
   where
-    type Reference Software = Ref
-    
+    type Reference Software = Ref    
     initRef = Software . fmap Ref . mapStructA (Imp.initRef) . resugar
     newRef  = Software . fmap Ref . mapStructA (const Imp.newRef) $ typeRep
     getRef  = Software . fmap resugar . mapStructA getRef' . unRef
@@ -203,21 +201,15 @@ instance References Software
       . unRef
 
 -- Imp.getRef specialized to software.
-getRef' :: forall b . SoftwarePrimType b
-  => Imp.Ref b
-  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
+getRef' :: forall b . SoftwarePrimType b => Imp.Ref b -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
 getRef' = withSType (Proxy :: Proxy b) Imp.getRef
 
 -- Imp.setRef specialized to software.
-setRef' :: forall b . SoftwarePrimType b
-  => Imp.Ref b -> SExp b
-  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
+setRef' :: forall b . SoftwarePrimType b => Imp.Ref b -> SExp b -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
 setRef' = withSType (Proxy :: Proxy b) Imp.setRef
 
 -- 'Imp.unsafeFreezeRef' specialized to software.
-freezeRef' :: forall b . SoftwarePrimType b
-  => Imp.Ref b
-  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
+freezeRef' :: forall b . SoftwarePrimType b => Imp.Ref b -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
 freezeRef' = withSType (Proxy :: Proxy b) Imp.unsafeFreezeRef
 
 --------------------------------------------------------------------------------
@@ -225,8 +217,7 @@ freezeRef' = withSType (Proxy :: Proxy b) Imp.unsafeFreezeRef
 instance Arrays Software
   where
     type Array Software = Arr
-    type Ix    Software = SExp Index
-    
+    type Ix    Software = SExp Index    
     newArr len
       = Software
       $ fmap (Arr 0 len)
@@ -258,23 +249,18 @@ instance Arrays Software
         (unArr brr)
 
 -- 'Imp.getArr' specialized to software.
-getArr' :: forall b . SoftwarePrimType b
-  => Imp.Arr Index b -> SExp Index
-  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
+getArr' :: forall b . SoftwarePrimType b => Imp.Arr Index b -> SExp Index -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
 getArr' = withSType (Proxy :: Proxy b) Imp.getArr
 
 -- 'Imp.setArr' specialized to software.
-setArr' :: forall b . SoftwarePrimType b
-  => Imp.Arr Index b -> SExp Index -> SExp b
-  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
+setArr' :: forall b . SoftwarePrimType b => Imp.Arr Index b -> SExp Index -> SExp b -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
 setArr' = withSType (Proxy :: Proxy b) Imp.setArr
 
 --------------------------------------------------------------------------------
 
 instance IArrays Software
   where
-    type IArray Software = IArr
-    
+    type IArray Software = IArr    
     unsafeFreezeArr arr
       = Software
       $ fmap (IArr (arrOffset arr) (length arr))
@@ -308,6 +294,7 @@ instance Control Software
 
 --------------------------------------------------------------------------------
 -- ** Software instructions.
+--------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 -- *** File handling.

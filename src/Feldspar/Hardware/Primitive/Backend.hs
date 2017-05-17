@@ -112,32 +112,66 @@ compFactor as f = do
   return $ Hoist.F $ f $ map lift as'
 
 compCast :: forall a b . HardwarePrimTypeRep a -> ASTF HardwarePrimDomain b -> VHDL Kind
-compCast t1 a = do
-  let size = VHDL.litAsDec (compTypeSize t1)
-  let t2   = getDecor a
-  ts1  <- compTypeSign t1
-  ts2  <- compTypeSign t2
-  a'   <- compKind a
-  if (signEq t1 t2) then
-    return $ Hoist.P $ VHDL.resize (lift a') (lift size)
-  else
-    return $ Hoist.P $ VHDL.cast ts1 $ lift $ VHDL.resize
-      (lift $ VHDL.cast ts2 $ lift a')
-      (lift size)
-
-signEq :: HardwarePrimTypeRep a -> HardwarePrimTypeRep b -> Bool
-signEq a b = signed a == signed b
+compCast tt a = do
+  let tf = getDecor a
+  a' <- compKind a
+  return $ Hoist.P $ cast (lift a') tf tt
   where
-    signed :: HardwarePrimTypeRep c -> Bool
-    signed (Int8HT)   = True
-    signed (Int16HT)  = True
-    signed (Int32HT)  = True
-    signed (Int64HT)  = True
-    signed (Word8HT)  = False
-    signed (Word16HT) = False
-    signed (Word32HT) = False
-    signed (Word64HT) = False
-    
+    cast :: VHDL.Expression -> HardwarePrimTypeRep b -> HardwarePrimTypeRep a -> VHDL.Primary
+    cast exp from to = case (isInteger from) of
+        -- I'm an integer.
+      Just True -> case (isSigned to) of
+        Just True  -> VHDL.toSigned   exp $ size to
+        Just False -> VHDL.toUnsigned exp $ size to
+        Nothing    -> lift exp
+      Nothing   -> case (isSigned from) of
+        -- I'm signed.
+        Just True -> case (isSigned to) of
+          Just True  -> resize exp from to -- same sign.
+          Just False -> resize (lift $ VHDL.asUnsigned exp) from to
+          Nothing    -> VHDL.toInteger exp
+        -- I'm unsigned.
+        Just False -> case (isSigned to) of
+          Just False -> resize exp from to -- same sign.
+          Just True  -> resize (lift $ VHDL.asSigned exp) from to
+          Nothing    -> VHDL.toInteger exp
+        -- I'm what now?
+        Nothing -> error "co-feldspar: missing sym in type cast."
+
+    resize :: VHDL.Expression -> HardwarePrimTypeRep b -> HardwarePrimTypeRep a -> VHDL.Primary
+    resize exp from to
+      | width from == width to = lift exp
+      | otherwise = VHDL.resize exp $ size to
+
+    size :: HardwarePrimTypeRep x -> VHDL.Expression
+    size = lift . VHDL.lit . show . width
+
+isSigned  :: HardwarePrimTypeRep x -> Maybe Bool
+isSigned (Int8HT)   = Just True
+isSigned (Int16HT)  = Just True
+isSigned (Int32HT)  = Just True
+isSigned (Int64HT)  = Just True    
+isSigned (Word8HT)  = Just False
+isSigned (Word16HT) = Just False
+isSigned (Word32HT) = Just False
+isSigned (Word64HT) = Just False    
+isSigned _          = Nothing
+
+isInteger :: HardwarePrimTypeRep x -> Maybe Bool
+isInteger (IntegerHT) = Just True
+isInteger _           = Nothing
+
+width :: HardwarePrimTypeRep x -> Int
+width (Int8HT)   = 8
+width (Int16HT)  = 16
+width (Int32HT)  = 32
+width (Int64HT)  = 64
+width (Word8HT)  = 8
+width (Word16HT) = 16
+width (Word32HT) = 32
+width (Word64HT) = 64
+width _          = 0
+
 --------------------------------------------------------------------------------
 
 compKind :: ASTF HardwarePrimDomain a -> VHDL Kind
@@ -163,16 +197,16 @@ compKind = simpleMatch (\(s :&: t) -> go t s)
     go t I2N (a :* Nil) = compCast t a
     
     go _ Not (a :* Nil)      = compFactor [a]    (one VHDL.not)
-    go _ And (a :* b :* Nil) = compExpr   [a, b] (    VHDL.and)
+    go _ And (a :* b :* Nil) = compExpr   [a, b] VHDL.and
     go _ Eq  (a :* b :* Nil) = compRel    [a, b] (two VHDL.eq)
     go _ Lt  (a :* b :* Nil) = compRel    [a, b] (two VHDL.lt)
     go _ Lte (a :* b :* Nil) = compRel    [a, b] (two VHDL.lte)
     go _ Gt  (a :* b :* Nil) = compRel    [a, b] (two VHDL.gt)
     go _ Gte (a :* b :* Nil) = compRel    [a, b] (two VHDL.gte)
 
-    go _ BitAnd   (a :* b :* Nil) = compExpr   [a, b] (    VHDL.and)
-    go _ BitOr    (a :* b :* Nil) = compExpr   [a, b] (    VHDL.or)
-    go _ BitXor   (a :* b :* Nil) = compExpr   [a, b] (    VHDL.xor)
+    go _ BitAnd   (a :* b :* Nil) = compExpr   [a, b] VHDL.and
+    go _ BitOr    (a :* b :* Nil) = compExpr   [a, b] VHDL.or
+    go _ BitXor   (a :* b :* Nil) = compExpr   [a, b] VHDL.xor
     go _ BitCompl (a :* Nil)      = compFactor [a]    (one VHDL.not)
     
     go _ ShiftL  (a :* b :* Nil) = compShift a b VHDL.sll
