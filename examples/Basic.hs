@@ -53,7 +53,7 @@ example =
 soft :: Software ()
 soft = example
 
--- soft compiles with:
+-- example compiles with:
 --   - Soft.icompile soft
 --
 --------------------------------------------------------------------------------
@@ -61,8 +61,8 @@ soft = example
 hard :: Hardware ()
 hard = example
 
--- hard compiles with:
---   - Hard.icompile cepa
+-- example compiles with:
+--   - Hard.icompile hard
 --
 --------------------------------------------------------------------------------
 -- * Type casting.
@@ -96,7 +96,7 @@ casting =
      setRef b (i2n va)
 
 -- example compiles with:
---   - Soft.icompile example
---   - Hard.icompile example
+--   - Soft.icompile casting
+--   - Hard.icompile casting
 --
 --------------------------------------------------------------------------------
