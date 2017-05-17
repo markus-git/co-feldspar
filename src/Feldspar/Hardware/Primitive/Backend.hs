@@ -112,15 +112,32 @@ compFactor as f = do
   return $ Hoist.F $ f $ map lift as'
 
 compCast :: forall a b . HardwarePrimTypeRep a -> ASTF HardwarePrimDomain b -> VHDL Kind
-compCast t a = do
-  let size = compTypeSize t
-  t1   <- compTypeSign $ t
-  t2   <- compTypeSign $ getDecor a
+compCast t1 a = do
+  let size = VHDL.litAsDec (compTypeSize t1)
+  let t2   = getDecor a
+  ts1  <- compTypeSign t1
+  ts2  <- compTypeSign t2
   a'   <- compKind a
-  return $ Hoist.P $ VHDL.cast t1 $ lift $
-    VHDL.resize (lift $ VHDL.cast t2 $ lift a')
-                (lift size)
+  if (signEq t1 t2) then
+    return $ Hoist.P $ VHDL.resize (lift a') (lift size)
+  else
+    return $ Hoist.P $ VHDL.cast ts1 $ lift $ VHDL.resize
+      (lift $ VHDL.cast ts2 $ lift a')
+      (lift size)
 
+signEq :: HardwarePrimTypeRep a -> HardwarePrimTypeRep b -> Bool
+signEq a b = signed a == signed b
+  where
+    signed :: HardwarePrimTypeRep c -> Bool
+    signed (Int8HT)   = True
+    signed (Int16HT)  = True
+    signed (Int32HT)  = True
+    signed (Int64HT)  = True
+    signed (Word8HT)  = False
+    signed (Word16HT) = False
+    signed (Word32HT) = False
+    signed (Word64HT) = False
+    
 --------------------------------------------------------------------------------
 
 compKind :: ASTF HardwarePrimDomain a -> VHDL Kind
