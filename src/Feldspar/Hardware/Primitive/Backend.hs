@@ -109,7 +109,11 @@ compShift :: ASTF HardwarePrimDomain a -> ASTF HardwarePrimDomain b -> (VHDL.Sim
 compShift a b f = do
   a' <- compKind a
   b' <- compKind b
-  return $ Hoist.Sh $ f (lift a') (lift b')
+  tf <- compTypeSign (getDecor b)
+  return $ Hoist.Sh $ f (lift a') $ lift $ VHDL.uCast (lift b') tf tt
+  where
+    tt :: VHDL.Type
+    tt = VHDL.integer Nothing
 
 compSimple :: [ASTF HardwarePrimDomain a] -> ([VHDL.Term] -> VHDL.SimpleExpression) -> VHDL Kind
 compSimple as f = do
@@ -128,38 +132,13 @@ compFactor as f = do
 
 compCast :: forall a b . HardwarePrimTypeRep a -> ASTF HardwarePrimDomain b -> VHDL Kind
 compCast tt a = do
-  let tf = getDecor a
-  a' <- compKind a
-  return $ Hoist.P $ cast (lift a') tf tt
+  a'  <- compKind a
+  tt' <- compTypeSign tt
+  tf' <- compTypeSign tf
+  return $ Hoist.E $ VHDL.uCast (lift a') tf' tt'
   where
-    cast :: VHDL.Expression -> HardwarePrimTypeRep b -> HardwarePrimTypeRep a -> VHDL.Primary
-    cast exp from to = case (isInteger from) of
-        -- I'm an integer.
-      Just True -> case (isSigned to) of
-        Just True  -> VHDL.toSigned   exp $ size to
-        Just False -> VHDL.toUnsigned exp $ size to
-        Nothing    -> lift exp
-      Nothing   -> case (isSigned from) of
-        -- I'm signed.
-        Just True -> case (isSigned to) of
-          Just True  -> resize exp from to -- same sign.
-          Just False -> resize (lift $ VHDL.asUnsigned exp) from to
-          Nothing    -> VHDL.toInteger exp
-        -- I'm unsigned.
-        Just False -> case (isSigned to) of
-          Just False -> resize exp from to -- same sign.
-          Just True  -> resize (lift $ VHDL.asSigned exp) from to
-          Nothing    -> VHDL.toInteger exp
-        -- I'm what now?
-        Nothing -> error "co-feldspar: missing sym in type cast."
-
-    resize :: VHDL.Expression -> HardwarePrimTypeRep b -> HardwarePrimTypeRep a -> VHDL.Primary
-    resize exp from to
-      | width from == width to = lift exp
-      | otherwise = VHDL.resize exp $ size to
-
-    size :: HardwarePrimTypeRep x -> VHDL.Expression
-    size = lift . VHDL.lit . show . width
+    tf :: HardwarePrimTypeRep b
+    tf = getDecor a
 
 isSigned  :: HardwarePrimTypeRep x -> Maybe Bool
 isSigned (Int8HT)   = Just True

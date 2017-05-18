@@ -153,23 +153,22 @@ class Bitwise dom
     (.&.) :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
     (.|.) :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
     xor   :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
-    complement
-      :: (Syntax' dom a, Bits (Internal a)) => a -> a
+    complement :: (Syntax' dom a, Bits (Internal a)) => a -> a
     shiftL
       :: ( Syntax' dom a, Bits (Internal a)
-         , Syntax' dom b, Word (Internal b))
+         , Syntax' dom b, Integral (Internal b))
       => a -> b -> a
     shiftR
       :: ( Syntax' dom a, Bits (Internal a)
-         , Syntax' dom b, Word (Internal b))
+         , Syntax' dom b, Integral (Internal b))
       => a -> b -> a
     rotateL
       :: ( Syntax' dom a, Bits (Internal a)
-         , Syntax' dom b, Word (Internal b))
+         , Syntax' dom b, Integral (Internal b))
       => a -> b -> a
     rotateR
       :: ( Syntax' dom a, Bits (Internal a)
-         , Syntax' dom b, Word (Internal b))
+         , Syntax' dom b, Integral (Internal b))
       => a -> b -> a
 
 bitSize :: forall a. FiniteBits (Internal a) => a -> Word64
