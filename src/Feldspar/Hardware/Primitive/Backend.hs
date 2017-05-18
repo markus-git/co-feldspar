@@ -39,15 +39,16 @@ instance CompileType HardwarePrimType
     compileType _ (v :: proxy a) =
       compTypeSign (hardwareRep :: HardwarePrimTypeRep a)    
     compileLit _ a = case hardwarePrimTypeOf a of
-      BoolHT   -> literal a
-      Int8HT   -> literal a
-      Int16HT  -> literal a
-      Int32HT  -> literal a
-      Int64HT  -> literal a
-      Word8HT  -> literal a
-      Word16HT -> literal a
-      Word32HT -> literal a
-      Word64HT -> literal a
+      BoolHT    -> literal a
+      IntegerHT -> literal a
+      Int8HT    -> literal a
+      Int16HT   -> literal a
+      Int32HT   -> literal a
+      Int64HT   -> literal a
+      Word8HT   -> literal a
+      Word16HT  -> literal a
+      Word32HT  -> literal a
+      Word64HT  -> literal a
 
 --------------------------------------------------------------------------------
 
@@ -58,25 +59,28 @@ instance CompileExp Prim
 --------------------------------------------------------------------------------
 
 compTypeSize :: forall a . HardwarePrimTypeRep a -> VHDL.Primary
-compTypeSize Int8HT   = VHDL.lit $ show (8  :: Int)
-compTypeSize Int16HT  = VHDL.lit $ show (16 :: Int)
-compTypeSize Int32HT  = VHDL.lit $ show (32 :: Int)
-compTypeSize Int64HT  = VHDL.lit $ show (64 :: Int)
-compTypeSize Word8HT  = VHDL.lit $ show (8  :: Int)
-compTypeSize Word16HT = VHDL.lit $ show (16 :: Int)
-compTypeSize Word32HT = VHDL.lit $ show (32 :: Int)
-compTypeSize Word64HT = VHDL.lit $ show (64 :: Int)
+compTypeSize BoolHT    = VHDL.lit $ show (1  :: Int)
+compTypeSize IntegerHT = VHDL.lit $ show (32 :: Int)
+compTypeSize Int8HT    = VHDL.lit $ show (8  :: Int)
+compTypeSize Int16HT   = VHDL.lit $ show (16 :: Int)
+compTypeSize Int32HT   = VHDL.lit $ show (32 :: Int)
+compTypeSize Int64HT   = VHDL.lit $ show (64 :: Int)
+compTypeSize Word8HT   = VHDL.lit $ show (8  :: Int)
+compTypeSize Word16HT  = VHDL.lit $ show (16 :: Int)
+compTypeSize Word32HT  = VHDL.lit $ show (32 :: Int)
+compTypeSize Word64HT  = VHDL.lit $ show (64 :: Int)
 
 compTypeSign :: forall a. HardwarePrimTypeRep a -> VHDL VHDL.Type
-compTypeSign BoolHT   = declare (Proxy :: Proxy a)
-compTypeSign Int8HT   = declare (Proxy :: Proxy a)
-compTypeSign Int16HT  = declare (Proxy :: Proxy a)
-compTypeSign Int32HT  = declare (Proxy :: Proxy a)
-compTypeSign Int64HT  = declare (Proxy :: Proxy a)
-compTypeSign Word8HT  = declare (Proxy :: Proxy a)
-compTypeSign Word16HT = declare (Proxy :: Proxy a)
-compTypeSign Word32HT = declare (Proxy :: Proxy a)
-compTypeSign Word64HT = declare (Proxy :: Proxy a)
+compTypeSign BoolHT    = declare (Proxy :: Proxy a)
+compTypeSign IntegerHT = declare (Proxy :: Proxy a)
+compTypeSign Int8HT    = declare (Proxy :: Proxy a)
+compTypeSign Int16HT   = declare (Proxy :: Proxy a)
+compTypeSign Int32HT   = declare (Proxy :: Proxy a)
+compTypeSign Int64HT   = declare (Proxy :: Proxy a)
+compTypeSign Word8HT   = declare (Proxy :: Proxy a)
+compTypeSign Word16HT  = declare (Proxy :: Proxy a)
+compTypeSign Word32HT  = declare (Proxy :: Proxy a)
+compTypeSign Word64HT  = declare (Proxy :: Proxy a)
 
 --------------------------------------------------------------------------------
 
@@ -162,15 +166,16 @@ isInteger (IntegerHT) = Just True
 isInteger _           = Nothing
 
 width :: HardwarePrimTypeRep x -> Int
-width (Int8HT)   = 8
-width (Int16HT)  = 16
-width (Int32HT)  = 32
-width (Int64HT)  = 64
-width (Word8HT)  = 8
-width (Word16HT) = 16
-width (Word32HT) = 32
-width (Word64HT) = 64
-width _          = 0
+width (IntegerHT) = 32
+width (Int8HT)    = 8
+width (Int16HT)   = 16
+width (Int32HT)   = 32
+width (Int64HT)   = 64
+width (Word8HT)   = 8
+width (Word16HT)  = 16
+width (Word32HT)  = 32
+width (Word64HT)  = 64
+width _           = 0
 
 --------------------------------------------------------------------------------
 
