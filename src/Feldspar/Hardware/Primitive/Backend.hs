@@ -49,6 +49,17 @@ instance CompileType HardwarePrimType
       Word16HT  -> literal a
       Word32HT  -> literal a
       Word64HT  -> literal a
+    compileBits _ a = case hardwarePrimTypeOf a of
+      BoolHT    -> literalBits a
+      IntegerHT -> literalBits a
+      Int8HT    -> literalBits a
+      Int16HT   -> literalBits a
+      Int32HT   -> literalBits a
+      Int64HT   -> literalBits a
+      Word8HT   -> literalBits a
+      Word16HT  -> literalBits a
+      Word32HT  -> literalBits a
+      Word64HT  -> literalBits a
 
 --------------------------------------------------------------------------------
 
