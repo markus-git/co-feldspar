@@ -164,15 +164,16 @@ withHType _ f = case hardwareDict (hardwareRep :: HardwarePrimTypeRep a) of
 -- Proves that a `HardwarePrimTypeRep a` type satisfies `Imp.FreePred`.
 hardwareDict :: HardwarePrimTypeRep a -> Dict (Imp.PredicateExp HExp a)
 hardwareDict rep = case rep of
-  BoolHT   -> Dict
-  Int8HT   -> Dict
-  Int16HT  -> Dict
-  Int32HT  -> Dict
-  Int64HT  -> Dict
-  Word8HT  -> Dict
-  Word16HT -> Dict
-  Word32HT -> Dict
-  Word64HT -> Dict
+  BoolHT    -> Dict
+  IntegerHT -> Dict
+  Int8HT    -> Dict
+  Int16HT   -> Dict
+  Int32HT   -> Dict
+  Int64HT   -> Dict
+  Word8HT   -> Dict
+  Word16HT  -> Dict
+  Word32HT  -> Dict
+  Word64HT  -> Dict
 
 --------------------------------------------------------------------------------
 -- ** General instructions.
