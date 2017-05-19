@@ -140,6 +140,7 @@ data HardwarePrim sig
     -- ^ logical operations.
     Not :: HardwarePrim (Bool :-> Full Bool)
     And :: HardwarePrim (Bool :-> Bool :-> Full Bool)
+    Or  :: HardwarePrim (Bool :-> Bool :-> Full Bool)
 
     -- ^ bitwise logical operations.
     BitAnd   :: (HardwarePrimType a, Bits a) => HardwarePrim (a :-> a :-> Full a)
@@ -244,6 +245,7 @@ instance Eval HardwarePrim
     evalSym I2N         = fromIntegral
     evalSym Not         = not
     evalSym And         = (&&)
+    evalSym Or          = (||)
     evalSym BitAnd      = (Bits..&.)
     evalSym BitOr       = (Bits..|.)
     evalSym BitXor      = Bits.xor
@@ -274,6 +276,7 @@ instance Symbol HardwarePrim
     symSig I2N         = signature
     symSig Not         = signature
     symSig And         = signature
+    symSig Or          = signature
     symSig BitAnd      = signature
     symSig BitOr       = signature
     symSig BitXor      = signature

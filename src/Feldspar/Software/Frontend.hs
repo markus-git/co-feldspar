@@ -81,21 +81,24 @@ instance Logical SoftwareDomain
   where
     not  = sugarSymSoftware Not
     (&&) = sugarSymSoftware And
+    (||) = sugarSymSoftware Or
 
 instance Multiplicative SoftwareDomain
   where
-    div = sugarSymSoftware Div
+    mult = sugarSymSoftware Mul
+    div  = sugarSymSoftware Div
+    mod  = sugarSymSoftware Mod
 
 instance Bitwise SoftwareDomain
   where
+    complement = sugarSymSoftware BitCompl
     (.&.)      = sugarSymSoftware BitAnd
     (.|.)      = sugarSymSoftware BitOr
     xor        = sugarSymSoftware BitXor
-    complement = sugarSymSoftware BitCompl
-    shiftL     = sugarSymSoftware ShiftL
-    shiftR     = sugarSymSoftware ShiftR
-    rotateL    = sugarSymSoftware RotateL
-    rotateR    = sugarSymSoftware RotateR
+    sll        = sugarSymSoftware ShiftL
+    srl        = sugarSymSoftware ShiftR
+    rol        = sugarSymSoftware RotateL
+    ror        = sugarSymSoftware RotateR
 
 instance Casting SoftwareDomain
   where

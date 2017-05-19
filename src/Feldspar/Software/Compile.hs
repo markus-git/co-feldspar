@@ -154,8 +154,7 @@ translateExp = goAST . unSExp
       | Just Cos <- prj op = liftStruct (sugarSymPrim Cos) <$> goAST a
       | Just Tan <- prj op = liftStruct (sugarSymPrim Tan) <$> goAST a
       | Just I2N <- prj op = liftStruct (sugarSymPrim I2N) <$> goAST a
-      | Just BitCompl <- prj op =
-          liftStruct (sugarSymPrim BitCompl) <$> goAST a
+      | Just BitCompl <- prj op = liftStruct (sugarSymPrim BitCompl) <$> goAST a
     go _ op (a :* b :* Nil)
       | Just Add <- prj op = liftStruct2 (sugarSymPrim Add) <$> goAST a <*> goAST b
       | Just Sub <- prj op = liftStruct2 (sugarSymPrim Sub) <$> goAST a <*> goAST b
@@ -164,6 +163,7 @@ translateExp = goAST . unSExp
       | Just Mod <- prj op = liftStruct2 (sugarSymPrim Mod) <$> goAST a <*> goAST b
       | Just Eq  <- prj op = liftStruct2 (sugarSymPrim Eq)  <$> goAST a <*> goAST b
       | Just And <- prj op = liftStruct2 (sugarSymPrim And) <$> goAST a <*> goAST b
+      | Just Or  <- prj op = liftStruct2 (sugarSymPrim Or)  <$> goAST a <*> goAST b
       | Just Lt  <- prj op = liftStruct2 (sugarSymPrim Lt)  <$> goAST a <*> goAST b
       | Just Lte <- prj op = liftStruct2 (sugarSymPrim Lte) <$> goAST a <*> goAST b
       | Just Gt  <- prj op = liftStruct2 (sugarSymPrim Gt)  <$> goAST a <*> goAST b

@@ -47,10 +47,14 @@ type Syntax  dom a = (Syntactic a, dom ~ Domain a, Type (PredicateOf dom) (Inter
 -- | Short-hand for a `Syntactic` instance over typed primitive values from `dom`.
 type Syntax' dom a = (Syntactic a, PrimType (PredicateOf dom) (Internal a), dom ~ Domain a)
 
---------------------------------------------------------------------------------
+-- | ...
+type SyntaxM  m a = Syntax  (DomainOf m) a
 
+-- | ...
+type SyntaxM' m a = Syntax' (DomainOf m) a
+
+-- | ...
 type Boolean a = a ~ Bool
-type Word a    = a ~ Word32
 
 --------------------------------------------------------------------------------
 
@@ -61,9 +65,9 @@ type Comp m
     , Arrays m
     , IArrays m
     , Control m
-      -- todo: add control structures and loops.
     , Value (DomainOf m)
     , Share (DomainOf m)
+    , Cond  (DomainOf m)
     )
 
 --------------------------------------------------------------------------------
@@ -113,27 +117,16 @@ infixl 1 ?
 
 class Equality dom
   where
-    (==) :: ( Syntax' dom a, Eq      (Internal a)
-            , Syntax' dom b, Boolean (Internal b)
-            )
-         => a -> a -> b
+    (==) :: (Syntax' dom a, Syntax' dom b, Eq (Internal a), Boolean (Internal b)) => a -> a -> b
 
 infix 4 ==
   
 class Equality dom => Ordered dom
   where
-    (<)  :: ( Syntax' dom a, Ord     (Internal a)
-            , Syntax' dom b, Boolean (Internal b)
-            ) => a -> a -> b
-    (<=) :: ( Syntax' dom a, Ord     (Internal a)
-            , Syntax' dom b, Boolean (Internal b)
-            ) => a -> a -> b
-    (>)  :: ( Syntax' dom a, Ord     (Internal a)
-            , Syntax' dom b, Boolean (Internal b)
-            ) => a -> a -> b
-    (>=) :: ( Syntax' dom a, Ord     (Internal a)
-            , Syntax' dom b, Boolean (Internal b)
-            ) => a -> a -> b
+    (<)  :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
+    (<=) :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
+    (>)  :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
+    (>=) :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
 
 infix 4 <, >, <=, >=
     
@@ -141,40 +134,45 @@ class Logical dom
   where
     not  :: (Syntax' dom a, Boolean (Internal a)) => a -> a
     (&&) :: (Syntax' dom a, Boolean (Internal a)) => a -> a -> a
+    (||) :: (Syntax' dom a, Boolean (Internal a)) => a -> a -> a
 
 infix 3 &&
+infix 2 ||
 
 class Multiplicative dom
   where
-    div :: (Syntax' dom a, Integral (Internal a)) => a -> a -> a
+    mult :: (Syntax' dom a, Integral (Internal a)) => a -> a -> a
+    div  :: (Syntax' dom a, Integral (Internal a)) => a -> a -> a
+    mod  :: (Syntax' dom a, Integral (Internal a)) => a -> a -> a
   
 class Bitwise dom
   where
+    complement :: (Syntax' dom a, Bits (Internal a)) => a -> a
     (.&.) :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
     (.|.) :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
     xor   :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
-    complement :: (Syntax' dom a, Bits (Internal a)) => a -> a
-    shiftL
-      :: ( Syntax' dom a, Bits (Internal a)
-         , Syntax' dom b, Integral (Internal b))
-      => a -> b -> a
-    shiftR
-      :: ( Syntax' dom a, Bits (Internal a)
-         , Syntax' dom b, Integral (Internal b))
-      => a -> b -> a
-    rotateL
-      :: ( Syntax' dom a, Bits (Internal a)
-         , Syntax' dom b, Integral (Internal b))
-      => a -> b -> a
-    rotateR
-      :: ( Syntax' dom a, Bits (Internal a)
-         , Syntax' dom b, Integral (Internal b))
-      => a -> b -> a
+    sll   :: (Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
+    srl   :: (Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
+    rol   :: (Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
+    ror   :: (Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
+
+shiftL :: (Bitwise dom, Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
+shiftL = sll
+
+shiftR :: (Bitwise dom, Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
+shiftR = srl
+
+rotateL :: (Bitwise dom, Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
+rotateL = rol
+
+rotateR :: (Bitwise dom, Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
+rotateR = ror
 
 bitSize :: forall a. FiniteBits (Internal a) => a -> Word64
 bitSize _ = fromIntegral $ Bits.finiteBitSize (a :: Internal a)
   where a = error "Bits.finiteBitSize evaluated its argument"
 
+infixl 8 `sll`, `srl`, `rol`, `ror`
 infixl 8 `shiftL`, `shiftR`, `rotateL`, `rotateR`
 infixl 7 .&.
 infixl 6 `xor`
@@ -182,10 +180,7 @@ infixl 5 .|.
 
 class Casting dom
   where
-    i2n :: ( Syntax' dom a, Integral (Internal a)
-           , Syntax' dom b, Num      (Internal b)
-           )
-        => a -> b
+    i2n :: (Syntax' dom a, Syntax' dom b, Integral (Internal a), Num (Internal b)) => a -> b
   
 --------------------------------------------------------------------------------
 -- arrays.
@@ -205,11 +200,6 @@ class Finite ix a
     
 --------------------------------------------------------------------------------
 -- ** Commands.
-
-type SyntaxM  m a = Syntax  (DomainOf m) a
-type SyntaxM' m a = Syntax' (DomainOf m) a
-
---------------------------------------------------------------------------------
 
 class Monad m => References m
   where
@@ -241,10 +231,8 @@ class Monad m => Arrays m
 class Arrays m => IArrays m
   where
     type IArray m :: * -> *
-    unsafeFreezeArr :: (SyntaxM m a, Finite (Ix m) (Array  m a))
-      => Array  m a -> m (IArray m a)
-    unsafeThawArr   :: (SyntaxM m a, Finite (Ix m) (IArray m a))
-      => IArray m a -> m (Array  m a)
+    unsafeFreezeArr :: (SyntaxM m a, Finite (Ix m) (Array  m a)) => Array  m a -> m (IArray m a)
+    unsafeThawArr   :: (SyntaxM m a, Finite (Ix m) (IArray m a)) => IArray m a -> m (Array  m a)
 
 freezeArr :: (IArrays m, SyntaxM m a, Finite (Ix m) (Array m a))
   => Array  m a -> m (IArray m a)
@@ -256,7 +244,7 @@ freezeArr arr =
 thawArr :: (IArrays m, SyntaxM m a, Finite (Ix m) (IArray m a))
   => IArray m a -> m (Array  m a)
 thawArr iarr =
-  do brr <- unsafeThawArr iarr -- hahah
+  do brr <- unsafeThawArr iarr -- haha.
      arr <- newArr (length iarr)
      copyArr arr brr
      return arr

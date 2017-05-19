@@ -193,6 +193,7 @@ compKind = simpleMatch (\(s :&: t) -> go t s)
     
     go _ Not (a :* Nil)      = compFactor [a]    (one VHDL.not)
     go _ And (a :* b :* Nil) = compExpr   [a, b] VHDL.and
+    go _ Or  (a :* b :* Nil) = compExpr   [a, b] VHDL.or
     go _ Eq  (a :* b :* Nil) = compRel    [a, b] (two VHDL.eq)
     go _ Lt  (a :* b :* Nil) = compRel    [a, b] (two VHDL.lt)
     go _ Lte (a :* b :* Nil) = compRel    [a, b] (two VHDL.lte)

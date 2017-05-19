@@ -73,21 +73,24 @@ instance Logical HardwareDomain
   where
     not  = sugarSymHardware Not
     (&&) = sugarSymHardware And
+    (||) = sugarSymHardware Or
 
 instance Multiplicative HardwareDomain
   where
-    div = sugarSymHardware Div
+    mult = sugarSymHardware Mul
+    div  = sugarSymHardware Div
+    mod  = sugarSymHardware Mod
 
 instance Bitwise HardwareDomain
   where
+    complement = sugarSymHardware BitCompl
     (.&.)      = sugarSymHardware BitAnd
     (.|.)      = sugarSymHardware BitOr
     xor        = sugarSymHardware BitXor
-    complement = sugarSymHardware BitCompl
-    shiftL     = sugarSymHardware ShiftL
-    shiftR     = sugarSymHardware ShiftR
-    rotateL    = sugarSymHardware RotateL
-    rotateR    = sugarSymHardware RotateR
+    sll        = sugarSymHardware ShiftL
+    srl        = sugarSymHardware ShiftR
+    rol        = sugarSymHardware RotateL
+    ror        = sugarSymHardware RotateR
 
 instance Casting HardwareDomain
   where

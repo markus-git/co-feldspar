@@ -137,32 +137,22 @@ data SoftwarePrim sig
     Mod :: (SoftwarePrimType a, Integral a) => SoftwarePrim (a :-> a :-> Full a)
 
     -- ^ type casting.
-    I2N :: ( SoftwarePrimType a, Integral a
-           , SoftwarePrimType b, Num b
-           )
-        => SoftwarePrim (a :-> Full b)
+    I2N :: (SoftwarePrimType a, Integral a, SoftwarePrimType b, Num b) => SoftwarePrim (a :-> Full b)
     
     -- ^ logical operations.
     Not     :: SoftwarePrim (Bool :-> Full Bool)
     And     :: SoftwarePrim (Bool :-> Bool :-> Full Bool)
+    Or      :: SoftwarePrim (Bool :-> Bool :-> Full Bool)
     
     -- ^ bitwise logical operations.
     BitAnd   :: (SoftwarePrimType a, Bits a) => SoftwarePrim (a :-> a :-> Full a)
     BitOr    :: (SoftwarePrimType a, Bits a) => SoftwarePrim (a :-> a :-> Full a)
     BitXor   :: (SoftwarePrimType a, Bits a) => SoftwarePrim (a :-> a :-> Full a)
     BitCompl :: (SoftwarePrimType a, Bits a) => SoftwarePrim (a :-> Full a)
-    ShiftL   :: ( SoftwarePrimType a, Bits a
-                , SoftwarePrimType b, Integral b)
-             => SoftwarePrim (a :-> b :-> Full a)
-    ShiftR   :: ( SoftwarePrimType a, Bits a
-                , SoftwarePrimType b, Integral b)
-             => SoftwarePrim (a :-> b :-> Full a)
-    RotateL  :: ( SoftwarePrimType a, Bits a
-                , SoftwarePrimType b, Integral b)
-             => SoftwarePrim (a :-> b :-> Full a)
-    RotateR  :: ( SoftwarePrimType a, Bits a
-                , SoftwarePrimType b, Integral b)
-             => SoftwarePrim (a :-> b :-> Full a)
+    ShiftL   :: (SoftwarePrimType a, Bits a, SoftwarePrimType b, Integral b) => SoftwarePrim (a :-> b :-> Full a)
+    ShiftR   :: (SoftwarePrimType a, Bits a, SoftwarePrimType b, Integral b) => SoftwarePrim (a :-> b :-> Full a)
+    RotateL  :: (SoftwarePrimType a, Bits a, SoftwarePrimType b, Integral b) => SoftwarePrim (a :-> b :-> Full a)
+    RotateR  :: (SoftwarePrimType a, Bits a, SoftwarePrimType b, Integral b) => SoftwarePrim (a :-> b :-> Full a)
              
     -- ^ relational operations.
     Eq  :: (SoftwarePrimType a, Eq a)  => SoftwarePrim (a :-> a :-> Full Bool)
@@ -262,6 +252,7 @@ instance Eval SoftwarePrim
     evalSym I2N         = fromIntegral
     evalSym Not         = not
     evalSym And         = (&&)
+    evalSym Or          = (||)
     evalSym BitAnd      = (Bits..&.)
     evalSym BitOr       = (Bits..|.)
     evalSym BitXor      = Bits.xor
@@ -295,6 +286,7 @@ instance Symbol SoftwarePrim
     symSig I2N         = signature
     symSig Not         = signature
     symSig And         = signature
+    symSig Or          = signature
     symSig BitAnd      = signature
     symSig BitOr       = signature
     symSig BitXor      = signature
