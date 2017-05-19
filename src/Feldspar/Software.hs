@@ -3,6 +3,7 @@ module Feldspar.Software
   , module Feldspar.Software.Frontend
   , SExp
   , SType
+  , SType'
   , Software
   , compile
   , icompile

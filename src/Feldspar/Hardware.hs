@@ -3,6 +3,7 @@ module Feldspar.Hardware
   , module Feldspar.Hardware.Frontend
   , HExp
   , HType
+  , HType'
   , Hardware
   , compile
   , icompile
