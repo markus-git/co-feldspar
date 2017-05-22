@@ -226,12 +226,12 @@ instance Arrays Hardware
     getArr arr ix
       = Hardware
       $ fmap resugar
-      $ mapStructA (getArr' (ix + arrOffset arr))
+      $ mapStructA (flip getArr' (ix + arrOffset arr))
       $ unArr arr
     setArr arr ix a
       = Hardware
       $ sequence_
-      $ zipListStruct (setArr' (ix + arrOffset arr)) (resugar a)
+      $ zipListStruct (\v a -> setArr' a (ix + arrOffset arr) v) (resugar a)
       $ unArr arr
     copyArr arr brr
       = Hardware
@@ -242,11 +242,11 @@ instance Arrays Hardware
         (unArr brr)
       
 -- 'Imp.getVArr' specialized to hardware.
-getArr' :: forall b . HardwarePrimType b => HExp Integer -> Imp.VArray b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
+getArr' :: forall b . HardwarePrimType b => Imp.VArray b -> HExp Integer -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
 getArr' = withHType (Proxy :: Proxy b) Imp.getVArray
 
 -- 'Imp.setVArr' specialized to hardware.
-setArr' :: forall b . HardwarePrimType b => HExp Integer -> HExp b -> Imp.VArray b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
+setArr' :: forall b . HardwarePrimType b => Imp.VArray b -> HExp Integer -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
 setArr' = withHType (Proxy :: Proxy b) Imp.setVArray
 
 --------------------------------------------------------------------------------
@@ -316,6 +316,14 @@ getSignal = Hardware . Imp.getSignal
 -- | Set the current value of a signal.
 setSignal :: HType' a => Signal a -> HExp a -> Hardware ()
 setSignal s = Hardware . (Imp.setSignal s)
+
+--------------------------------------------------------------------------------
+-- *** Signal arrays.
+
+type SArray = Imp.Array
+
+newArray :: HType' a => HExp a -> Hardware (SArray a)
+newArray = undefined
 
 --------------------------------------------------------------------------------
 -- *** Structural entities.
