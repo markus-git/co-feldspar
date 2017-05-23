@@ -25,10 +25,11 @@ import Control.Monad.Operational.Higher (Program, ProgramT)
 import qualified Control.Monad.Operational.Higher as Oper
 
 -- syntactic.
-import Language.Syntactic --(AST (..), ASTF (..), (:&:) (..), Args (..), prj)
+import Language.Syntactic hiding (Nil)
 import Language.Syntactic.Functional hiding (Binding (..))
 import Language.Syntactic.Functional.Tuple
-import qualified Language.Syntactic as S
+
+import qualified Language.Syntactic as Syn
 
 -- hardware-edsl.
 import Language.Embedded.Hardware hiding (Hardware, HExp, Name, compile, icompile)
@@ -36,7 +37,40 @@ import qualified Language.Embedded.Hardware         as Hard
 import qualified Language.Embedded.Hardware.Command as Hard
 
 --------------------------------------------------------------------------------
--- * ...
+-- * Hardware compiler.
+--------------------------------------------------------------------------------
+
+compile :: Hardware a -> String
+compile = Hard.compile . translate
+
+icompile :: Hardware a -> IO ()
+icompile = Hard.icompile . translate
+
+--------------------------------------------------------------------------------
+-- ** Instructions.
+--------------------------------------------------------------------------------
+
+type TargetCMD
+    =        Hard.VariableCMD
+    Oper.:+: Hard.ArrayCMD
+    Oper.:+: Hard.VArrayCMD
+    Oper.:+: Hard.LoopCMD
+    Oper.:+: Hard.ConditionalCMD
+    Oper.:+: Hard.ComponentCMD
+    Oper.:+: Hard.StructuralCMD
+    Oper.:+: Hard.ConstantCMD
+    Oper.:+: Hard.SignalCMD
+
+type TargetT m = ReaderT Env (ProgramT TargetCMD (Oper.Param2 Prim HardwarePrimType) m)
+
+type ProgH = Program TargetCMD (Oper.Param2 Prim HardwarePrimType)
+
+--------------------------------------------------------------------------------
+
+-- ...
+
+--------------------------------------------------------------------------------
+-- ** Expressions.
 --------------------------------------------------------------------------------
 
 -- | Struct expression.
@@ -77,66 +111,49 @@ lookAlias t v = do
 
 --------------------------------------------------------------------------------
 
-type TargetCMD
-    =        Hard.VariableCMD
-    Oper.:+: Hard.ArrayCMD
-    Oper.:+: Hard.VArrayCMD
-    Oper.:+: Hard.LoopCMD
-    Oper.:+: Hard.ConditionalCMD
-    Oper.:+: Hard.ComponentCMD
-    Oper.:+: Hard.StructuralCMD
-    Oper.:+: Hard.ConstantCMD
-    Oper.:+: Hard.SignalCMD
-
-type TargetT m = ReaderT Env (ProgramT TargetCMD (Oper.Param2 Prim HardwarePrimType) m)
-
-type ProgH = Program TargetCMD (Oper.Param2 Prim HardwarePrimType)
-
---------------------------------------------------------------------------------
-
 translateExp :: forall m a . Monad m => HExp a -> TargetT m (VExp a)
 translateExp = goAST . unHExp
   where
     goAST :: ASTF HardwareDomain b -> TargetT m (VExp b)
     goAST = simpleMatch (\(s :&: ValT t) -> go t s)
 
-    goSmallAST :: HardwarePrimType b => S.ASTF HardwareDomain b -> TargetT m (Prim b)
+    goSmallAST :: HardwarePrimType b => ASTF HardwareDomain b -> TargetT m (Prim b)
     goSmallAST = fmap extractNode . goAST
 
     go    :: HTypeRep (DenResult sig)
           -> HardwareConstructs sig
-          -> Args (AST HardwareDomain) sig
+          -> Syn.Args (AST HardwareDomain) sig
           -> TargetT m (VExp (DenResult sig))
-    go t lit Nil
+    go t lit Syn.Nil
       | Just (Lit a) <- prj lit
       = return $ mapStruct (litE . runIdentity) $ toStruct t a
-    go t lit Nil
+    go t lit Syn.Nil
       | Just (Literal a) <- prj lit
       = return $ mapStruct (litE . runIdentity) $ toStruct t a
-    go t var Nil
+    go t var Syn.Nil
       | Just (FreeVar v) <- prj var
       = return $ Node $ sugarSymPrim $ FreeVar v
-    go t var Nil
+    go t var Syn.Nil
       | Just (VarT v) <- prj var
       = lookAlias t v
-    go t lt (a :* (lam :$ body) :* Nil)
+    go t lt (a :* (lam :$ body) :* Syn.Nil)
       | Just (Let tag) <- prj lt
       , Just (LamT v)  <- prj lam
       = do let base = if Prelude.null tag then "let" else tag
            r  <- initRefV base =<< goAST a
            a' <- unsafeFreezeRefV r
            localAlias v a' $ goAST body
-    go t tup (a :* b :* Nil)
+    go t tup (a :* b :* Syn.Nil)
       | Just Pair <- prj tup =
           Branch <$> goAST a <*> goAST b
-    go t sel (ab :* Nil)
+    go t sel (ab :* Syn.Nil)
       | Just Fst <- prj sel = do
           Branch a _ <- goAST ab
           return a
       | Just Snd <- prj sel = do
           Branch _ b <- goAST ab
           return b
-    go ty cond (b :* t :* f :* Nil)
+    go ty cond (b :* t :* f :* Syn.Nil)
       | Just Cond <- prj cond = do
           res <- newRefV ty "b"
           b'  <- goSmallAST b
@@ -144,13 +161,13 @@ translateExp = goAST . unHExp
             (flip runReaderT env $ setRefV res =<< goAST t)
             (flip runReaderT env $ setRefV res =<< goAST f)
           unsafeFreezeRefV res
-    go t op (a :* Nil)
+    go t op (a :* Syn.Nil)
       | Just Neg <- prj op = liftStruct (sugarSymPrim Neg) <$> goAST a
       | Just Not <- prj op = liftStruct (sugarSymPrim Not) <$> goAST a
       | Just I2N <- prj op = liftStruct (sugarSymPrim I2N) <$> goAST a
       | Just BitCompl <- prj op =
           liftStruct (sugarSymPrim BitCompl) <$> goAST a
-    go t op (a :* b :* Nil)
+    go t op (a :* b :* Syn.Nil)
       | Just Add <- prj op = liftStruct2 (sugarSymPrim Add) <$> goAST a <*> goAST b
       | Just Sub <- prj op = liftStruct2 (sugarSymPrim Sub) <$> goAST a <*> goAST b
       | Just Mul <- prj op = liftStruct2 (sugarSymPrim Mul) <$> goAST a <*> goAST b
@@ -177,13 +194,10 @@ translateExp = goAST . unHExp
           liftStruct2 (sugarSymPrim RotateL) <$> goAST a <*> goAST b
       | Just RotateR <- prj op =
           liftStruct2 (sugarSymPrim RotateR) <$> goAST a <*> goAST b
-    go _ arrIx (i :* Nil)
+    go _ arrIx (i :* Syn.Nil)
       | Just (ArrIx arr) <- prj arrIx
-      = do i' <- goSmallAST i
-           return $ Node $ sugarSymPrim (ArrIx arr) i'
-    go _ s _ = error $ "hardware translation handling for symbol " ++ S.renderSym s ++ " is missing."
-
---------------------------------------------------------------------------------
+      = goSmallAST i >>= return . Node . sugarSymPrim (ArrIx arr)
+    go _ s _ = error $ "hardware translation handling for symbol " ++ Syn.renderSym s ++ " is missing."
 
 unsafeTranslateSmallExp :: Monad m => HExp a -> TargetT m (Prim a)
 unsafeTranslateSmallExp a =
@@ -194,13 +208,5 @@ unsafeTranslateSmallExp a =
 
 translate :: Hardware a -> ProgH a
 translate = flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp . unHardware
-
---------------------------------------------------------------------------------
-
-compile :: Hardware a -> String
-compile = Hard.compile . translate
-
-icompile :: Hardware a -> IO ()
-icompile = Hard.icompile . translate
 
 --------------------------------------------------------------------------------

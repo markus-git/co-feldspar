@@ -1,9 +1,10 @@
-{-# language TypeOperators #-}
 {-# language StandaloneDeriving #-}
 {-# language GADTs #-}
 {-# language FlexibleInstances #-}
 {-# language MultiParamTypeClasses #-}
 {-# language UndecidableInstances #-}
+{-# LANGUAGE PolyKinds #-}
+{-# language TypeOperators #-}
 {-# language TypeFamilies #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language FlexibleContexts #-}
@@ -26,9 +27,11 @@ import Data.Constraint
 import Control.Monad.Trans
 
 -- syntactic.
-import Language.Syntactic as S
-import Language.Syntactic.Functional
+import Language.Syntactic hiding (Signature, Nil)
+import Language.Syntactic.Functional hiding (Lam)
 import Language.Syntactic.Functional.Tuple
+
+import qualified Language.Syntactic as Syn
 
 -- operational-higher.
 import Control.Monad.Operational.Higher as Oper hiding ((:<:))
@@ -60,6 +63,7 @@ type HardwareCMD =
   Oper.:+: Imp.SignalCMD
   Oper.:+: Imp.ArrayCMD
   Oper.:+: Imp.StructuralCMD
+  Oper.:+: Imp.ComponentCMD
     -- ^ Hardware specific instructions.
 
 -- | Monad for building software programs in Feldspar.
@@ -85,6 +89,13 @@ data IArr a = IArr
   , unIArr     :: Struct HardwarePrimType (Imp.IArray) (Internal a)
   }
 
+-- | Hardware arrays of signals.
+data SArr a = SArr
+  { sarrOffset :: HExp Integer
+  , sarrLength :: HExp Integer
+  , unSArr     :: Struct HardwarePrimType (Imp.Array) (Internal a)
+  }
+
 --------------------------------------------------------------------------------
 -- * Expression.
 --------------------------------------------------------------------------------
@@ -92,9 +103,9 @@ data IArr a = IArr
 -- | Hardware symbols.
 type HardwareConstructs =
         HardwarePrimConstructs
-  S.:+: Tuple
-  S.:+: Let
-  S.:+: BindingT
+  Syn.:+: Tuple
+  Syn.:+: Let
+  Syn.:+: BindingT
 
 -- | Hardware symbols tagged with their type representation.
 type HardwareDomain = HardwareConstructs :&: TypeRepF HardwarePrimType HardwarePrimTypeRep
@@ -109,7 +120,7 @@ eval = evalClosed . desugar
 --------------------------------------------------------------------------------
 
 -- ... hmm ...
-type instance Expr Hardware         = HExp
+type instance Expr Hardware = HExp
 
 -- ...
 type instance DomainOf         Hardware         = HardwareDomain
@@ -146,7 +157,7 @@ instance Syntactic (Struct HardwarePrimType HExp a)
 --------------------------------------------------------------------------------
 
 sugarSymHardware
-    :: ( Signature sig
+    :: ( Syn.Signature sig
        , fi             ~ SmartFun HardwareDomain sig
        , sig            ~ SmartSig fi
        , HardwareDomain ~ SmartSym fi
@@ -160,7 +171,7 @@ sugarSymHardware = sugarSymDecor $ ValT $ typeRep
 --------------------------------------------------------------------------------
 
 sugarSymPrimHardware
-    :: ( Signature sig
+    :: ( Syn.Signature sig
        , fi             ~ SmartFun HardwareDomain sig
        , sig            ~ SmartSig fi
        , HardwareDomain ~ SmartSym fi

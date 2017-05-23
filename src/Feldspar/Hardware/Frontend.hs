@@ -10,6 +10,8 @@ module Feldspar.Hardware.Frontend where
 
 import Prelude hiding (length)
 
+import Control.Monad.Identity (Identity)
+
 import Data.Constraint hiding (Sub)
 import Data.List (genericLength)
 import Data.Proxy
@@ -196,6 +198,8 @@ instance References Hardware
       . mapStructA freezeRef'
       . unRef
 
+--------------------------------------------------------------------------------
+
 -- 'Imp.getRef' specialized hardware.
 getRef' :: forall b . HardwarePrimType b => Imp.Variable b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
 getRef' = withHType (Proxy :: Proxy b) Imp.getVariable
@@ -241,6 +245,8 @@ instance Arrays Hardware
           Imp.copyVArray (a, arrOffset arr) (b, arrOffset brr) (length brr))
         (unArr arr)
         (unArr brr)
+
+--------------------------------------------------------------------------------
       
 -- 'Imp.getVArr' specialized to hardware.
 getArr' :: forall b . HardwarePrimType b => Imp.VArray b -> HExp Integer -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
@@ -287,6 +293,8 @@ instance Control Hardware
           (desugar' upper)
           (unHardware . body . sugar')
 
+--------------------------------------------------------------------------------
+
 -- desugar into a hardware expression over an integer.
 desugar' :: forall a . (SyntaxM' Hardware a, Integral (Internal a)) => a -> HExp Integer
 desugar' a = i2n (resugar a :: HExp (Internal a))
@@ -321,13 +329,6 @@ setSignal s = Hardware . (Imp.setSignal s)
 --------------------------------------------------------------------------------
 -- *** Signal arrays.
 
--- | Hardware arrays.
-data SArr a = SArr
-  { sarrOffset :: HExp Integer
-  , sarrLength :: HExp Integer
-  , unSArr     :: Struct HardwarePrimType (Imp.Array) (Internal a)
-  }
-
 newArray :: HType (Internal a) => HExp Integer -> Hardware (SArr a)
 newArray len = Hardware $ fmap (SArr 0 len) $ mapStructA (const (Imp.newArray len)) $ typeRep
 
@@ -344,6 +345,8 @@ setArray arr ix a = Hardware $ sequence_ $ zipListStruct (\v a -> setSArr' a (ix
 copyArray :: HType (Internal a) => SArr a -> SArr a -> Hardware ()
 copyArray arr brr = Hardware $ sequence_ $ zipListStruct (\a b -> Imp.copyArray (a, sarrOffset arr) (b, sarrOffset brr) (length brr)) (unSArr arr) (unSArr brr)
 
+--------------------------------------------------------------------------------
+
 -- 'Imp.getVArr' specialized to hardware.
 getSArr' :: forall b . HardwarePrimType b => Imp.Array b -> HExp Integer -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
 getSArr' = withHType (Proxy :: Proxy b) Imp.getArray
@@ -351,6 +354,27 @@ getSArr' = withHType (Proxy :: Proxy b) Imp.getArray
 -- 'Imp.setVArr' specialized to hardware.
 setSArr' :: forall b . HardwarePrimType b => Imp.Array b -> HExp Integer -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
 setSArr' = withHType (Proxy :: Proxy b) Imp.setArray
+
+--------------------------------------------------------------------------------
+-- *** Components.
+
+-- short-hand for signatures.
+type Signature = Imp.Sig  HardwareCMD HExp HardwarePrimType Identity
+
+-- short-hand for components.
+type Component = Imp.Comp HardwareCMD HExp HardwarePrimType Identity
+
+-- short-hand for arguments to signatures.
+type Argument = Imp.Arg
+
+namedComponent :: String -> Signature a -> Hardware (Component a)
+namedComponent n = Hardware . Imp.namedComponent n
+
+component :: Signature a -> Hardware (Component a)
+component = namedComponent "comp"
+
+portmap :: Component a -> Argument a -> Hardware ()
+portmap c = Hardware . Imp.portmap c
 
 --------------------------------------------------------------------------------
 -- *** Structural entities.
