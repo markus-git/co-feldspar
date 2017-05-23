@@ -58,6 +58,7 @@ type HardwareCMD =
   Oper.:+: Imp.ConditionalCMD
     -- ^ Computatonal instructions.
   Oper.:+: Imp.SignalCMD
+  Oper.:+: Imp.ArrayCMD
   Oper.:+: Imp.StructuralCMD
     -- ^ Hardware specific instructions.
 

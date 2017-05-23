@@ -133,6 +133,7 @@ instance Slicable (HExp Integer) (IArr a)
 
 instance Finite (HExp Integer) (Arr a)  where length = arrLength
 instance Finite (HExp Integer) (IArr a) where length = iarrLength
+instance Finite (HExp Integer) (SArr a) where length = sarrLength
 
 --------------------------------------------------------------------------------
 -- * Instructions.
@@ -320,10 +321,36 @@ setSignal s = Hardware . (Imp.setSignal s)
 --------------------------------------------------------------------------------
 -- *** Signal arrays.
 
-type SArray = Imp.Array
+-- | Hardware arrays.
+data SArr a = SArr
+  { sarrOffset :: HExp Integer
+  , sarrLength :: HExp Integer
+  , unSArr     :: Struct HardwarePrimType (Imp.Array) (Internal a)
+  }
 
-newArray :: HType' a => HExp a -> Hardware (SArray a)
-newArray = undefined
+newArray :: HType (Internal a) => HExp Integer -> Hardware (SArr a)
+newArray len = Hardware $ fmap (SArr 0 len) $ mapStructA (const (Imp.newArray len)) $ typeRep
+
+initArray :: HType' (Internal a) => [Internal a] -> Hardware (SArr a)
+initArray as = Hardware $ fmap (SArr 0 len . Node) $ Imp.initArray as
+  where len = value $ genericLength as
+
+getArray :: HType (Internal a) => SArr a -> HExp Integer -> Hardware (HExp (Internal a))
+getArray arr ix = Hardware $ fmap resugar $ mapStructA (flip getSArr' (ix + sarrOffset arr)) $ (unSArr arr)
+
+setArray :: HType (Internal a) => SArr a -> HExp Integer -> HExp (Internal a) -> Hardware ()
+setArray arr ix a = Hardware $ sequence_ $ zipListStruct (\v a -> setSArr' a (ix + sarrOffset arr) v) (resugar a) $ unSArr arr
+
+copyArray :: HType (Internal a) => SArr a -> SArr a -> Hardware ()
+copyArray arr brr = Hardware $ sequence_ $ zipListStruct (\a b -> Imp.copyArray (a, sarrOffset arr) (b, sarrOffset brr) (length brr)) (unSArr arr) (unSArr brr)
+
+-- 'Imp.getVArr' specialized to hardware.
+getSArr' :: forall b . HardwarePrimType b => Imp.Array b -> HExp Integer -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
+getSArr' = withHType (Proxy :: Proxy b) Imp.getArray
+
+-- 'Imp.setVArr' specialized to hardware.
+setSArr' :: forall b . HardwarePrimType b => Imp.Array b -> HExp Integer -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
+setSArr' = withHType (Proxy :: Proxy b) Imp.setArray
 
 --------------------------------------------------------------------------------
 -- *** Structural entities.
