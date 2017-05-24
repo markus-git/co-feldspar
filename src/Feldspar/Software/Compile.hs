@@ -38,7 +38,41 @@ import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Embedded.Backend.C  as Imp
 
 --------------------------------------------------------------------------------
--- * ...
+-- * Software compiler.
+--------------------------------------------------------------------------------
+
+compile :: Software a -> String
+compile = Imp.compile . translate
+
+icompile :: Software a -> IO ()
+icompile = Imp.icompile . translate
+
+--------------------------------------------------------------------------------
+-- ** Instructions.
+--------------------------------------------------------------------------------
+
+type TargetCMD
+    =        RefCMD
+    Oper.:+: ArrCMD
+    Oper.:+: ControlCMD
+    Oper.:+: ThreadCMD
+    Oper.:+: ChanCMD
+    Oper.:+: PtrCMD
+    Oper.:+: FileCMD
+    Oper.:+: C_CMD
+
+-- | Target monad during translation
+type TargetT m = ReaderT Env (ProgramT TargetCMD (Oper.Param2 Prim SoftwarePrimType) m)
+
+-- | Monad for translated program
+type ProgC = Program TargetCMD (Oper.Param2 Prim SoftwarePrimType)
+
+--------------------------------------------------------------------------------
+
+-- ...
+
+--------------------------------------------------------------------------------
+-- ** Expressions.
 --------------------------------------------------------------------------------
 
 -- | Struct expression.
@@ -76,24 +110,6 @@ lookAlias t v = do
   return $ case Map.lookup v env of
     Nothing -> error $ "lookAlias: variable " ++ show v ++ " not in scope."
     Just (VExp' e) -> case softwareTypeEq t (softwareTypeRep e) of Just Dict -> e
-
---------------------------------------------------------------------------------
-
-type TargetCMD
-    =        RefCMD
-    Oper.:+: ArrCMD
-    Oper.:+: ControlCMD
-    Oper.:+: ThreadCMD
-    Oper.:+: ChanCMD
-    Oper.:+: PtrCMD
-    Oper.:+: FileCMD
-    Oper.:+: C_CMD
-
--- | Target monad during translation
-type TargetT m = ReaderT Env (ProgramT TargetCMD (Oper.Param2 Prim SoftwarePrimType) m)
-
--- | Monad for translated program
-type ProgC = Program TargetCMD (Oper.Param2 Prim SoftwarePrimType)
 
 --------------------------------------------------------------------------------
 
@@ -201,8 +217,6 @@ translateExp = goAST . unSExp
           return $ Node $ sugarSymPrim (ArrIx arr) i'
     go _ s _ = error $ "software translation handling for symbol " ++ S.renderSym s ++ " is missing."
 
---------------------------------------------------------------------------------
-
 unsafeTranslateSmallExp :: Monad m => SExp a -> TargetT m (Prim a)
 unsafeTranslateSmallExp a = do
   Node b <- translateExp a
@@ -212,13 +226,5 @@ unsafeTranslateSmallExp a = do
 
 translate :: Software a -> ProgC a
 translate = flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp . unSoftware
-
---------------------------------------------------------------------------------
-
-compile :: Software a -> String
-compile = Imp.compile . translate
-
-icompile :: Software a -> IO ()
-icompile = Imp.icompile . translate
 
 --------------------------------------------------------------------------------

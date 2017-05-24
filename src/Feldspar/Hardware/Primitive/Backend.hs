@@ -12,6 +12,7 @@ import Data.Proxy
 
 -- syntactic.
 import Language.Syntactic
+import qualified Language.Syntactic.Traversal as Syn (Args(Nil))
 
 -- hardware-edsl.
 import Language.Embedded.Hardware
@@ -177,40 +178,40 @@ compKind = simpleMatch (\(s :&: t) -> go t s)
         -> HardwarePrimConstructs sig
         -> Args (AST HardwarePrimDomain) sig
         -> VHDL Kind
-    go _ (FreeVar v) Nil =
+    go _ (FreeVar v) Syn.Nil =
       return $ Hoist.P $ VHDL.name $ VHDL.NSimple $ VHDL.Ident v
-    go t (Lit a)     Nil | Dict <- hardwarePrimWitType t =
+    go t (Lit a)     Syn.Nil | Dict <- hardwarePrimWitType t =
       fmap Hoist.E $ compileLit (Proxy :: Proxy HardwarePrimType) a
       
-    go _ Neg (a :* Nil)      = compSimple [a]    (one VHDL.neg)
-    go _ Add (a :* b :* Nil) = compSimple [a, b] VHDL.add
-    go _ Sub (a :* b :* Nil) = compSimple [a, b] VHDL.sub
-    go _ Mul (a :* b :* Nil) = compTerm   [a, b] VHDL.mul
-    go _ Div (a :* b :* Nil) = compTerm   [a, b] VHDL.div
-    go _ Mod (a :* b :* Nil) = compTerm   [a, b] VHDL.mod
+    go _ Neg (a :* Syn.Nil)      = compSimple [a]    (one VHDL.neg)
+    go _ Add (a :* b :* Syn.Nil) = compSimple [a, b] VHDL.add
+    go _ Sub (a :* b :* Syn.Nil) = compSimple [a, b] VHDL.sub
+    go _ Mul (a :* b :* Syn.Nil) = compTerm   [a, b] VHDL.mul
+    go _ Div (a :* b :* Syn.Nil) = compTerm   [a, b] VHDL.div
+    go _ Mod (a :* b :* Syn.Nil) = compTerm   [a, b] VHDL.mod
 
-    go t I2N (a :* Nil) = compCast t a
+    go t I2N (a :* Syn.Nil) = compCast t a
     
-    go _ Not (a :* Nil)      = compFactor [a]    (one VHDL.not)
-    go _ And (a :* b :* Nil) = compExpr   [a, b] VHDL.and
-    go _ Or  (a :* b :* Nil) = compExpr   [a, b] VHDL.or
-    go _ Eq  (a :* b :* Nil) = compRel    [a, b] (two VHDL.eq)
-    go _ Lt  (a :* b :* Nil) = compRel    [a, b] (two VHDL.lt)
-    go _ Lte (a :* b :* Nil) = compRel    [a, b] (two VHDL.lte)
-    go _ Gt  (a :* b :* Nil) = compRel    [a, b] (two VHDL.gt)
-    go _ Gte (a :* b :* Nil) = compRel    [a, b] (two VHDL.gte)
+    go _ Not (a :* Syn.Nil)      = compFactor [a]    (one VHDL.not)
+    go _ And (a :* b :* Syn.Nil) = compExpr   [a, b] VHDL.and
+    go _ Or  (a :* b :* Syn.Nil) = compExpr   [a, b] VHDL.or
+    go _ Eq  (a :* b :* Syn.Nil) = compRel    [a, b] (two VHDL.eq)
+    go _ Lt  (a :* b :* Syn.Nil) = compRel    [a, b] (two VHDL.lt)
+    go _ Lte (a :* b :* Syn.Nil) = compRel    [a, b] (two VHDL.lte)
+    go _ Gt  (a :* b :* Syn.Nil) = compRel    [a, b] (two VHDL.gt)
+    go _ Gte (a :* b :* Syn.Nil) = compRel    [a, b] (two VHDL.gte)
 
-    go _ BitAnd   (a :* b :* Nil) = compExpr   [a, b] VHDL.and
-    go _ BitOr    (a :* b :* Nil) = compExpr   [a, b] VHDL.or
-    go _ BitXor   (a :* b :* Nil) = compExpr   [a, b] VHDL.xor
-    go _ BitCompl (a :* Nil)      = compFactor [a]    (one VHDL.not)
+    go _ BitAnd   (a :* b :* Syn.Nil) = compExpr   [a, b] VHDL.and
+    go _ BitOr    (a :* b :* Syn.Nil) = compExpr   [a, b] VHDL.or
+    go _ BitXor   (a :* b :* Syn.Nil) = compExpr   [a, b] VHDL.xor
+    go _ BitCompl (a :* Syn.Nil)      = compFactor [a]    (one VHDL.not)
     
-    go _ ShiftL  (a :* b :* Nil) = compShift a b VHDL.sll
-    go _ ShiftR  (a :* b :* Nil) = compShift a b VHDL.srl
-    go _ RotateL (a :* b :* Nil) = compShift a b VHDL.rol
-    go _ RotateR (a :* b :* Nil) = compShift a b VHDL.ror
+    go _ ShiftL  (a :* b :* Syn.Nil) = compShift a b VHDL.sll
+    go _ ShiftR  (a :* b :* Syn.Nil) = compShift a b VHDL.srl
+    go _ RotateL (a :* b :* Syn.Nil) = compShift a b VHDL.rol
+    go _ RotateR (a :* b :* Syn.Nil) = compShift a b VHDL.ror
 
-    go _ (ArrIx (IArrayC arr)) (i :* Nil) =
+    go _ (ArrIx (IArrayC arr)) (i :* Syn.Nil) =
       do i' <- compPrim $ Prim i
          return $ Hoist.P $ VHDL.name $ VHDL.indexed (VHDL.Ident arr) (lift i')
 
