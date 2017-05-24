@@ -377,6 +377,27 @@ portmap :: Component a -> Argument a -> Hardware ()
 portmap c = Hardware . Imp.portmap c
 
 --------------------------------------------------------------------------------
+
+output :: HType' a => (Signal a -> Signature b) -> Signature (Imp.Signal a -> b)
+output = Imp.output
+
+outputArr :: HType' (Internal a) => (SArr a -> Signature b) -> Signature (Imp.Array (Internal a) -> b)
+outputArr f = Imp.outputArr (pack f)
+
+--------------------------------------------------------------------------------
+
+input :: HType' a => (Signal a -> Signature b) -> Signature (Imp.Signal a -> b)
+input = Imp.input
+
+inputArr :: HType' (Internal a) => (SArr a -> Signature b) -> Signature (Imp.Array (Internal a) -> b)
+inputArr f = Imp.inputArr (pack f)
+
+--------------------------------------------------------------------------------
+
+pack :: HType' (Internal a) => (SArr a -> Signature b) -> (Imp.Array (Internal a) -> Signature b)
+pack f = f . SArr 0 0 . Node
+
+--------------------------------------------------------------------------------
 -- *** Structural entities.
 
 entity  :: String -> Hardware () -> Hardware ()
