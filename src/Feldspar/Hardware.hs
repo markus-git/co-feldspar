@@ -1,10 +1,11 @@
 module Feldspar.Hardware
   ( module Feldspar
   , module Feldspar.Hardware.Frontend
-  , HExp
-  , HType
-  , HType'
   , Hardware
+  , Arr, IArr, SArr
+  , Signature, Component, Argument
+  , HExp
+  , HType, HType'
   , compile
   , icompile
   ) where

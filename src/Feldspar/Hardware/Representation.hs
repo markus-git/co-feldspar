@@ -24,10 +24,11 @@ import Data.Typeable (Typeable)
 import Data.Proxy
 import Data.Constraint
 
+import Control.Monad.Identity (Identity)
 import Control.Monad.Trans
 
 -- syntactic.
-import Language.Syntactic hiding (Signature, Nil)
+import Language.Syntactic hiding (Signature, Args)
 import Language.Syntactic.Functional hiding (Lam)
 import Language.Syntactic.Functional.Tuple
 
@@ -95,6 +96,17 @@ data SArr a = SArr
   , sarrLength :: HExp Integer
   , unSArr     :: Struct HardwarePrimType (Imp.Array) (Internal a)
   }
+
+--------------------------------------------------------------------------------
+
+-- short-hand for signatures.
+type Signature = Imp.Sig  HardwareCMD HExp HardwarePrimType Identity
+
+-- short-hand for components.
+type Component = Imp.Comp HardwareCMD HExp HardwarePrimType Identity
+
+-- short-hand for arguments to signatures.
+type Argument = Imp.Arg
 
 --------------------------------------------------------------------------------
 -- ** Instructions.

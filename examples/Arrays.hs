@@ -2,7 +2,7 @@
 {-# language ScopedTypeVariables #-}
 {-# language TypeFamilies #-}
 
-module Basic where
+module Arrays where
 
 import Prelude hiding ((<))
 
@@ -17,7 +17,7 @@ import Feldspar.Hardware
 import Feldspar.Hardware as Hard (icompile)
 
 --------------------------------------------------------------------------------
--- * Basic example of arrays in co-feldspar.
+-- * Example of arrays in co-feldspar.
 --------------------------------------------------------------------------------
 
 arrays

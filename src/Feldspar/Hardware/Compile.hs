@@ -28,7 +28,6 @@ import qualified Control.Monad.Operational.Higher as Oper
 import Language.Syntactic hiding (Nil)
 import Language.Syntactic.Functional hiding (Binding (..))
 import Language.Syntactic.Functional.Tuple
-
 import qualified Language.Syntactic as Syn
 
 -- hardware-edsl.

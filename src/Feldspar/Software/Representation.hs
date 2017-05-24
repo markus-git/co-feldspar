@@ -8,6 +8,7 @@
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language FlexibleContexts #-}
 {-# language ScopedTypeVariables #-}
+{-# language PolyKinds #-}
 
 {-# language InstanceSigs #-}
 {-# language Rank2Types #-}
@@ -21,6 +22,8 @@ import Feldspar.Frontend
 
 import Feldspar.Software.Primitive
 
+import Feldspar.Hardware.Representation (Signature)
+
 import Data.Struct
 import Data.Inhabited
 
@@ -31,10 +34,14 @@ import Data.Typeable (Typeable)
 import Data.Proxy
 import Data.Constraint
 
+import Control.Monad.Reader (ReaderT(..), runReaderT, lift)
+
 -- syntactic.
-import Language.Syntactic as S
-import Language.Syntactic.Functional
+import Language.Syntactic hiding (Signature, Args)
+import Language.Syntactic.Functional hiding (Lam)
 import Language.Syntactic.Functional.Tuple
+
+import qualified Language.Syntactic as Syn
 
 -- operational-higher.
 import Control.Monad.Operational.Higher as Oper hiding ((:<:))
@@ -42,6 +49,9 @@ import Control.Monad.Operational.Higher as Oper hiding ((:<:))
 -- imperative-edsl.
 import qualified Language.Embedded.Expression as Imp
 import qualified Language.Embedded.Imperative as Imp
+
+-- hardware-edsl
+import qualified Language.Embedded.Hardware.Command as Imp (Signal, Array)
 
 --------------------------------------------------------------------------------
 -- * Programs.
@@ -55,6 +65,7 @@ type SoftwareCMD
     -- ^ Computational instructions.
   Oper.:+: Imp.FileCMD
     -- ^ Software specific instructions.
+  Oper.:+: MMapCMD
 
 -- | Monad for building software programs in Feldspar.
 newtype Software a = Software { unSoftware :: Program SoftwareCMD (Param2 SExp SoftwarePrimType) a }
@@ -83,7 +94,76 @@ data IArr a = IArr
 -- ** Instructions.
 --------------------------------------------------------------------------------
 
-data MMap fs 
+-- todo : these two families could probably be better.
+type family Result a where
+  Result ()        = ()
+  Result (a -> ()) = a
+  Result (a -> b)  = Result b
+
+-- todo : yep, most likely.
+type family Argument a where
+  Argument ()        = ()
+  Argument (a -> ()) = ()
+  Argument (a -> b)  = a -> Argument b
+
+data Args a
+  where
+    Nil  :: Args ()
+    ARef :: SType' a => Ref a -> Args b -> Args (Ref a -> b)
+    AArr :: SType' a => Arr a -> Args b -> Args (Arr a -> b)
+
+--------------------------------------------------------------------------------
+
+type family Soften a
+type instance Soften ()                  = ()
+type instance Soften (Imp.Signal a -> b) = Ref (SExp a) -> Soften b
+type instance Soften (Imp.Array  a -> b) = Arr (SExp a) -> Soften b
+
+-- todo : I simplify a bit here, and assume that a signature is on the form
+--        'input -> input -> ... -> input -> output -> ()'. In reality, any
+--        signal in a hardware component could be input/output/both.
+data Addr a
+  where
+    Ret  :: Addr ()
+    SRef :: Ref (SExp Int32) -> (Ref a -> Addr b) -> Addr (Ref a -> b)
+    SArr :: Ref (SExp Int32) -> (Arr a -> Addr b) -> Addr (Arr a -> b)
+
+-- (Signal a -> Array b -> Signal c -> ())
+-- < softend ............................>
+--   1           2          0
+-- (Ref a    -> Array b -> Ref c    -> ())
+-- < arguments .........>
+--                      < result ..>
+
+--------------------------------------------------------------------------------
+
+data MMapCMD fs a
+  where
+    MMap :: String -> Signature a
+         -> MMapCMD (Param3 prog exp pred) (Addr (Soften a))
+    Call :: Addr a -> Args (Argument a)
+         -> MMapCMD (Param3 prog exp pred) (Result a)
+
+-- todo : I ignore translations for the signature. I think this is correct,
+--        since the software side should not touch the hardware program inside,
+--        but I should double check this later. This todo goes for all
+--        instance declarations below.
+instance Oper.HFunctor MMapCMD
+  where
+    hfmap _ (MMap n sig)     = MMap n sig
+    hfmap _ (Call addr args) = Call addr args
+
+instance Oper.HBifunctor MMapCMD
+  where
+    hbimap _ _ (MMap n sig)     = MMap n sig
+    hbimap _ _ (Call addr args) = Call addr args
+
+instance (MMapCMD Imp.:<: instr) => Oper.Reexpressible MMapCMD instr env
+  where
+    reexpressInstrEnv reexp (MMap n sig) = ReaderT $ \env ->
+      Oper.singleInj $ MMap n sig
+    reexpressInstrEnv reexp (Call addr args) = ReaderT $ \env ->
+      Oper.singleInj $ Call addr args
 
 --------------------------------------------------------------------------------
 -- ** Expression.
@@ -104,10 +184,10 @@ deriving instance Typeable (ForLoop a)
 -- | Software symbols.
 type SoftwareConstructs = 
         SoftwarePrimConstructs
-  S.:+: ForLoop
-  S.:+: Tuple
-  S.:+: Let
-  S.:+: BindingT
+  Syn.:+: ForLoop
+  Syn.:+: Tuple
+  Syn.:+: Let
+  Syn.:+: BindingT
 
 -- | Software symbols tagged with their type representation.
 type SoftwareDomain = SoftwareConstructs :&: TypeRepF SoftwarePrimType SoftwarePrimTypeRep
@@ -159,7 +239,7 @@ instance Syntactic (Struct SoftwarePrimType SExp a)
 --------------------------------------------------------------------------------
 
 sugarSymSoftware
-  :: ( Signature sig
+  :: ( Syn.Signature sig
        , fi             ~ SmartFun SoftwareDomain sig
        , sig            ~ SmartSig fi
        , SoftwareDomain ~ SmartSym fi
@@ -173,7 +253,7 @@ sugarSymSoftware = sugarSymDecor $ ValT $ typeRep
 --------------------------------------------------------------------------------
 
 sugarSymPrimSoftware
-    :: ( Signature sig
+    :: ( Syn.Signature sig
        , fi             ~ SmartFun SoftwareDomain sig
        , sig            ~ SmartSig fi
        , SoftwareDomain ~ SmartSym fi

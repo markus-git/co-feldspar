@@ -10,8 +10,6 @@ module Feldspar.Hardware.Frontend where
 
 import Prelude hiding (length)
 
-import Control.Monad.Identity (Identity)
-
 import Data.Constraint hiding (Sub)
 import Data.List (genericLength)
 import Data.Proxy
@@ -358,15 +356,6 @@ setSArr' = withHType (Proxy :: Proxy b) Imp.setArray
 --------------------------------------------------------------------------------
 -- *** Components.
 
--- short-hand for signatures.
-type Signature = Imp.Sig  HardwareCMD HExp HardwarePrimType Identity
-
--- short-hand for components.
-type Component = Imp.Comp HardwareCMD HExp HardwarePrimType Identity
-
--- short-hand for arguments to signatures.
-type Argument = Imp.Arg
-
 namedComponent :: String -> Signature a -> Hardware (Component a)
 namedComponent n = Hardware . Imp.namedComponent n
 
@@ -378,21 +367,26 @@ portmap c = Hardware . Imp.portmap c
 
 --------------------------------------------------------------------------------
 
-output :: HType' a => (Signal a -> Signature b) -> Signature (Imp.Signal a -> b)
-output = Imp.output
+ret :: Hardware () -> Signature ()
+ret = Imp.ret . unHardware
 
-outputArr :: HType' (Internal a) => (SArr a -> Signature b) -> Signature (Imp.Array (Internal a) -> b)
-outputArr f = Imp.outputArr (pack f)
+output :: HType' a => (Signal a -> Hardware ()) -> Signature (Signal a -> ())
+output f = Imp.output $ \sig -> ret $ f sig
+
+outputArr :: HType' (Internal a) => Integer -> (SArr a -> Hardware ()) -> Signature (Imp.Array (Internal a) -> ())
+outputArr len f = Imp.outputArr $ \arr -> ret $ f $ SArr 0 (value len) $ Node arr
 
 --------------------------------------------------------------------------------
 
-input :: HType' a => (Signal a -> Signature b) -> Signature (Imp.Signal a -> b)
+input :: HType' a => (Signal a -> Signature b) -> Signature (Signal a -> b)
 input = Imp.input
 
-inputArr :: HType' (Internal a) => (SArr a -> Signature b) -> Signature (Imp.Array (Internal a) -> b)
-inputArr f = Imp.inputArr (pack f)
+inputArr :: HType' (Internal a) => Integer -> (SArr a -> Signature b) -> Signature (Imp.Array (Internal a) -> b)
+inputArr len f = Imp.inputArr $ \arr -> f $ SArr 0 (value len) $ Node arr
 
 --------------------------------------------------------------------------------
+-- todo : if I addded in a sig construct for structs of signals I could change
+--        input/output, arr ver. could probably work for HType.
 
 pack :: HType' (Internal a) => (SArr a -> Signature b) -> (Imp.Array (Internal a) -> Signature b)
 pack f = f . SArr 0 0 . Node

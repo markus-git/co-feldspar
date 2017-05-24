@@ -42,6 +42,8 @@ import Feldspar.Frontend
 import Feldspar.Software.Primitive
 import Feldspar.Software.Representation
 
+import Feldspar.Hardware.Representation (Signature)
+
 import Prelude hiding (length, Word)
 
 --------------------------------------------------------------------------------
@@ -349,5 +351,14 @@ fprintf h format = fprf h format []
 -- | Print to @stdout@. Accepts a variable number of arguments.
 printf :: PrintfType r => String -> r
 printf = fprintf Imp.stdout
+
+--------------------------------------------------------------------------------
+-- *** Memory.
+
+mmap :: String -> Signature a -> Software (Addr (Soften a))
+mmap name sig = Software $ Oper.singleInj $ MMap name sig
+
+call :: Addr a -> Args (Argument a) -> Software (Result a)
+call addr args = Software $ Oper.singleInj $ Call addr args
 
 --------------------------------------------------------------------------------
