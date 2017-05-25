@@ -2,8 +2,8 @@ module Feldspar.Hardware
   ( module Feldspar
   , module Feldspar.Hardware.Frontend
   , Hardware
-  , Arr, IArr, SArr
-  , Signature, Component, Argument
+  , Ref, Arr, IArr, SArr, Signal
+  , Sig, HArg
   , HExp
   , HType, HType'
   , compile
@@ -11,8 +11,11 @@ module Feldspar.Hardware
   ) where
 
 import Feldspar
+import Feldspar.Common
 
 import Feldspar.Hardware.Representation
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Frontend
 import Feldspar.Hardware.Compile
+
+import Language.Embedded.Hardware.Command (Signal)

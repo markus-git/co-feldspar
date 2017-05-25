@@ -11,7 +11,17 @@
 
 module Feldspar.Software.Frontend where
 
-import Prelude hiding (length)
+import Feldspar.Sugar
+import Feldspar.Representation
+import Feldspar.Common
+import Feldspar.Frontend
+
+import Feldspar.Software.Primitive
+import Feldspar.Software.Representation
+
+import Feldspar.Hardware.Representation (Sig)
+
+import Data.Struct
 
 import Data.Bits (Bits)
 import Data.Constraint hiding (Sub)
@@ -32,17 +42,6 @@ import qualified Control.Monad.Operational.Higher as Oper
 import Language.Embedded.Imperative.Frontend.General hiding (Ref, Arr, IArr)
 import qualified Language.Embedded.Imperative     as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
-
-import Data.Struct
-
-import Feldspar.Sugar
-import Feldspar.Representation
-import Feldspar.Frontend
-
-import Feldspar.Software.Primitive
-import Feldspar.Software.Representation
-
-import Feldspar.Hardware.Representation (Signature)
 
 import Prelude hiding (length, Word)
 
@@ -355,10 +354,23 @@ printf = fprintf Imp.stdout
 --------------------------------------------------------------------------------
 -- *** Memory.
 
-mmap :: String -> Signature a -> Software (Addr (Soften a))
+mmap :: String -> Sig a -> Software (Address (Soften a))
 mmap name sig = Software $ Oper.singleInj $ MMap name sig
 
-call :: Addr a -> Args (Argument a) -> Software (Result a)
+call :: Address a -> SArg (Argument a) -> Software (Result a)
 call addr args = Software $ Oper.singleInj $ Call addr args
+
+--------------------------------------------------------------------------------
+
+nil :: SArg ()
+nil = SoftNil
+
+(>:) :: SType' a => Ref (SExp a) -> SArg b -> SArg (Imp.Ref a -> b)
+(>:) r = let (Ref (Node r')) = r in SoftRef r'
+
+(>>:) :: SType' a => Arr (SExp a) -> SArg b -> SArg (Imp.Arr Index a -> b)
+(>>:) a = let (Arr _ _ (Node a')) = a in SoftArr a'
+
+infixr 1 >:, >>:
 
 --------------------------------------------------------------------------------

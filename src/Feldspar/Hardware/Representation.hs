@@ -16,6 +16,16 @@
 
 module Feldspar.Hardware.Representation where
 
+import Feldspar.Sugar
+import Feldspar.Representation
+import Feldspar.Common
+import Feldspar.Frontend
+
+import Feldspar.Hardware.Primitive
+
+import Data.Struct
+import Data.Inhabited
+
 import Data.Array ((!))
 import Data.Int
 import Data.Word
@@ -40,15 +50,6 @@ import Control.Monad.Operational.Higher as Oper hiding ((:<:))
 -- hardware-edsl.
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
-
-import Data.Struct
-import Data.Inhabited
-
-import Feldspar.Sugar
-import Feldspar.Representation
-import Feldspar.Frontend
-
-import Feldspar.Hardware.Primitive
 
 --------------------------------------------------------------------------------
 -- * Programs.
@@ -98,21 +99,10 @@ data SArr a = SArr
   }
 
 --------------------------------------------------------------------------------
-
--- short-hand for signatures.
-type Signature = Imp.Sig  HardwareCMD HExp HardwarePrimType Identity
-
--- short-hand for components.
-type Component = Imp.Comp HardwareCMD HExp HardwarePrimType Identity
-
--- short-hand for arguments to signatures.
-type Argument = Imp.Arg
-
---------------------------------------------------------------------------------
 -- ** Instructions.
 --------------------------------------------------------------------------------
 
--- ...
+type Sig = Signature (Param3 Hardware HExp HardwarePrimType)
 
 --------------------------------------------------------------------------------
 -- ** Expression.
@@ -181,7 +171,7 @@ sugarSymHardware
        , HardwareDomain ~ SmartSym fi
        , SyntacticN f fi
        , sub :<: HardwareConstructs
-       , HType (DenResult sig)
+       , Type HardwarePrimType (DenResult sig)
        )
     => sub sig -> f
 sugarSymHardware = sugarSymDecor $ ValT $ typeRep
@@ -213,12 +203,17 @@ instance Tuples HardwareDomain
 
 instance Imp.FreeExp HExp
   where
-    type PredicateExp HExp = HType'
+    type PredicateExp HExp = PrimType HardwarePrimType
     litE = sugarSymHardware . Lit
     varE = sugarSymHardware . FreeVar
 
 --------------------------------------------------------------------------------
 -- ** Types.
+--------------------------------------------------------------------------------
+
+-- ... hardware type representation ...
+type HTypeRep = TypeRep HardwarePrimType HardwarePrimTypeRep
+
 --------------------------------------------------------------------------------
 
 instance Type HardwarePrimType Bool    where typeRep = Node BoolHT
@@ -231,17 +226,6 @@ instance Type HardwarePrimType Word8   where typeRep = Node Word8HT
 instance Type HardwarePrimType Word16  where typeRep = Node Word16HT
 instance Type HardwarePrimType Word32  where typeRep = Node Word32HT
 instance Type HardwarePrimType Word64  where typeRep = Node Word64HT
-
---------------------------------------------------------------------------------
-
--- ... hardware type representation ...
-type HTypeRep = TypeRep HardwarePrimType HardwarePrimTypeRep
-
--- ... hardware types ...
-type HType    = Type HardwarePrimType
-
--- ... hardware primitive types ...
-type HType'   = PrimType HardwarePrimType
 
 --------------------------------------------------------------------------------
 

@@ -18,11 +18,12 @@ module Feldspar.Software.Representation where
 
 import Feldspar.Sugar
 import Feldspar.Representation
+import Feldspar.Common
 import Feldspar.Frontend
 
 import Feldspar.Software.Primitive
 
-import Feldspar.Hardware.Representation (Signature)
+import Feldspar.Hardware.Representation (Sig)
 
 import Data.Struct
 import Data.Inhabited
@@ -51,7 +52,8 @@ import qualified Language.Embedded.Expression as Imp
 import qualified Language.Embedded.Imperative as Imp
 
 -- hardware-edsl
-import qualified Language.Embedded.Hardware.Command as Imp (Signal, Array)
+import qualified Language.Embedded.Hardware.Command   as H
+import qualified Language.Embedded.Hardware.Interface as H
 
 --------------------------------------------------------------------------------
 -- * Programs.
@@ -90,15 +92,24 @@ data IArr a = IArr
   , unIArr     :: Struct SoftwarePrimType (Imp.IArr Index) (Internal a)
   }
 
+
 --------------------------------------------------------------------------------
 -- ** Instructions.
 --------------------------------------------------------------------------------
 
+-- todo : must it really be closed?
+type family Soften a where
+  Soften () = ()
+  Soften (H.Signal a -> b) = Imp.Ref a       -> Soften b
+  Soften (H.Array  a -> b) = Imp.Arr Index a -> Soften b
+
 -- todo : these two families could probably be better.
 type family Result a where
-  Result ()        = ()
-  Result (a -> ()) = a
-  Result (a -> b)  = Result b
+  Result ()                    = ()
+  Result (Imp.Ref a -> ())       = Ref (SExp a)
+  Result (Imp.Ref a -> b)        = Result b
+  Result (Imp.Arr Index a -> ()) = Arr (SExp a)
+  Result (Imp.Arr Index a -> b)  = Result b
 
 -- todo : yep, most likely.
 type family Argument a where
@@ -106,42 +117,13 @@ type family Argument a where
   Argument (a -> ()) = ()
   Argument (a -> b)  = a -> Argument b
 
-data Args a
-  where
-    Nil  :: Args ()
-    ARef :: SType' a => Ref a -> Args b -> Args (Ref a -> b)
-    AArr :: SType' a => Arr a -> Args b -> Args (Arr a -> b)
-
---------------------------------------------------------------------------------
-
-type family Soften a
-type instance Soften ()                  = ()
-type instance Soften (Imp.Signal a -> b) = Ref (SExp a) -> Soften b
-type instance Soften (Imp.Array  a -> b) = Arr (SExp a) -> Soften b
-
--- todo : I simplify a bit here, and assume that a signature is on the form
---        'input -> input -> ... -> input -> output -> ()'. In reality, any
---        signal in a hardware component could be input/output/both.
-data Addr a
-  where
-    Ret  :: Addr ()
-    SRef :: Ref (SExp Int32) -> (Ref a -> Addr b) -> Addr (Ref a -> b)
-    SArr :: Ref (SExp Int32) -> (Arr a -> Addr b) -> Addr (Arr a -> b)
-
--- (Signal a -> Array b -> Signal c -> ())
--- < softend ............................>
---   1           2          0
--- (Ref a    -> Array b -> Ref c    -> ())
--- < arguments .........>
---                      < result ..>
-
 --------------------------------------------------------------------------------
 
 data MMapCMD fs a
   where
-    MMap :: String -> Signature a
-         -> MMapCMD (Param3 prog exp pred) (Addr (Soften a))
-    Call :: Addr a -> Args (Argument a)
+    MMap :: String -> Sig a
+         -> MMapCMD (Param3 prog exp pred) (Address (Soften a))
+    Call :: Address a -> SArg (Argument a)
          -> MMapCMD (Param3 prog exp pred) (Result a)
 
 -- todo : I ignore translations for the signature. I think this is correct,
@@ -183,7 +165,7 @@ deriving instance Typeable (ForLoop a)
 
 -- | Software symbols.
 type SoftwareConstructs = 
-        SoftwarePrimConstructs
+          SoftwarePrimConstructs
   Syn.:+: ForLoop
   Syn.:+: Tuple
   Syn.:+: Let
@@ -245,7 +227,7 @@ sugarSymSoftware
        , SoftwareDomain ~ SmartSym fi
        , SyntacticN f fi
        , sub :<: SoftwareConstructs
-       , SType (DenResult sig)
+       , Type SoftwarePrimType (DenResult sig)
        )
     => sub sig -> f
 sugarSymSoftware = sugarSymDecor $ ValT $ typeRep
@@ -277,7 +259,7 @@ instance Tuples SoftwareDomain
 
 instance Imp.FreeExp SExp
   where
-    type FreePred SExp = SType'
+    type FreePred SExp = PrimType SoftwarePrimType
     constExp = sugarSymSoftware . Lit
     varExp   = sugarSymSoftware . FreeVar
 
@@ -306,6 +288,11 @@ instance StringTree ForLoop
 -- ** Types.
 --------------------------------------------------------------------------------
 
+-- ... software type representation ...
+type STypeRep = TypeRep SoftwarePrimType SoftwarePrimTypeRep
+
+--------------------------------------------------------------------------------
+
 instance Type SoftwarePrimType Bool   where typeRep = Node BoolST
 instance Type SoftwarePrimType Int8   where typeRep = Node Int8ST
 instance Type SoftwarePrimType Int16  where typeRep = Node Int16ST
@@ -316,17 +303,6 @@ instance Type SoftwarePrimType Word16 where typeRep = Node Word16ST
 instance Type SoftwarePrimType Word32 where typeRep = Node Word32ST
 instance Type SoftwarePrimType Word64 where typeRep = Node Word64ST
 instance Type SoftwarePrimType Float  where typeRep = Node FloatST
-
---------------------------------------------------------------------------------
-
--- ... software type representation ...
-type STypeRep = TypeRep SoftwarePrimType SoftwarePrimTypeRep
-
--- ... software types ...
-type SType    = Type SoftwarePrimType
-
--- ... software primitive types ...
-type SType'   = PrimType SoftwarePrimType
 
 --------------------------------------------------------------------------------
 

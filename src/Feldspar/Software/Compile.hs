@@ -12,16 +12,19 @@ module Feldspar.Software.Compile where
 
 import Feldspar.Sugar
 import Feldspar.Representation
+import Feldspar.Common
+
 import Feldspar.Software.Primitive
 import Feldspar.Software.Primitive.Backend
 import Feldspar.Software.Representation
 
-import Feldspar.Hardware.Representation (Signature)
+import Feldspar.Hardware.Representation (Sig)
 
 import Data.Struct
 
 import Control.Monad.Identity
 import Control.Monad.Reader
+import Data.Proxy
 import Data.Constraint hiding (Sub)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -51,6 +54,9 @@ import qualified Language.C.Syntax as C
 
 -- hardware-edsl
 import qualified Language.Embedded.Hardware.Command.CMD as Imp
+
+-- wtf?
+import Unsafe.Coerce
 
 --------------------------------------------------------------------------------
 -- * Software compiler.
@@ -96,39 +102,97 @@ compMMapCMD
    . (Imp.CompExp exp, Imp.CompTypeClass ct)
   => MMapCMD (Param3 C.CGen exp ct) a
   -> C.CGen a
-compMMapCMD cmd@(MMap n sig) = do
-  -- mmap
-  C.addInclude "<stdio.h>"
-  C.addInclude "<stdlib.h>"
-  C.addInclude "<stddef.h>"
-  C.addInclude "<unistd.h>"
-  C.addInclude "<sys/mman.h>"
-  C.addInclude "<fcntl.h>"
-  C.addGlobal [cedecl| unsigned page_size = 0; |]
-  C.addGlobal [cedecl| int mem_fd = -1; |]
-  C.addGlobal mmapDef
-  mem <- C.gensym "mem"
-  C.addLocal [cdecl| int * $id:mem = f_map($string:n); |]
-  soften mem 0 sig
+compMMapCMD cmd@(MMap n sig) =
+  do C.addInclude "<stdio.h>"
+     C.addInclude "<stdlib.h>"
+     C.addInclude "<stddef.h>"
+     C.addInclude "<unistd.h>"
+     C.addInclude "<sys/mman.h>"
+     C.addInclude "<fcntl.h>"
+     C.addGlobal [cedecl| unsigned page_size = 0; |]
+     C.addGlobal [cedecl| int mem_fd = -1; |]
+     C.addGlobal mmapDef
+     mem <- C.gensym "mem"
+     C.addLocal [cdecl| int * $id:mem = f_map($string:n); |]
+     soften mem 0 sig
   where
-    soften :: String -> Int -> Signature b -> C.CGen (Addr (Soften b))
-    soften _ _ (Imp.Ret _)       = return Ret
-    soften m i (Imp.SSig n _ sf) = do
+    soften :: String -> Int -> Sig b -> C.CGen (Address (Soften b))
+    soften _ _ (SigRet _)       = return AddrRet
+    soften m i (SigSignal n _ sf) = do
       ref <- Imp.RefComp <$> C.gensym "proc"
       C.addLocal [cdecl| int $id:ref = *($id:m + $int:i); |]
       adr <- soften m (i+1) (sf dummy)
-      return $ SRef (Ref $ Node ref) (\_ -> adr)
-    soften m i (Imp.SArr n _ af) = do
+      return $ AddrRef ref (const adr)
+    soften m i (SigArray n _ len af) = do
       ref <- Imp.RefComp <$> C.gensym "proc"
       C.addLocal [cdecl| int $id:ref = *($id:m + $int:i); |]
       adr <- soften m (i+1) (af dummy)
-      return $ SArr (Ref $ Node ref) (\_ -> adr)
-      
+      return $ AddrArr ref len (const adr)
+    -- todo : I should remove this one.
     dummy :: b
     dummy = error "co-feldspar.soften: evaluated signature."
+    -- todo : get types of 'channel -> ref/arr'.
+    proxySig :: (c b -> Signature fs d) -> Proxy b
+    proxySig _ = (Proxy::Proxy b)
 
-compMMapCMD (Call addr args) = do
-  undefined
+compMMapCMD cmd@(Call addr args) =
+  do res <- apply addr args
+     return $ result res addr
+  where
+    result :: forall b . String -> Address b -> Result b
+    result s (AddrRet) = ()
+    result s (AddrRef _ (rf :: Imp.Ref c -> Address d)) =
+      case rf dummy of
+        a@(AddrRet)       -> unsafeCoerce (Imp.RefComp s) :: Result b
+        a@(AddrRef _ _)   -> result s a
+        a@(AddrArr _ _ _) -> result s a
+    result s (AddrArr _ _ (af :: Imp.Arr Index c -> Address d)) =
+      case af dummy of
+        a@(AddrRet)       -> unsafeCoerce (Imp.ArrComp s) :: Result b
+        a@(AddrRef _ _)   -> result s a
+        a@(AddrArr _ _ _) -> result s a
+    -- todo : return a new reference instead of the channel one, so users
+    --        cannot do wierd things with it.
+    --
+    -- todo : the type I use is temporary, this function shuold have the following
+    --        type instead:
+    --
+    --    :: Address b -> SArg (Argument b) -> C.CGen (Result b)
+    apply :: Address b -> SArg c -> C.CGen String
+    apply (AddrRef ref rf) (SoftNil) =
+      do out <- C.gensym "res"
+         C.addLocal [cdecl| int $id:out; |]
+         C.addStm [cstm| $id:out = $id:ref; |]
+         return out
+    apply (AddrRef ref rf) (SoftRef arg as) =
+      do C.addStm [cstm| $id:ref = $id:arg; |]
+         apply (rf dummy) as
+    apply (AddrArr ref len af) (SoftNil) =
+      do sym <- C.gensym "res"
+         let sym' = '_':sym
+         count <- Imp.RefComp <$> C.gensym "v"
+         C.addLocal [cdecl| int $id:count; |]
+         C.addLocal [cdecl| int $id:sym'[ $int:len ]; |]
+         C.addLocal [cdecl| int * $id:sym = $id:sym'; |]
+         C.addStm   [cstm|
+             for($id:count=0;$id:count<$int:len;$id:count++) {
+               $id:sym[$id:count] = $id:ref;
+             } |]
+         return sym
+    apply (AddrArr ref len af) (SoftArr arg as) =
+      do count <- Imp.RefComp <$> C.gensym "v"
+         C.addLocal [cdecl| int $id:count; |]
+         C.addStm   [cstm|
+             for($id:count=0;$id:count<$int:len;$id:count++) {
+               $id:ref = $id:arg[$id:count];
+             } |]
+         apply (af dummy) as
+    -- todo : ...
+    proxyAddr :: (c b -> Address d) -> Proxy b
+    proxyAddr _ = Proxy::Proxy b
+    -- todo : I should remove this one.
+    dummy :: b
+    dummy = error "co-feldspar.apply: evaluated signature."
 
 mmapDef :: C.Definition
 mmapDef =  [cedecl|

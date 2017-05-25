@@ -8,9 +8,19 @@
 
 module Feldspar.Hardware.Frontend where
 
-import Prelude hiding (length)
+import Feldspar.Sugar
+import Feldspar.Representation
+import Feldspar.Common
+import Feldspar.Frontend
 
+import Feldspar.Hardware.Primitive
+import Feldspar.Hardware.Representation
+
+import Data.Struct
+
+import Control.Monad.Identity (Identity)
 import Data.Constraint hiding (Sub)
+import Data.Int
 import Data.List (genericLength)
 import Data.Proxy
 
@@ -27,14 +37,7 @@ import Language.Embedded.Hardware.Command (Signal, Ident)
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
 
-import Data.Struct
-
-import Feldspar.Sugar
-import Feldspar.Representation
-import Feldspar.Frontend
-
-import Feldspar.Hardware.Primitive
-import Feldspar.Hardware.Representation
+import Prelude hiding (length)
 
 --------------------------------------------------------------------------------
 -- * Expressions.
@@ -356,40 +359,56 @@ setSArr' = withHType (Proxy :: Proxy b) Imp.setArray
 --------------------------------------------------------------------------------
 -- *** Components.
 
-namedComponent :: String -> Signature a -> Hardware (Component a)
-namedComponent n = Hardware . Imp.namedComponent n
+-- short-hand for hardware signatures.
+type HSignature = Imp.Sig HardwareCMD HExp HardwarePrimType Identity
 
-component :: Signature a -> Hardware (Component a)
+-- short-hand for hardware components.
+type HComponent = Imp.Comp HardwareCMD HExp HardwarePrimType Identity
+
+-- short-hand for arguments to hardware signatures.
+type HArgument = Imp.Arg
+
+--------------------------------------------------------------------------------
+
+namedComponent :: String -> Sig a -> Hardware (HComponent a)
+namedComponent n sig = Hardware $ Imp.namedComponent n $ toHardware sig
+  where
+    toHardware :: Sig a -> HSignature a
+    toHardware (SigRet p)          = Imp.Ret (unHardware p)
+    toHardware (SigSignal n m sf)  = Imp.SSig (Imp.Base n) m (toHardware . sf)
+    toHardware (SigArray n m _ af) = Imp.SArr (Imp.Base n) m (toHardware . af)
+
+component :: Sig a -> Hardware (HComponent a)
 component = namedComponent "comp"
 
-portmap :: Component a -> Argument a -> Hardware ()
+portmap :: HComponent a -> HArgument a -> Hardware ()
 portmap c = Hardware . Imp.portmap c
 
 --------------------------------------------------------------------------------
 
-ret :: Hardware () -> Signature ()
-ret = Imp.ret . unHardware
+ret :: Hardware () -> Sig ()
+ret = SigRet
 
-output :: HType' a => (Signal a -> Hardware ()) -> Signature (Signal a -> ())
-output f = Imp.output $ \sig -> ret $ f sig
+output :: FType' a => (Signal a -> Hardware ()) -> Sig (Signal a -> ())
+output f = SigSignal "out" Imp.Out $ \sig -> ret (f sig)
 
-outputArr :: HType' (Internal a) => Integer -> (SArr a -> Hardware ()) -> Signature (Imp.Array (Internal a) -> ())
-outputArr len f = Imp.outputArr $ \arr -> ret $ f $ SArr 0 (value len) $ Node arr
-
---------------------------------------------------------------------------------
-
-input :: HType' a => (Signal a -> Signature b) -> Signature (Signal a -> b)
-input = Imp.input
-
-inputArr :: HType' (Internal a) => Integer -> (SArr a -> Signature b) -> Signature (Imp.Array (Internal a) -> b)
-inputArr len f = Imp.inputArr $ \arr -> f $ SArr 0 (value len) $ Node arr
+outputArr :: FType' a
+  => Integer
+  -> (SArr (HExp a) -> Hardware ())
+  -> Sig (Imp.Array a -> ())
+outputArr len f = SigArray "out" Imp.Out (fromIntegral len) $ \arr ->
+  ret $ f $ SArr 0 (value len) $ Node arr
 
 --------------------------------------------------------------------------------
--- todo : if I addded in a sig construct for structs of signals I could change
---        input/output, arr ver. could probably work for HType.
 
-pack :: HType' (Internal a) => (SArr a -> Signature b) -> (Imp.Array (Internal a) -> Signature b)
-pack f = f . SArr 0 0 . Node
+input :: FType' a => (Signal a -> Sig b) -> Sig (Signal a -> b)
+input = SigSignal "in" Imp.In
+
+inputArr :: FType' a
+  => Integer
+  -> (SArr (HExp a) -> Sig b) -> Sig (Imp.Array a -> b)
+inputArr len f = SigArray "in" Imp.In (fromIntegral len) $ \arr ->
+  f $ SArr 0 (value len) $ Node arr
 
 --------------------------------------------------------------------------------
 -- *** Structural entities.
