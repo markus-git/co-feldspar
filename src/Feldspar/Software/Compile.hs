@@ -57,9 +57,6 @@ import qualified Language.C.Syntax as C
 -- hardware-edsl
 import qualified Language.Embedded.Hardware.Command.CMD as Imp
 
--- wtf?
-import Unsafe.Coerce
-
 --------------------------------------------------------------------------------
 -- * Software compiler.
 --------------------------------------------------------------------------------
@@ -139,7 +136,6 @@ compMMapCMD cmd@(MMap n sig) =
 
 compMMapCMD cmd@(Call addr args) =
   do res <- apply addr args
-     --error "uhoh"
      return $ result res addr
   where
     result :: forall b . String -> Address b -> Result b
@@ -163,7 +159,8 @@ compMMapCMD cmd@(Call addr args) =
     --    :: Address b -> SArg (Argument b) -> C.CGen (Result b)
     apply :: Address b -> SArg c -> C.CGen String
     apply (AddrRef ref rf) (SoftNil) =
-      do out <- C.gensym "res"
+      do 
+         out <- C.gensym "res"
          C.addLocal [cdecl| int $id:out; |]
          C.addStm [cstm| $id:out = $id:ref; |]
          return out
