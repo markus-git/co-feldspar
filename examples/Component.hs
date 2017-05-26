@@ -39,10 +39,8 @@ soft = do
   ra :: S.Ref (SExp Int32) <- newRef
   rb :: S.Ref (SExp Int32) <- newRef
   let args = ra >: rb >: nil
-  return ()
-{-
   rc :: S.Ref (SExp Int32) <- call addr args
   vc <- getRef rc
   printf "%d" vc
--}
+
 --------------------------------------------------------------------------------

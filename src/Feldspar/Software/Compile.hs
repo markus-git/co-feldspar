@@ -17,6 +17,8 @@ import Feldspar.Common
 import Feldspar.Software.Primitive
 import Feldspar.Software.Primitive.Backend
 import Feldspar.Software.Representation
+-- todo : hmm...
+import Feldspar.Software.Frontend
 
 import Feldspar.Hardware.Representation (Sig)
 
@@ -137,18 +139,19 @@ compMMapCMD cmd@(MMap n sig) =
 
 compMMapCMD cmd@(Call addr args) =
   do res <- apply addr args
+     --error "uhoh"
      return $ result res addr
   where
     result :: forall b . String -> Address b -> Result b
     result s (AddrRet) = ()
     result s (AddrRef _ (rf :: Imp.Ref c -> Address d)) =
       case rf dummy of
-        a@(AddrRet)       -> unsafeCoerce (Imp.RefComp s) :: Result b
+        a@(AddrRet)       -> Ref (Node (Imp.RefComp s)) :: Result b
         a@(AddrRef _ _)   -> result s a
         a@(AddrArr _ _ _) -> result s a
-    result s (AddrArr _ _ (af :: Imp.Arr Index c -> Address d)) =
+    result s (AddrArr _ l (af :: Imp.Arr Index c -> Address d)) =
       case af dummy of
-        a@(AddrRet)       -> unsafeCoerce (Imp.ArrComp s) :: Result b
+        a@(AddrRet)       -> Arr 0 (fromIntegral l) (Node (Imp.ArrComp s))
         a@(AddrRef _ _)   -> result s a
         a@(AddrArr _ _ _) -> result s a
     -- todo : return a new reference instead of the channel one, so users
