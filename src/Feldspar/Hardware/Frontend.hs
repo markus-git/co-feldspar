@@ -8,10 +8,10 @@
 
 module Feldspar.Hardware.Frontend where
 
-import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Common
 import Feldspar.Frontend
+import Feldspar.Sugar
 
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Representation

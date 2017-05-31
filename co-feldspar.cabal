@@ -19,6 +19,8 @@ library
   exposed-modules:
     Feldspar,
     Feldspar.Representation,
+    Feldspar.Common,
+    Feldspar.Common.Frontend,
     Feldspar.Frontend,
     Feldspar.Sugar,
     Feldspar.Hardware,

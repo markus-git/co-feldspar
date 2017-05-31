@@ -95,6 +95,17 @@ instance (Imp.CompExp exp, Imp.CompTypeClass ct)
   => Oper.Interp MMapCMD C.CGen (Param2 exp ct)
   where
     interp = compMMapCMD
+{-
+class Oper.Interp (instr :: (k1 -> *, k) -> k1 -> *)
+                  (m :: k1 -> *)
+                  (fs :: k) where
+  Oper.interp :: forall (a :: k1). instr ('(,) m fs) a -> m a
+
+data RefCMD (fs :: (k, (* -> *, (* -> Constraint, *)))) a where
+  Imp.NewRef :: forall k (pred :: * -> Constraint) a1 (prog :: k) (exp :: * -> *).
+                pred a1 =>
+                String -> RefCMD ('(,) prog (Param2 exp pred)) (Imp.Ref a1)
+-}
 
 compMMapCMD
   :: forall exp ct a
@@ -156,16 +167,27 @@ compMMapCMD cmd@(Call addr args) =
     -- todo : the type I use is temporary, this function shuold have the following
     --        type instead:
     --
-    --    :: Address b -> SArg (Argument b) -> C.CGen (Result b)
+    -- apply :: Address b -> SArg (Argument b) -> C.CGen (Result b)
+    --
+    -- todo : avoid the extra compilation steps here by instead invocing the
+    --        compiler from the respective languages. That is, create a instruction
+    --        like below and call 'Oper.interp'. This requires 'Adddress' to have
+    --        its predicate be a parameter (like instructions with 'fs' do).
+    --
+    -- let ri :: Imp.RefCMD (Imp.Param3 C.CGen exp ct) (Imp.Ref x)
+    --     ri  = Imp.NewRef "res"
+    --
     apply :: Address b -> SArg c -> C.CGen String
-    apply (AddrRef ref rf) (SoftNil) =
-      do 
-         out <- C.gensym "res"
+    apply (AddrRef
+             (ref :: (Imp.Ref Int32))
+             (rf  :: (Imp.Ref x -> Address y)))
+          (SoftNil) =
+      do out <- C.gensym "res"
          C.addLocal [cdecl| int $id:out; |]
          C.addStm [cstm| $id:out = $id:ref; |]
          return out
     apply (AddrRef ref rf) (SoftRef arg as) =
-      do C.addStm [cstm| $id:ref = $id:arg; |]
+      do C.addStm [cstm| $id:ref = (int) $id:arg; |]
          apply (rf dummy) as
     apply (AddrArr ref len af) (SoftNil) =
       do sym <- C.gensym "res"
@@ -184,7 +206,7 @@ compMMapCMD cmd@(Call addr args) =
          C.addLocal [cdecl| int $id:count; |]
          C.addStm   [cstm|
              for($id:count=0;$id:count<$int:len;$id:count++) {
-               $id:ref = $id:arg[$id:count];
+               $id:ref = (int) $id:arg[$id:count];
              } |]
          apply (af dummy) as
     -- todo : ...
