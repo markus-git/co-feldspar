@@ -1,0 +1,66 @@
+flags: {}
+packages:
+- location: .
+- location:
+    git: git@github.com:markus-git/hardware-edsl.git
+    commit: 7017af69da13a483244c33dd9a3e677b9bd3ef9a
+  extra-dep: true
+- location:
+    git: git@github.com:emilaxelsson/imperative-edsl.git
+    commit: cc41a5a44ad5116ac06fc35598afe276d384ff5f
+  extra-dep: true
+extra-deps:
+- BoundedChan-1.0.3.0
+- QuickCheck-2.10.0.1
+- ansi-terminal-0.6.3.1
+- ansi-wl-pprint-0.6.8.1
+- async-2.1.1.1
+- clock-0.7.2
+- constraints-0.9.1
+- cpphs-1.20.8
+- data-default-class-0.1.2.0
+- data-hash-0.2.0.1
+- exception-mtl-0.4.0.1
+- exception-transformers-0.4.0.5
+- hashable-1.2.6.1
+- haskell-src-exts-1.18.2
+- haskell-src-meta-0.7.0.1
+- language-c-quote-0.11.7.3
+- language-vhdl-0.1.2.8
+- mainland-pretty-0.5.0.0
+- microlens-0.4.8.1
+- microlens-mtl-0.1.11.0
+- microlens-th-0.4.1.1
+- mtl-2.2.1
+- old-locale-1.0.0.7
+- old-time-1.1.0.3
+- operational-alacarte-0.3.1
+- optparse-applicative-0.14.0.0
+- parsec-3.1.11
+- polyparse-1.12
+- primitive-0.6.2.0
+- random-1.1
+- regex-base-0.93.2
+- regex-tdfa-1.2.2
+- safe-0.3.15
+- srcloc-0.5.1.1
+- stm-2.4.4.1
+- syb-0.6
+- symbol-0.2.4
+- syntactic-3.6.3
+- tagged-0.8.5
+- tasty-0.11.2.5
+- tasty-quickcheck-0.9.1
+- tasty-th-0.1.7
+- text-1.2.2.2
+- tf-random-0.5
+- th-expand-syns-0.4.3.0
+- th-lift-0.7.7
+- th-lift-instances-0.1.11
+- th-orphans-0.13.4
+- th-reify-many-0.1.8
+- transformers-compat-0.5.1.4
+- tree-view-0.5
+- unbounded-delays-0.1.1.0
+- vector-0.12.0.1
+resolver: ghc-8.0.2
