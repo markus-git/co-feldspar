@@ -10,7 +10,7 @@ import Feldspar.Software
 import Feldspar.Software as Soft (icompile)
 
 import Feldspar.Hardware
-import Feldspar.Hardware as Hard (icompile)
+import Feldspar.Hardware as Hard (icompileWrap)
 
 import Prelude hiding (mod)
 
@@ -30,6 +30,6 @@ hex =
 
 --------------------------------------------------------------------------------
 
-htest = Hard.icompile hex
+htest = Hard.icompileWrap hex
 
 --------------------------------------------------------------------------------

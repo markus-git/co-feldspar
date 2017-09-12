@@ -13,7 +13,7 @@ import Feldspar.Software
 import Feldspar.Software as S (icompile)
 
 import Feldspar.Hardware
-import Feldspar.Hardware as H (icompile)
+import Feldspar.Hardware as H (icompile, icompileWrap)
 
 import qualified Feldspar.Software as S (Ref)
 import qualified Feldspar.Hardware as H (Ref)
