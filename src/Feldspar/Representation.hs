@@ -14,7 +14,6 @@
 module Feldspar.Representation where
 
 import Data.Struct
-import Data.Inhabited
 
 import Data.Constraint
 import Data.Word
@@ -25,6 +24,9 @@ import Data.Typeable hiding (typeRep, TypeRep)
 import Language.Syntactic hiding ((:+:))
 import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
+
+-- hardware-edsl.
+import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))
 
 -- operational-higher.
 import Control.Monad.Operational.Higher (Program, Param2, (:+:))
@@ -82,5 +84,11 @@ instance (Type pred a, pred a) => PrimType pred a
 type Length = Word32
 
 type Index  = Word32
+
+--------------------------------------------------------------------------------
+
+instance (Inhabited a, Inhabited b) => Inhabited (a, b)
+  where
+    reset = (reset, reset)
 
 --------------------------------------------------------------------------------

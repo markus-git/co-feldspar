@@ -35,32 +35,45 @@ viewLitPrim _                    = Nothing
 
 --------------------------------------------------------------------------------
 
+-- todo: should we declare types here as well?
+compLiteral :: forall a . Rep a => (a -> String) -> a -> VHDL VHDL.Expression
+compLiteral f = return . exp
+  where
+    exp :: a -> VHDL.Expression
+    exp = lift . VHDL.literal . VHDL.number . f
+
+compNum  :: Rep a => a -> VHDL VHDL.Expression
+compNum  = compLiteral printVal
+
+compBits :: Rep a => a -> VHDL VHDL.Expression
+compBits = compLiteral printBits
+
 instance CompileType HardwarePrimType
   where
     compileType _ (v :: proxy a) =
-      compTypeSign (hardwareRep :: HardwarePrimTypeRep a)    
+      compTypeSign (hardwareRep :: HardwarePrimTypeRep a)      
     compileLit _ a = case hardwarePrimTypeOf a of
-      BoolHT    -> literal a
-      IntegerHT -> literal a
-      Int8HT    -> literal a
-      Int16HT   -> literal a
-      Int32HT   -> literal a
-      Int64HT   -> literal a
-      Word8HT   -> literal a
-      Word16HT  -> literal a
-      Word32HT  -> literal a
-      Word64HT  -> literal a
+      BoolHT    -> compNum a
+      IntegerHT -> compNum a
+      Int8HT    -> compNum a
+      Int16HT   -> compNum a
+      Int32HT   -> compNum a
+      Int64HT   -> compNum a
+      Word8HT   -> compNum a
+      Word16HT  -> compNum a
+      Word32HT  -> compNum a
+      Word64HT  -> compNum a
     compileBits _ a = case hardwarePrimTypeOf a of
-      BoolHT    -> literalBits a
-      IntegerHT -> literalBits a
-      Int8HT    -> literalBits a
-      Int16HT   -> literalBits a
-      Int32HT   -> literalBits a
-      Int64HT   -> literalBits a
-      Word8HT   -> literalBits a
-      Word16HT  -> literalBits a
-      Word32HT  -> literalBits a
-      Word64HT  -> literalBits a
+      BoolHT    -> compBits a
+      IntegerHT -> compBits a
+      Int8HT    -> compBits a
+      Int16HT   -> compBits a
+      Int32HT   -> compBits a
+      Int64HT   -> compBits a
+      Word8HT   -> compBits a
+      Word16HT  -> compBits a
+      Word32HT  -> compBits a
+      Word64HT  -> compBits a
 
 --------------------------------------------------------------------------------
 
@@ -70,17 +83,20 @@ instance CompileExp Prim
 
 --------------------------------------------------------------------------------
 
+compSize :: Int -> VHDL.Primary
+compSize = VHDL.literal . VHDL.number . printVal
+
 compTypeSize :: forall a . HardwarePrimTypeRep a -> VHDL.Primary
-compTypeSize BoolHT    = VHDL.lit $ show (1  :: Int)
-compTypeSize IntegerHT = VHDL.lit $ show (32 :: Int)
-compTypeSize Int8HT    = VHDL.lit $ show (8  :: Int)
-compTypeSize Int16HT   = VHDL.lit $ show (16 :: Int)
-compTypeSize Int32HT   = VHDL.lit $ show (32 :: Int)
-compTypeSize Int64HT   = VHDL.lit $ show (64 :: Int)
-compTypeSize Word8HT   = VHDL.lit $ show (8  :: Int)
-compTypeSize Word16HT  = VHDL.lit $ show (16 :: Int)
-compTypeSize Word32HT  = VHDL.lit $ show (32 :: Int)
-compTypeSize Word64HT  = VHDL.lit $ show (64 :: Int)
+compTypeSize BoolHT    = compSize (1  :: Int)
+compTypeSize IntegerHT = compSize (32 :: Int)
+compTypeSize Int8HT    = compSize (8  :: Int)
+compTypeSize Int16HT   = compSize (16 :: Int)
+compTypeSize Int32HT   = compSize (32 :: Int)
+compTypeSize Int64HT   = compSize (64 :: Int)
+compTypeSize Word8HT   = compSize (8  :: Int)
+compTypeSize Word16HT  = compSize (16 :: Int)
+compTypeSize Word32HT  = compSize (32 :: Int)
+compTypeSize Word64HT  = compSize (64 :: Int)
 
 compTypeSign :: forall a. HardwarePrimTypeRep a -> VHDL VHDL.Type
 compTypeSign BoolHT    = declare (Proxy :: Proxy a)
@@ -213,7 +229,7 @@ compKind = simpleMatch (\(s :&: t) -> go t s)
 
     go _ (ArrIx (IArrayC arr)) (i :* Syn.Nil) =
       do i' <- compPrim $ Prim i
-         return $ Hoist.P $ VHDL.name $ VHDL.indexed (VHDL.Ident arr) (lift i')
+         return $ Hoist.P $ VHDL.name $ VHDL.indexed (VHDL.simple arr) (lift i')
 
     one :: (a -> b) -> ([a] -> b)
     one f = \[a] -> f a

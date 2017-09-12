@@ -366,7 +366,7 @@ type HSignature = Imp.Sig HardwareCMD HExp HardwarePrimType Identity
 type HComponent = Imp.Comp HardwareCMD HExp HardwarePrimType Identity
 
 -- short-hand for arguments to hardware signatures.
-type HArgument = Imp.Arg
+type HArgument  = Imp.Argument HardwarePrimType
 
 --------------------------------------------------------------------------------
 
@@ -374,9 +374,9 @@ namedComponent :: String -> Sig a -> Hardware (HComponent a)
 namedComponent n sig = Hardware $ Imp.namedComponent n $ toHardware sig
   where
     toHardware :: Sig a -> HSignature a
-    toHardware (SigRet p)          = Imp.Ret (unHardware p)
-    toHardware (SigSignal n m sf)  = Imp.SSig (Imp.Base n) m (toHardware . sf)
-    toHardware (SigArray n m _ af) = Imp.SArr (Imp.Base n) m (toHardware . af)
+    toHardware (SigRet p)           = Imp.Ret (unHardware p)
+    toHardware (SigSignal n m   sf) = Imp.SSig n m (toHardware . sf)
+    toHardware (SigArray  n m l af) = Imp.SArr n m (toInteger l) (toHardware . af)
 
 component :: Sig a -> Hardware (HComponent a)
 component = namedComponent "comp"
@@ -389,25 +389,27 @@ portmap c = Hardware . Imp.portmap c
 ret :: Hardware () -> Sig ()
 ret = SigRet
 
+--------------------------------------------------------------------------------
+
 output :: FType' a => (Signal a -> Hardware ()) -> Sig (Signal a -> ())
-output f = SigSignal "out" Imp.Out $ \sig -> ret (f sig)
+output f = SigSignal (Imp.Base "out") Imp.Out $ \sig -> ret (f sig)
 
 outputArr :: FType' a
   => Integer
   -> (SArr (HExp a) -> Hardware ())
   -> Sig (Imp.Array a -> ())
-outputArr len f = SigArray "out" Imp.Out (fromIntegral len) $ \arr ->
+outputArr len f = SigArray (Imp.Base "out") Imp.Out (fromIntegral len) $ \arr ->
   ret $ f $ SArr 0 (value len) $ Node arr
 
 --------------------------------------------------------------------------------
 
 input :: FType' a => (Signal a -> Sig b) -> Sig (Signal a -> b)
-input = SigSignal "in" Imp.In
+input = SigSignal (Imp.Base "in") Imp.In
 
 inputArr :: FType' a
   => Integer
   -> (SArr (HExp a) -> Sig b) -> Sig (Imp.Array a -> b)
-inputArr len f = SigArray "in" Imp.In (fromIntegral len) $ \arr ->
+inputArr len f = SigArray (Imp.Base "in") Imp.In (fromIntegral len) $ \arr ->
   f $ SArr 0 (value len) $ Node arr
 
 --------------------------------------------------------------------------------

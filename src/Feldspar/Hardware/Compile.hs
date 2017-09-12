@@ -4,13 +4,16 @@
 {-# language ConstraintKinds #-}
 {-# language ScopedTypeVariables #-}
 
-module Feldspar.Hardware.Compile (compile, icompile) where
+module Feldspar.Hardware.Compile (compile, icompile, icompileWrap) where
 
 import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Primitive.Backend
 import Feldspar.Hardware.Representation
+-- ...
+import Feldspar.Hardware.Frontend (component, input, ret, process)
+--import Feldspar.Software.Representation ()
 
 import Data.Struct
 
@@ -31,7 +34,7 @@ import Language.Syntactic.Functional.Tuple
 import qualified Language.Syntactic as Syn
 
 -- hardware-edsl.
-import Language.Embedded.Hardware hiding (Hardware, HExp, Name, compile, icompile)
+import Language.Embedded.Hardware (Signal, FreeExp (..))
 import qualified Language.Embedded.Hardware         as Hard
 import qualified Language.Embedded.Hardware.Command as Hard
 
@@ -44,6 +47,18 @@ compile = Hard.compile . translate
 
 icompile :: Hardware a -> IO ()
 icompile = Hard.icompile . translate
+
+--------------------------------------------------------------------------------
+
+icompileWrap :: Hardware () -> IO ()
+icompileWrap = Hard.icompile . translate . wrap
+
+--------------------------------------------------------------------------------
+
+-- todo: use wrap from hardware-edsl.
+wrap :: Hardware () -> Hardware ()
+wrap prg = void $ component $
+  ret $ process [] $ prg
 
 --------------------------------------------------------------------------------
 -- ** Instructions.
@@ -92,7 +107,7 @@ setRefV :: Monad m => Struct HardwarePrimType Hard.Variable a -> VExp a -> Targe
 setRefV r = lift . sequence_ . zipListStruct Hard.setVariable r
 
 unsafeFreezeRefV :: Monad m => Struct HardwarePrimType Hard.Variable a -> TargetT m (VExp a)
-unsafeFreezeRefV = lift . mapStructA unsafeFreezeVariable
+unsafeFreezeRefV = lift . mapStructA Hard.unsafeFreezeVariable
 
 --------------------------------------------------------------------------------
 
@@ -156,7 +171,7 @@ translateExp = goAST . unHExp
       | Just Cond <- prj cond = do
           res <- newRefV ty "b"
           b'  <- goSmallAST b
-          ReaderT $ \env -> iff b'
+          ReaderT $ \env -> Hard.iff b'
             (flip runReaderT env $ setRefV res =<< goAST t)
             (flip runReaderT env $ setRefV res =<< goAST f)
           unsafeFreezeRefV res

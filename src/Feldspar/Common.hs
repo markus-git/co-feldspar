@@ -67,11 +67,11 @@ data Signature fs a
     SigRet
       :: prog () -> Signature (Param3 prog exp pred) ()
     SigSignal
-      :: (FType' a, pred a) => String -> H.Mode
+      :: (FType' a, pred a) => H.Name -> H.Mode
       -> (H.Signal a -> Signature (Param3 prog exp pred) b)
       -> Signature (Param3 prog exp pred) (H.Signal a -> b)
     SigArray
-      :: (FType' a, pred a) => String -> H.Mode -> Int32
+      :: (FType' a, pred a) => H.Name -> H.Mode -> Int32
       -> (H.Array a -> Signature (Param3 prog exp pred) b)
       -> Signature (Param3 prog exp pred) (H.Array a -> b)
 

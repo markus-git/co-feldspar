@@ -8,6 +8,7 @@ module Feldspar.Hardware
   , HType, HType'
   , compile
   , icompile
+  , icompileWrap
   ) where
 
 import Feldspar
