@@ -3,7 +3,7 @@ packages:
 - location: .
 - location:
     git: git@github.com:markus-git/hardware-edsl.git
-    commit: 7017af69da13a483244c33dd9a3e677b9bd3ef9a
+    commit: 549630726c4f93a4d2d02a7b0010dee7b58a213c 
   extra-dep: true
 - location:
     git: git@github.com:emilaxelsson/imperative-edsl.git
