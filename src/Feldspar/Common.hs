@@ -61,20 +61,21 @@ type FType' a = (SType' a, HType' a)
 -- * ...
 --------------------------------------------------------------------------------
 
--- | Signature description.
+-- | Signature description of a hardware component.
 data Signature fs a
   where
     SigRet
       :: prog () -> Signature (Param3 prog exp pred) ()
     SigSignal
-      :: (FType' a, pred a) => String -> H.Mode
+      :: (FType' a, pred a) => H.Name -> H.Mode
       -> (H.Signal a -> Signature (Param3 prog exp pred) b)
       -> Signature (Param3 prog exp pred) (H.Signal a -> b)
     SigArray
-      :: (FType' a, pred a) => String -> H.Mode -> Int32
+      :: (FType' a, pred a) => H.Name -> H.Mode -> Int32
       -> (H.Array a -> Signature (Param3 prog exp pred) b)
       -> Signature (Param3 prog exp pred) (H.Array a -> b)
 
+-- | Arguments for a hardware component.
 data HArg a
   where
     HardNil :: HArg ()
@@ -83,6 +84,7 @@ data HArg a
 
 --------------------------------------------------------------------------------
 
+-- | Software signature description of a hardware component.
 data Address a
   where
     AddrRet
@@ -96,6 +98,7 @@ data Address a
       -> (S.Arr Index a -> Address b)
       -> Address (S.Arr Index a -> b)
 
+-- | Arguments for a software component.
 data SArg a
   where
     SoftNil :: SArg ()

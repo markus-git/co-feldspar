@@ -28,10 +28,10 @@ import Language.Syntactic.Functional.Tuple
 
 -- hardware-edsl.
 import Language.Embedded.Hardware.Interface
+import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))
 import qualified Language.Embedded.Hardware.Command as Imp (IArray(..))
 
 import Data.Struct
-import Data.Inhabited
 
 import Feldspar.Representation
 

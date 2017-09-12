@@ -19,6 +19,8 @@ library
   exposed-modules:
     Feldspar,
     Feldspar.Representation,
+    Feldspar.Common,
+    Feldspar.Common.AXI,
     Feldspar.Frontend,
     Feldspar.Sugar,
     Feldspar.Hardware,
@@ -33,8 +35,7 @@ library
     Feldspar.Software.Representation,
     Feldspar.Software.Frontend,
     Feldspar.Software.Compile,
-    Data.Struct,
-    Data.Inhabited
+    Data.Struct
     
   -- other-modules:       
   -- other-extensions:    
@@ -47,7 +48,7 @@ library
     syntactic >=3.6.1,
     operational-alacarte >=0.3,
     imperative-edsl >=0.7,
-    hardware-edsl >=0.1.1.1,
+    hardware-edsl >=0.1.2,
     language-c-quote >=0.11,
     language-vhdl >=0.1.2.8
   hs-source-dirs:      src

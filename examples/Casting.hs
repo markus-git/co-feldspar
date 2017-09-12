@@ -10,7 +10,7 @@ import Feldspar.Software
 import Feldspar.Software as Soft (icompile)
 
 import Feldspar.Hardware
-import Feldspar.Hardware as Hard (icompile)
+import Feldspar.Hardware as Hard (icompileWrap)
 
 import Prelude hiding (toInteger, (&&), Ord(..))
 
@@ -56,6 +56,6 @@ k t = (0  <= t && t <= 19) ?? 0x5a827999 $
      
 --------------------------------------------------------------------------------
 
-test = Hard.icompile example
+test = Hard.icompileWrap example
 
 --------------------------------------------------------------------------------

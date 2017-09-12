@@ -26,7 +26,6 @@ import Feldspar.Software.Primitive
 import Feldspar.Hardware.Representation (Sig)
 
 import Data.Struct
-import Data.Inhabited
 
 import Data.Int
 import Data.Word
@@ -52,6 +51,7 @@ import qualified Language.Embedded.Expression as Imp
 import qualified Language.Embedded.Imperative as Imp
 
 -- hardware-edsl
+import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))
 import qualified Language.Embedded.Hardware.Command   as H
 import qualified Language.Embedded.Hardware.Interface as H
 

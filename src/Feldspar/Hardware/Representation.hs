@@ -24,7 +24,6 @@ import Feldspar.Frontend
 import Feldspar.Hardware.Primitive
 
 import Data.Struct
-import Data.Inhabited
 
 import Data.Array ((!))
 import Data.Int
@@ -48,6 +47,7 @@ import qualified Language.Syntactic as Syn
 import Control.Monad.Operational.Higher as Oper hiding ((:<:))
 
 -- hardware-edsl.
+import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
 

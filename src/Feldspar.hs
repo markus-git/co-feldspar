@@ -11,9 +11,11 @@ import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
 
-import Data.Inhabited
-
 import Data.Int
 import Data.Word hiding (Word)
 
+-- syntactic.
 import Language.Syntactic (Syntactic, Domain, Internal)
+
+-- hardware-edsl.
+import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))

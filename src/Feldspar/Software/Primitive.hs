@@ -11,11 +11,10 @@
 
 module Feldspar.Software.Primitive where
 
+import Data.Struct
+
 import Data.Array ((!))
 import Data.Bits (Bits)
-import Data.Struct
-import Data.Inhabited
-
 import Data.Int
 import Data.Word
 import Data.List (genericTake)
@@ -32,6 +31,9 @@ import Language.Syntactic.Functional.Tuple
 -- imperative-edsl.
 import Language.Embedded.Expression
 import qualified Language.Embedded.Imperative.CMD as Imp (IArr(..))
+
+-- hardware-edsl.
+import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))
 
 import Feldspar.Representation
 

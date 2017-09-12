@@ -11,10 +11,10 @@
 
 module Feldspar.Software.Frontend where
 
-import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Common
 import Feldspar.Frontend
+import Feldspar.Sugar
 
 import Feldspar.Software.Primitive
 import Feldspar.Software.Representation
