@@ -21,7 +21,6 @@ import Data.Constraint
 import Data.Struct
 import Data.Proxy
 import Data.Word hiding (Word)
---import Data.Ix
 
 import qualified Data.Bits as Bits
 

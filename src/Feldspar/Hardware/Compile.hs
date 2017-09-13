@@ -12,11 +12,9 @@ import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Primitive.Backend
 import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Representation
--- ...
-import Feldspar.Hardware.Frontend (component, input, ret, process)
---import Feldspar.Software.Representation ()
-
 import Data.Struct
+-- ... hmm ...
+import Feldspar.Hardware.Frontend (entity, architecture, process)
 
 import Control.Monad.Identity
 import Control.Monad.Reader
@@ -58,8 +56,10 @@ icompileWrap = Hard.icompile . translate . wrap
 
 -- todo: use wrap from hardware-edsl.
 wrap :: Hardware () -> Hardware ()
-wrap prg = void $ component $
-  ret $ process [] $ prg
+wrap prg = do
+  entity       "empty" $ return ()
+  architecture "empty" "behav" $
+    process [] $ prg
 
 --------------------------------------------------------------------------------
 -- ** Instructions.

@@ -1,26 +1,19 @@
-{-# language TypeFamilies #-}
-{-# language FlexibleInstances #-}
-{-# language FlexibleContexts #-}
+{-# language TypeFamilies          #-}
+{-# language FlexibleInstances     #-}
+{-# language FlexibleContexts      #-}
 {-# language MultiParamTypeClasses #-}
-{-# language UndecidableInstances #-}
-{-# language ConstraintKinds #-}
-{-# language Rank2Types #-}
-{-# language ScopedTypeVariables #-}
-
-{-# language InstanceSigs #-}
+{-# language UndecidableInstances  #-}
+{-# language Rank2Types            #-}
+{-# language ScopedTypeVariables   #-}
 
 module Feldspar.Software.Frontend where
 
-import Feldspar.Representation
-import Feldspar.Common
-import Feldspar.Frontend
 import Feldspar.Sugar
+import Feldspar.Representation
+import Feldspar.Frontend
 import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
 import Feldspar.Software.Representation
-
-import Feldspar.Hardware.Representation (Sig)
-
 import Data.Struct
 
 import Data.Bits (Bits)
@@ -28,7 +21,6 @@ import Data.Constraint hiding (Sub)
 import Data.Proxy
 import Data.List (genericLength)
 import Data.Word hiding (Word)
---import Data.Ix
 
 -- syntactic.
 import Language.Syntactic (Syntactic(..))
@@ -353,14 +345,12 @@ printf = fprintf Imp.stdout
 
 --------------------------------------------------------------------------------
 -- *** Memory.
-
+{-
 mmap :: String -> Sig a -> Software (Address (Soften a))
 mmap name sig = Software $ Oper.singleInj $ MMap name sig
 
 call :: Address a -> SArg (Argument a) -> Software (Result a)
 call addr args = Software $ Oper.singleInj $ Call addr args
-
---------------------------------------------------------------------------------
 
 nil :: SArg ()
 nil = SoftNil
@@ -372,5 +362,5 @@ nil = SoftNil
 (>>:) a = let (Arr _ _ (Node a')) = a in SoftArr a'
 
 infixr 1 >:, >>:
-
+-}
 --------------------------------------------------------------------------------

@@ -1,9 +1,6 @@
 module Feldspar.Hardware.Command where
 
-import Feldspar.Hardware.Expresson
-
-import Data.Int
-import Data.Word
+import Feldspar.Hardware.Expression
 
 -- operational-higher.
 import Control.Monad.Operational.Higher
@@ -18,7 +15,6 @@ import qualified Language.Embedded.Hardware.Interface as H
 
 --------------------------------------------------------------------------------
 -- ** Components
-
 
 
 --------------------------------------------------------------------------------

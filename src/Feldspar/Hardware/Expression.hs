@@ -1,11 +1,12 @@
 {-# language GADTs                 #-}
-{-# language StandaloneDeriving    #-}
+{-# language TypeFamilies          #-}
 {-# language TypeOperators         #-}
 {-# language FlexibleInstances     #-}
 {-# language FlexibleContexts      #-}
 {-# language UndecidableInstances  #-}
 {-# language MultiParamTypeClasses #-}
-{-# language TypeFamilies          #-}
+{-# language ConstraintKinds       #-}
+{-# language StandaloneDeriving    #-}
 
 {-# options_ghc -fwarn-incomplete-patterns #-}
 

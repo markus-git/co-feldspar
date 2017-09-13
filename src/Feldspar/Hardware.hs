@@ -3,7 +3,6 @@ module Feldspar.Hardware
   , module Feldspar.Hardware.Frontend
   , Hardware
   , Ref, Arr, IArr, SArr, Signal
-  , Sig, HArg
   , HExp
   , HType, HType'
   , compile
@@ -12,8 +11,6 @@ module Feldspar.Hardware
   ) where
 
 import Feldspar
-import Feldspar.Common
-
 import Feldspar.Hardware.Representation
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Expression

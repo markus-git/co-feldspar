@@ -1,21 +1,19 @@
-{-# language TypeFamilies #-}
-{-# language FlexibleInstances #-}
-{-# language FlexibleContexts #-}
+{-# language TypeFamilies          #-}
+{-# language FlexibleInstances     #-}
+{-# language FlexibleContexts      #-}
 {-# language MultiParamTypeClasses #-}
-{-# language UndecidableInstances #-}
-{-# language Rank2Types #-}
-{-# language ScopedTypeVariables #-}
+{-# language UndecidableInstances  #-}
+{-# language Rank2Types            #-}
+{-# language ScopedTypeVariables   #-}
 
 module Feldspar.Hardware.Frontend where
 
 import Feldspar.Representation
-import Feldspar.Common
 import Feldspar.Frontend
 import Feldspar.Sugar
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Representation
-
 import Data.Struct
 
 import Control.Monad.Identity (Identity)
@@ -199,8 +197,6 @@ instance References Hardware
       . mapStructA freezeRef'
       . unRef
 
---------------------------------------------------------------------------------
-
 -- 'Imp.getRef' specialized hardware.
 getRef' :: forall b . HardwarePrimType b => Imp.Variable b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
 getRef' = withHType (Proxy :: Proxy b) Imp.getVariable
@@ -246,8 +242,6 @@ instance Arrays Hardware
           Imp.copyVArray (a, arrOffset arr) (b, arrOffset brr) (length brr))
         (unArr arr)
         (unArr brr)
-
---------------------------------------------------------------------------------
       
 -- 'Imp.getVArr' specialized to hardware.
 getArr' :: forall b . HardwarePrimType b => Imp.VArray b -> HExp Integer -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
@@ -294,8 +288,6 @@ instance Control Hardware
           (desugar' upper)
           (unHardware . body . sugar')
 
---------------------------------------------------------------------------------
-
 -- desugar into a hardware expression over an integer.
 desugar' :: forall a . (SyntaxM' Hardware a, Integral (Internal a)) => a -> HExp Integer
 desugar' a = i2n (resugar a :: HExp (Internal a))
@@ -329,6 +321,10 @@ setSignal s = Hardware . (Imp.setSignal s)
 
 --------------------------------------------------------------------------------
 -- *** Signal arrays.
+--
+-- todo: These functions could use some cleaning up. 'Internal' is not really
+--       necessary here, its better to assume 'SArr (HExp a)'.
+--------------------------------------------------------------------------------
 
 newArray :: HType (Internal a) => HExp Integer -> Hardware (SArr a)
 newArray len = Hardware $ fmap (SArr 0 len) $ mapStructA (const (Imp.newArray len)) $ typeRep
@@ -357,8 +353,20 @@ setSArr' :: forall b . HardwarePrimType b => Imp.Array b -> HExp Integer -> HExp
 setSArr' = withHType (Proxy :: Proxy b) Imp.setArray
 
 --------------------------------------------------------------------------------
--- *** Components.
+-- *** Structural entities.
 
+entity  :: String -> Hardware () -> Hardware ()
+entity name = Hardware . (Imp.entity name) . unHardware
+
+architecture :: String -> String -> Hardware () -> Hardware ()
+architecture entity name = Hardware . (Imp.architecture entity name) . unHardware
+
+process :: [Ident] -> Hardware () -> Hardware ()
+process is = Hardware . (Imp.process is) . unHardware
+
+--------------------------------------------------------------------------------
+-- *** Components.
+{-
 -- short-hand for hardware signatures.
 type HSignature = Imp.Sig HardwareCMD HExp HardwarePrimType Identity
 
@@ -367,8 +375,6 @@ type HComponent = Imp.Comp HardwareCMD HExp HardwarePrimType Identity
 
 -- short-hand for arguments to hardware signatures.
 type HArgument  = Imp.Argument HardwarePrimType
-
---------------------------------------------------------------------------------
 
 namedComponent :: String -> Sig a -> Hardware (HComponent a)
 namedComponent n sig = Hardware $ Imp.namedComponent n $ toHardware sig
@@ -384,15 +390,14 @@ component = namedComponent "comp"
 portmap :: HComponent a -> HArgument a -> Hardware ()
 portmap c = Hardware . Imp.portmap c
 
---------------------------------------------------------------------------------
-
 ret :: Hardware () -> Sig ()
 ret = SigRet
 
---------------------------------------------------------------------------------
-
 output :: FType' a => (Signal a -> Hardware ()) -> Sig (Signal a -> ())
 output f = SigSignal (Imp.Base "out") Imp.Out $ \sig -> ret (f sig)
+
+input :: FType' a => (Signal a -> Sig b) -> Sig (Signal a -> b)
+input = SigSignal (Imp.Base "in") Imp.In
 
 outputArr :: FType' a
   => Integer
@@ -401,27 +406,10 @@ outputArr :: FType' a
 outputArr len f = SigArray (Imp.Base "out") Imp.Out (fromIntegral len) $ \arr ->
   ret $ f $ SArr 0 (value len) $ Node arr
 
---------------------------------------------------------------------------------
-
-input :: FType' a => (Signal a -> Sig b) -> Sig (Signal a -> b)
-input = SigSignal (Imp.Base "in") Imp.In
-
 inputArr :: FType' a
   => Integer
   -> (SArr (HExp a) -> Sig b) -> Sig (Imp.Array a -> b)
 inputArr len f = SigArray (Imp.Base "in") Imp.In (fromIntegral len) $ \arr ->
   f $ SArr 0 (value len) $ Node arr
-
---------------------------------------------------------------------------------
--- *** Structural entities.
-
-entity  :: String -> Hardware () -> Hardware ()
-entity name = Hardware . (Imp.entity name) . unHardware
-
-architecture :: String -> String -> Hardware () -> Hardware ()
-architecture entity name = Hardware . (Imp.architecture entity name) . unHardware
-
-process :: [Ident] -> Hardware () -> Hardware ()
-process is = Hardware . (Imp.process is) . unHardware
-
+-}
 --------------------------------------------------------------------------------

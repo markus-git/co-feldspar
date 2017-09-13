@@ -7,18 +7,16 @@ module Feldspar.Hardware.Representation where
 
 import Feldspar.Sugar
 import Feldspar.Representation
-import Feldspar.Common
 import Feldspar.Frontend
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Expression
+import Feldspar.Hardware.Command
 import Data.Struct
 
-import Data.Array ((!))
 import Data.Int
 import Data.Word
 import Data.List (genericTake)
 import Data.Typeable (Typeable)
-import Data.Proxy
 import Data.Constraint
 
 import Control.Monad.Identity (Identity)
@@ -35,7 +33,6 @@ import qualified Language.Syntactic as Syn
 import Control.Monad.Operational.Higher as Oper hiding ((:<:))
 
 -- hardware-edsl.
-import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
 
@@ -43,20 +40,21 @@ import qualified Language.Embedded.Hardware.Interface as Imp
 -- * Programs.
 --------------------------------------------------------------------------------
 
--- | Hardware instructions.
+-- | Hardware instruction set.
 type HardwareCMD =
+    -- ^ Computatonal instructions.
            Imp.VariableCMD
   Oper.:+: Imp.VArrayCMD
   Oper.:+: Imp.LoopCMD
   Oper.:+: Imp.ConditionalCMD
-    -- ^ Computatonal instructions.
+    -- ^ Hardware specific instructions.
   Oper.:+: Imp.SignalCMD
   Oper.:+: Imp.ArrayCMD
   Oper.:+: Imp.StructuralCMD
   Oper.:+: Imp.ComponentCMD
-    -- ^ Hardware specific instructions.
+    -- ^ ...
 
--- | Monad for building software programs in Feldspar.
+-- | Monad for building hardware programs in Co-Feldspar.
 newtype Hardware a = Hardware { unHardware :: Program HardwareCMD (Param2 HExp HardwarePrimType) a}
   deriving (Functor, Applicative, Monad)
 
@@ -85,9 +83,6 @@ data SArr a = SArr
   , sarrLength :: HExp Integer
   , unSArr     :: Struct HardwarePrimType (Imp.Array) (Internal a)
   }
-
--- | Hardware signatures.
-type Sig = Signature (Param3 Hardware HExp HardwarePrimType)
 
 --------------------------------------------------------------------------------
 

@@ -5,6 +5,7 @@
 {-# language FlexibleContexts      #-}
 {-# language UndecidableInstances  #-}
 {-# language MultiParamTypeClasses #-}
+{-# language ConstraintKinds       #-}
 {-# language TypeFamilies          #-}
 
 {-# options_ghc -fwarn-incomplete-patterns #-}
