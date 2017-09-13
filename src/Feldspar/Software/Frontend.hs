@@ -116,7 +116,7 @@ instance (Num a, SType' a) => Num (SExp a)
 
 --------------------------------------------------------------------------------
 
-instance Indexed SoftwareDomain (SExp Index) (IArr a)
+instance Syntax SoftwareDomain a => Indexed (SExp Index) (IArr a)
   where
     type Elem (IArr a) = a
     (!) (IArr off len a) ix = resugar $ mapStruct index a

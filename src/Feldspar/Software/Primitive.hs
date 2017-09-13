@@ -273,7 +273,7 @@ instance Eval SoftwarePrim
     evalSym Cos         = cos
     evalSym Tan         = tan
     evalSym (ArrIx (Imp.IArrRun arr)) = \i -> arr ! i
-    evalSym (ArrIx _)                 = error "eval of variable."
+    evalSym (ArrIx _)   = error "eval of variable."
 
 instance Symbol SoftwarePrim
   where

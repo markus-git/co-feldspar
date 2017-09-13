@@ -116,7 +116,7 @@ instance (Num a, HType' a) => Num (HExp a)
 
 --------------------------------------------------------------------------------
 
-instance Indexed HardwareDomain (HExp Integer) (IArr a)
+instance Syntax HardwareDomain a => Indexed (HExp Index) (IArr a)
   where
     type Elem (IArr a) = a
     (!) (IArr off len a) ix = resugar $ mapStruct index a

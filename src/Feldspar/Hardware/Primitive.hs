@@ -124,7 +124,7 @@ data HardwarePrim sig
     Cond :: HardwarePrim (Bool :-> a :-> a :-> Full a)
     
     -- ^ array indexing.
-    ArrIx :: (HardwarePrimType a) => Imp.IArray a -> HardwarePrim (Integer :-> Full a)
+    ArrIx :: (HardwarePrimType a) => Imp.IArray a -> HardwarePrim (Index :-> Full a)
             
     -- ^ numerical operations.
     Neg :: (HardwarePrimType a, Num a) => HardwarePrim (a :-> Full a)
@@ -261,7 +261,7 @@ instance Eval HardwarePrim
     evalSym Gt          = (>)
     evalSym Gte         = (>=)
     evalSym (ArrIx (Imp.IArrayE a)) = \i -> a ! i
-    evalSym (ArrIx _)               = error "eval of array variable"
+    evalSym (ArrIx _)   = error "eval of array variable"
 
 instance Symbol HardwarePrim
   where

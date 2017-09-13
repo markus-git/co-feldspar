@@ -184,10 +184,10 @@ class Casting dom
 --------------------------------------------------------------------------------
 -- arrays.
 
-class Indexed dom ix a
+class Indexed ix a
   where
     type Elem a :: *
-    (!) :: Syntax dom (Elem a) => a -> ix -> Elem a
+    (!) :: a -> ix -> Elem a
 
 class Slicable ix a
   where
