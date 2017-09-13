@@ -1,18 +1,7 @@
-{-# language StandaloneDeriving #-}
 {-# language GADTs #-}
-{-# language FlexibleInstances #-}
-{-# language MultiParamTypeClasses #-}
-{-# language UndecidableInstances #-}
-{-# LANGUAGE PolyKinds #-}
 {-# language TypeOperators #-}
 {-# language TypeFamilies #-}
 {-# language GeneralizedNewtypeDeriving #-}
-{-# language FlexibleContexts #-}
-{-# language ScopedTypeVariables #-}
-
-{-# language InstanceSigs #-}
-{-# language Rank2Types #-}
-{-# language ConstraintKinds #-}
 
 module Feldspar.Hardware.Representation where
 

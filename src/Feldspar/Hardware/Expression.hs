@@ -69,6 +69,14 @@ hardwareTypeRep :: Struct HardwarePrimType c a -> HTypeRep a
 hardwareTypeRep = mapStruct (const hardwareRep)
 
 --------------------------------------------------------------------------------
+
+-- | Short-hand for hardware types.
+type HType    = Type HardwarePrimType
+
+-- | Short-hand for primitive hardware types.
+type HType'   = PrimType HardwarePrimType
+
+--------------------------------------------------------------------------------
 -- ** Hardware expression symbols.
 
 -- | Hardware symbols.

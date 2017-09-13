@@ -70,6 +70,14 @@ softwareTypeRep :: Struct SoftwarePrimType c a -> STypeRep a
 softwareTypeRep = mapStruct (const softwareRep)
 
 --------------------------------------------------------------------------------
+
+-- | Short-hand for software types.
+type SType    = Type SoftwarePrimType
+
+-- | Short-hand for primitive software types.
+type SType'   = PrimType SoftwarePrimType
+
+--------------------------------------------------------------------------------
 -- ** Software expression symbols.
 
 -- | For loop.

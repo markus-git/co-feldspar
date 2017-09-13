@@ -10,6 +10,7 @@ import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Primitive.Backend
+import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Representation
 -- ...
 import Feldspar.Hardware.Frontend (component, input, ret, process)

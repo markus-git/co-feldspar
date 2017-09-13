@@ -16,6 +16,7 @@ import Feldspar.Common
 
 import Feldspar.Hardware.Representation
 import Feldspar.Hardware.Primitive
+import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Frontend
 import Feldspar.Hardware.Compile
 

@@ -15,5 +15,6 @@ import Feldspar.Common
 
 import Feldspar.Software.Representation
 import Feldspar.Software.Primitive
+import Feldspar.Software.Expression
 import Feldspar.Software.Frontend
 import Feldspar.Software.Compile

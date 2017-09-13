@@ -13,7 +13,6 @@ module Feldspar.Common where
 
 import Feldspar.Representation
 import Feldspar.Frontend
-
 import Feldspar.Software.Primitive
 import Feldspar.Hardware.Primitive
 

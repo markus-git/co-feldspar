@@ -16,6 +16,7 @@ import Feldspar.Common
 
 import Feldspar.Software.Primitive
 import Feldspar.Software.Primitive.Backend
+import Feldspar.Software.Expression
 import Feldspar.Software.Representation
 -- todo : hmm...
 import Feldspar.Software.Frontend

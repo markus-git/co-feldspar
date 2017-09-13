@@ -15,8 +15,8 @@ import Feldspar.Representation
 import Feldspar.Common
 import Feldspar.Frontend
 import Feldspar.Sugar
-
 import Feldspar.Software.Primitive
+import Feldspar.Software.Expression
 import Feldspar.Software.Representation
 
 import Feldspar.Hardware.Representation (Sig)

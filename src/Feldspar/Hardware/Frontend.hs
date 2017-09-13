@@ -12,8 +12,8 @@ import Feldspar.Representation
 import Feldspar.Common
 import Feldspar.Frontend
 import Feldspar.Sugar
-
 import Feldspar.Hardware.Primitive
+import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Representation
 
 import Data.Struct
