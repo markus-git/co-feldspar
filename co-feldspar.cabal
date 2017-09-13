@@ -34,6 +34,7 @@ library
     Feldspar.Software.Primitive.Backend,
     Feldspar.Software.Expression,
     Feldspar.Software.Command,
+    Feldspar.Software.Command.Backend,
     Feldspar.Software.Representation,
     Feldspar.Software.Frontend,
     Feldspar.Software.Compile,

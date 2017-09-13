@@ -1,10 +1,10 @@
-{-# language GADTs #-}
-{-# language TypeOperators #-}
-{-# language FlexibleContexts #-}
-{-# language ConstraintKinds #-}
+{-# language GADTs               #-}
+{-# language TypeOperators       #-}
+{-# language FlexibleContexts    #-}
+{-# language ConstraintKinds     #-}
 {-# language ScopedTypeVariables #-}
 
-module Feldspar.Hardware.Compile (compile, icompile, icompileWrap) where
+module Feldspar.Hardware.Compile where
 
 import Feldspar.Sugar
 import Feldspar.Representation
@@ -13,8 +13,6 @@ import Feldspar.Hardware.Primitive.Backend
 import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Representation
 import Data.Struct
--- ... hmm ...
-import Feldspar.Hardware.Frontend (entity, architecture, process)
 
 import Control.Monad.Identity
 import Control.Monad.Reader
@@ -34,37 +32,13 @@ import qualified Language.Syntactic as Syn
 
 -- hardware-edsl.
 import Language.Embedded.Hardware (Signal, FreeExp (..))
-import qualified Language.Embedded.Hardware         as Hard
-import qualified Language.Embedded.Hardware.Command as Hard
+import qualified Language.Embedded.Hardware as Hard
 
 --------------------------------------------------------------------------------
 -- * Hardware compiler.
 --------------------------------------------------------------------------------
 
-compile :: Hardware a -> String
-compile = Hard.compile . translate
-
-icompile :: Hardware a -> IO ()
-icompile = Hard.icompile . translate
-
---------------------------------------------------------------------------------
-
-icompileWrap :: Hardware () -> IO ()
-icompileWrap = Hard.icompile . translate . wrap
-
---------------------------------------------------------------------------------
-
--- todo: use wrap from hardware-edsl.
-wrap :: Hardware () -> Hardware ()
-wrap prg = do
-  entity       "empty" $ return ()
-  architecture "empty" "behav" $
-    process [] $ prg
-
---------------------------------------------------------------------------------
--- ** Instructions.
---------------------------------------------------------------------------------
-
+-- | Target hardware instructions.
 type TargetCMD
     =        Hard.VariableCMD
     Oper.:+: Hard.ArrayCMD
@@ -76,17 +50,14 @@ type TargetCMD
     Oper.:+: Hard.ConstantCMD
     Oper.:+: Hard.SignalCMD
 
+-- | Target monad during translation.
 type TargetT m = ReaderT Env (ProgramT TargetCMD (Oper.Param2 Prim HardwarePrimType) m)
 
+-- | Monad for translated programs.
 type ProgH = Program TargetCMD (Oper.Param2 Prim HardwarePrimType)
 
 --------------------------------------------------------------------------------
-
--- ...
-
---------------------------------------------------------------------------------
--- ** Expressions.
---------------------------------------------------------------------------------
+-- ** Compilation of expressions.
 
 -- | Struct expression.
 type VExp = Struct HardwarePrimType Prim
@@ -218,8 +189,6 @@ unsafeTranslateSmallExp :: Monad m => HExp a -> TargetT m (Prim a)
 unsafeTranslateSmallExp a =
   do Node b <- translateExp a
      return b
-
---------------------------------------------------------------------------------
 
 translate :: Hardware a -> ProgH a
 translate = flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp . unHardware
