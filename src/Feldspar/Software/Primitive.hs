@@ -1,16 +1,17 @@
-{-# language GADTs #-}
-{-# language StandaloneDeriving #-}
-{-# language TypeOperators #-}
-{-# language FlexibleInstances #-}
-{-# language FlexibleContexts #-}
-{-# language UndecidableInstances #-}
+{-# language GADTs                 #-}
+{-# language StandaloneDeriving    #-}
+{-# language TypeOperators         #-}
+{-# language FlexibleInstances     #-}
+{-# language FlexibleContexts      #-}
+{-# language UndecidableInstances  #-}
 {-# language MultiParamTypeClasses #-}
-{-# language TypeFamilies #-}
+{-# language TypeFamilies          #-}
 
 {-# options_ghc -fwarn-incomplete-patterns #-}
 
 module Feldspar.Software.Primitive where
 
+import Feldspar.Representation
 import Data.Struct
 
 import Data.Array ((!))
@@ -20,7 +21,6 @@ import Data.Word
 import Data.List (genericTake)
 import Data.Typeable hiding (TypeRep)
 import Data.Constraint hiding (Sub)
-
 import qualified Data.Bits as Bits
 
 -- syntactic.
@@ -32,15 +32,14 @@ import Language.Syntactic.Functional.Tuple
 import Language.Embedded.Expression
 import qualified Language.Embedded.Imperative.CMD as Imp (IArr(..))
 
--- hardware-edsl.
-import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))
-
-import Feldspar.Representation
-
 --------------------------------------------------------------------------------
--- * Software Types.
+-- * Software primitives.
 --------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- ** Software primitive types.
+
+-- | Representation of supported, primitive software types.
 data SoftwarePrimTypeRep a
   where
     -- booleans
@@ -57,7 +56,7 @@ data SoftwarePrimTypeRep a
     Word64ST :: SoftwarePrimTypeRep Word64
     -- floating point numbers.
     FloatST  :: SoftwarePrimTypeRep Float
---  DoulbeST :: SoftwarePrimTypeRep Double
+    DoubleST :: SoftwarePrimTypeRep Double
 
 deriving instance Eq       (SoftwarePrimTypeRep a)
 deriving instance Show     (SoftwarePrimTypeRep a)
@@ -65,7 +64,7 @@ deriving instance Typeable (SoftwarePrimTypeRep a)
 
 --------------------------------------------------------------------------------
 
--- | Class of supported software types.
+-- | Class of supported, primitive software types.
 class (Eq a, Show a, Typeable a, Inhabited a) => SoftwarePrimType a
   where
     softwareRep :: SoftwarePrimTypeRep a
@@ -80,9 +79,9 @@ instance SoftwarePrimType Word16 where softwareRep = Word16ST
 instance SoftwarePrimType Word32 where softwareRep = Word32ST
 instance SoftwarePrimType Word64 where softwareRep = Word64ST
 instance SoftwarePrimType Float  where softwareRep = FloatST
+instance SoftwarePrimType Double where softwareRep = DoubleST
 
---------------------------------------------------------------------------------
-
+-- | Compare two primitive software types for equality.
 softwarePrimTypeEq :: SoftwarePrimTypeRep a -> SoftwarePrimTypeRep b -> Maybe (Dict (a ~ b))
 softwarePrimTypeEq (BoolST)   (BoolST)   = Just Dict
 softwarePrimTypeEq (Int8ST)   (Int8ST)   = Just Dict
@@ -94,11 +93,14 @@ softwarePrimTypeEq (Word16ST) (Word16ST) = Just Dict
 softwarePrimTypeEq (Word32ST) (Word32ST) = Just Dict
 softwarePrimTypeEq (Word64ST) (Word64ST) = Just Dict
 softwarePrimTypeEq (FloatST)  (FloatST)  = Just Dict
+softwarePrimTypeEq (DoubleST) (DoubleST) = Just Dict
 softwarePrimTypeEq _          _          = Nothing
 
+-- | Construct the primitive software type representation of 'a'.
 softwarePrimTypeOf :: SoftwarePrimType a => a -> SoftwarePrimTypeRep a
 softwarePrimTypeOf _ = softwareRep
 
+-- | Construct a primitive software type witness from its representation.
 softwarePrimWitType :: SoftwarePrimTypeRep a -> Dict (SoftwarePrimType a)
 softwarePrimWitType BoolST   = Dict
 softwarePrimWitType Int8ST   = Dict
@@ -110,14 +112,15 @@ softwarePrimWitType Word16ST = Dict
 softwarePrimWitType Word32ST = Dict
 softwarePrimWitType Word64ST = Dict
 softwarePrimWitType FloatST  = Dict
+softwarePrimWitType DoubleST = Dict
 
 --------------------------------------------------------------------------------
--- * ... prim ...
---------------------------------------------------------------------------------
+-- ** Software primitive expressions.
 
 -- | Software primitive symbols.
 data SoftwarePrim sig
   where
+    -- ^ free variables and literals.
     FreeVar :: (SoftwarePrimType a) => String -> SoftwarePrim (Full a)
     Lit     :: (Show a, Eq a)       => a      -> SoftwarePrim (Full a)
     
@@ -125,9 +128,8 @@ data SoftwarePrim sig
     Cond :: SoftwarePrim (Bool :-> a :-> a :-> Full a)
     
     -- ^ array indexing.
-    ArrIx :: (SoftwarePrimType a) => Imp.IArr Index a
-          -> SoftwarePrim (Index :-> Full a)
-          
+    ArrIx :: (SoftwarePrimType a) => Imp.IArr Index a -> SoftwarePrim (Index :-> Full a)
+
     -- ^ numerical operations.
     Neg :: (SoftwarePrimType a, Num a) => SoftwarePrim (a :-> Full a)
     Add :: (SoftwarePrimType a, Num a) => SoftwarePrim (a :-> a :-> Full a)
@@ -182,8 +184,7 @@ type SoftwarePrimDomain = SoftwarePrimConstructs :&: SoftwarePrimTypeRep
 -- | Software primitive expressions.
 newtype Prim a = Prim { unPrim :: ASTF SoftwarePrimDomain a }
 
---------------------------------------------------------------------------------
-
+-- | Evaluate a closed, software primitive expression.
 evalPrim :: Prim a -> a
 evalPrim = go . unPrim
   where
@@ -191,15 +192,7 @@ evalPrim = go . unPrim
     go (Sym (s :&: _)) = evalSym s
     go (f :$ a)        = go f $ go a
 
---------------------------------------------------------------------------------
-
-instance Syntactic (Prim a)
-  where
-    type Domain   (Prim a) = SoftwarePrimDomain
-    type Internal (Prim a) = a
-    desugar = unPrim
-    sugar   = Prim
-
+-- | Sugar a software primitive symbol as a smart constructor.
 sugarSymPrim
   :: ( Signature sig
      , fi  ~ SmartFun dom sig
@@ -215,6 +208,13 @@ sugarSymPrim = sugarSymDecor softwareRep
 
 --------------------------------------------------------------------------------
 
+instance Syntactic (Prim a)
+  where
+    type Domain   (Prim a) = SoftwarePrimDomain
+    type Internal (Prim a) = a
+    desugar = unPrim
+    sugar   = Prim
+
 instance FreeExp Prim
   where
     type FreePred Prim = SoftwarePrimType
@@ -226,6 +226,7 @@ instance EvalExp Prim
     evalExp = evalPrim
 
 --------------------------------------------------------------------------------
+-- front-end.
 
 instance (SoftwarePrimType a, Num a) => Num (Prim a)
   where

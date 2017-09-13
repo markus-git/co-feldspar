@@ -95,17 +95,6 @@ instance (Imp.CompExp exp, Imp.CompTypeClass ct)
   => Oper.Interp MMapCMD C.CGen (Param2 exp ct)
   where
     interp = compMMapCMD
-{-
-class Oper.Interp (instr :: (k1 -> *, k) -> k1 -> *)
-                  (m :: k1 -> *)
-                  (fs :: k) where
-  Oper.interp :: forall (a :: k1). instr ('(,) m fs) a -> m a
-
-data RefCMD (fs :: (k, (* -> *, (* -> Constraint, *)))) a where
-  Imp.NewRef :: forall k (pred :: * -> Constraint) a1 (prog :: k) (exp :: * -> *).
-                pred a1 =>
-                String -> RefCMD ('(,) prog (Param2 exp pred)) (Imp.Ref a1)
--}
 
 compMMapCMD
   :: forall exp ct a

@@ -59,8 +59,6 @@ instance CompTypeClass SoftwarePrimType
       Word64ST -> return [cexp| $a |]
       FloatST  -> return [cexp| $a |]
 
---------------------------------------------------------------------------------
-
 instance CompExp Prim
   where
     compExp = compPrim
