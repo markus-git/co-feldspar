@@ -65,23 +65,23 @@ newtype Ref a = Ref { unRef :: Struct HardwarePrimType Imp.Variable (Internal a)
 
 -- | Hardware arrays.
 data Arr a = Arr
-  { arrOffset :: HExp Integer
-  , arrLength :: HExp Integer
-  , unArr     :: Struct HardwarePrimType (Imp.VArray) (Internal a)
+  { arrOffset :: HExp Index
+  , arrLength :: HExp Length
+  , unArr     :: Struct HardwarePrimType (Imp.VArray Index) (Internal a)
   }
 
 -- | Immutable hardware arrays.
 data IArr a = IArr
-  { iarrOffset :: HExp Integer
-  , iarrLength :: HExp Integer
-  , unIArr     :: Struct HardwarePrimType (Imp.IArray) (Internal a)
+  { iarrOffset :: HExp Index
+  , iarrLength :: HExp Length
+  , unIArr     :: Struct HardwarePrimType (Imp.IArray Index) (Internal a)
   }
 
 -- | Hardware arrays of signals.
 data SArr a = SArr
-  { sarrOffset :: HExp Integer
-  , sarrLength :: HExp Integer
-  , unSArr     :: Struct HardwarePrimType (Imp.Array) (Internal a)
+  { sarrOffset :: HExp Index
+  , sarrLength :: HExp Length
+  , unSArr     :: Struct HardwarePrimType (Imp.Array Index) (Internal a)
   }
 
 --------------------------------------------------------------------------------

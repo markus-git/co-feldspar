@@ -121,20 +121,20 @@ instance Syntax HardwareDomain a => Indexed (HExp Index) (IArr a)
     type Elem (IArr a) = a
     (!) (IArr off len a) ix = resugar $ mapStruct index a
       where
-        index :: HardwarePrimType b => Imp.IArray b -> HExp b
+        index :: HardwarePrimType b => Imp.IArray Index b -> HExp b
         index arr = sugarSymPrimHardware (ArrIx arr) (ix + off)
 
-instance Slicable (HExp Integer) (Arr a)
+instance Slicable (HExp Index) (Arr a)
   where
     slice from len (Arr o l arr) = Arr (o+from) len arr
 
-instance Slicable (HExp Integer) (IArr a)
+instance Slicable (HExp Index) (IArr a)
   where
     slice from len (IArr o l arr) = IArr (o+from) len arr
 
-instance Finite (HExp Integer) (Arr a)  where length = arrLength
-instance Finite (HExp Integer) (IArr a) where length = iarrLength
-instance Finite (HExp Integer) (SArr a) where length = sarrLength
+instance Finite (HExp Index) (Arr a)  where length = arrLength
+instance Finite (HExp Index) (IArr a) where length = iarrLength
+instance Finite (HExp Index) (SArr a) where length = sarrLength
 
 --------------------------------------------------------------------------------
 -- * Instructions.
@@ -214,7 +214,7 @@ freezeRef' = withHType (Proxy :: Proxy b) Imp.unsafeFreezeVariable
 instance Arrays Hardware
   where
     type Array Hardware = Arr
-    type Ix    Hardware = HExp Integer    
+    type Ix    Hardware = HExp Index
     newArr len
       = Hardware
       $ fmap (Arr 0 len)
@@ -244,11 +244,11 @@ instance Arrays Hardware
         (unArr brr)
       
 -- 'Imp.getVArr' specialized to hardware.
-getArr' :: forall b . HardwarePrimType b => Imp.VArray b -> HExp Integer -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
+getArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
 getArr' = withHType (Proxy :: Proxy b) Imp.getVArray
 
 -- 'Imp.setVArr' specialized to hardware.
-setArr' :: forall b . HardwarePrimType b => Imp.VArray b -> HExp Integer -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
+setArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
 setArr' = withHType (Proxy :: Proxy b) Imp.setVArray
 
 --------------------------------------------------------------------------------
@@ -326,17 +326,17 @@ setSignal s = Hardware . (Imp.setSignal s)
 --       necessary here, its better to assume 'SArr (HExp a)'.
 --------------------------------------------------------------------------------
 
-newArray :: HType (Internal a) => HExp Integer -> Hardware (SArr a)
+newArray :: HType (Internal a) => HExp Index -> Hardware (SArr a)
 newArray len = Hardware $ fmap (SArr 0 len) $ mapStructA (const (Imp.newArray len)) $ typeRep
 
 initArray :: HType' (Internal a) => [Internal a] -> Hardware (SArr a)
 initArray as = Hardware $ fmap (SArr 0 len . Node) $ Imp.initArray as
   where len = value $ genericLength as
 
-getArray :: HType (Internal a) => SArr a -> HExp Integer -> Hardware (HExp (Internal a))
+getArray :: HType (Internal a) => SArr a -> HExp Index -> Hardware (HExp (Internal a))
 getArray arr ix = Hardware $ fmap resugar $ mapStructA (flip getSArr' (ix + sarrOffset arr)) $ (unSArr arr)
 
-setArray :: HType (Internal a) => SArr a -> HExp Integer -> HExp (Internal a) -> Hardware ()
+setArray :: HType (Internal a) => SArr a -> HExp Index -> HExp (Internal a) -> Hardware ()
 setArray arr ix a = Hardware $ sequence_ $ zipListStruct (\v a -> setSArr' a (ix + sarrOffset arr) v) (resugar a) $ unSArr arr
 
 copyArray :: HType (Internal a) => SArr a -> SArr a -> Hardware ()
@@ -345,11 +345,11 @@ copyArray arr brr = Hardware $ sequence_ $ zipListStruct (\a b -> Imp.copyArray 
 --------------------------------------------------------------------------------
 
 -- 'Imp.getVArr' specialized to hardware.
-getSArr' :: forall b . HardwarePrimType b => Imp.Array b -> HExp Integer -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
+getSArr' :: forall b . HardwarePrimType b => Imp.Array Index b -> HExp Index -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
 getSArr' = withHType (Proxy :: Proxy b) Imp.getArray
 
 -- 'Imp.setVArr' specialized to hardware.
-setSArr' :: forall b . HardwarePrimType b => Imp.Array b -> HExp Integer -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
+setSArr' :: forall b . HardwarePrimType b => Imp.Array Index b -> HExp Index -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
 setSArr' = withHType (Proxy :: Proxy b) Imp.setArray
 
 --------------------------------------------------------------------------------

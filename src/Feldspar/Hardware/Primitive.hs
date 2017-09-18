@@ -124,7 +124,7 @@ data HardwarePrim sig
     Cond :: HardwarePrim (Bool :-> a :-> a :-> Full a)
     
     -- ^ array indexing.
-    ArrIx :: (HardwarePrimType a) => Imp.IArray a -> HardwarePrim (Index :-> Full a)
+    ArrIx :: (HardwarePrimType a) => Imp.IArray Index a -> HardwarePrim (Index :-> Full a)
             
     -- ^ numerical operations.
     Neg :: (HardwarePrimType a, Num a) => HardwarePrim (a :-> Full a)
