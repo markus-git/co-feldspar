@@ -115,28 +115,6 @@ instance (Num a, HType' a) => Num (HExp a)
     signum      = error "signum not implemented for `HExp`"
 
 --------------------------------------------------------------------------------
-
-instance Syntax HardwareDomain a => Indexed (HExp Index) (IArr a)
-  where
-    type Elem (IArr a) = a
-    (!) (IArr off len a) ix = resugar $ mapStruct index a
-      where
-        index :: HardwarePrimType b => Imp.IArray Index b -> HExp b
-        index arr = sugarSymPrimHardware (ArrIx arr) (ix + off)
-
-instance Slicable (HExp Index) (Arr a)
-  where
-    slice from len (Arr o l arr) = Arr (o+from) len arr
-
-instance Slicable (HExp Index) (IArr a)
-  where
-    slice from len (IArr o l arr) = IArr (o+from) len arr
-
-instance Finite (HExp Index) (Arr a)  where length = arrLength
-instance Finite (HExp Index) (IArr a) where length = iarrLength
-instance Finite (HExp Index) (SArr a) where length = sarrLength
-
---------------------------------------------------------------------------------
 -- * Instructions.
 --------------------------------------------------------------------------------
 
@@ -211,10 +189,30 @@ freezeRef' = withHType (Proxy :: Proxy b) Imp.unsafeFreezeVariable
 
 --------------------------------------------------------------------------------
 
+
+instance Syntax HardwareDomain a => Indexed HExp (IArr a)
+  where
+    type Elem (IArr a) = a
+    (!) (IArr off len a) ix = resugar $ mapStruct index a
+      where
+        index :: HardwarePrimType b => Imp.IArray Index b -> HExp b
+        index arr = sugarSymPrimHardware (ArrIx arr) (ix + off)
+
+instance Slicable HExp (Arr a)
+  where
+    slice from len (Arr o l arr) = Arr (o+from) len arr
+
+instance Slicable HExp (IArr a)
+  where
+    slice from len (IArr o l arr) = IArr (o+from) len arr
+
+instance Finite HExp (Arr a)  where length = arrLength
+instance Finite HExp (IArr a) where length = iarrLength
+instance Finite HExp (SArr a) where length = sarrLength
+
 instance Arrays Hardware
   where
     type Array Hardware = Arr
-    type Ix    Hardware = HExp Index
     newArr len
       = Hardware
       $ fmap (Arr 0 len)
@@ -243,16 +241,6 @@ instance Arrays Hardware
         (unArr arr)
         (unArr brr)
       
--- 'Imp.getVArr' specialized to hardware.
-getArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
-getArr' = withHType (Proxy :: Proxy b) Imp.getVArray
-
--- 'Imp.setVArr' specialized to hardware.
-setArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
-setArr' = withHType (Proxy :: Proxy b) Imp.setVArray
-
---------------------------------------------------------------------------------
-
 instance IArrays Hardware
   where
     type IArray Hardware = IArr
@@ -266,6 +254,14 @@ instance IArrays Hardware
       $ fmap (Arr (iarrOffset iarr) (length iarr))
       $ mapStructA (Imp.unsafeThawVArray)
       $ unIArr iarr
+
+-- 'Imp.getVArr' specialized to hardware.
+getArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
+getArr' = withHType (Proxy :: Proxy b) Imp.getVArray
+
+-- 'Imp.setVArr' specialized to hardware.
+setArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
+setArr' = withHType (Proxy :: Proxy b) Imp.setVArray
 
 --------------------------------------------------------------------------------
 

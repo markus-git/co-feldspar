@@ -1,15 +1,8 @@
-{-# language TypeFamilies #-}
-{-# language TypeSynonymInstances #-}
-{-# language FlexibleInstances #-}
-{-# language UndecidableInstances #-}
+{-# language TypeFamilies          #-}
 {-# language MultiParamTypeClasses #-}
-{-# language ConstraintKinds #-}
-{-# language ScopedTypeVariables #-}
-{-# language FlexibleContexts #-}
-
-{-# language FunctionalDependencies #-}
-
-{-# language TypeOperators #-}
+{-# language FlexibleContexts      #-}
+{-# language ConstraintKinds       #-}
+{-# language ScopedTypeVariables   #-}
 
 module Feldspar.Frontend where
 
@@ -44,30 +37,10 @@ import Prelude hiding (length, Word)
 type Syntax  dom a = (Syntactic a, dom ~ Domain a, Type (PredicateOf dom) (Internal a), Tuples dom)
 
 -- | Short-hand for a `Syntactic` instance over typed primitive values from `dom`.
-type Syntax' dom a = (Syntactic a, PrimType (PredicateOf dom) (Internal a), dom ~ Domain a)
-
--- | ...
-type SyntaxM  m a = Syntax  (DomainOf m) a
-
--- | ...
-type SyntaxM' m a = Syntax' (DomainOf m) a
+type Syntax' dom a = (Syntactic a, dom ~ Domain a, PrimType (PredicateOf dom) (Internal a))
 
 -- | ...
 type Boolean a = a ~ Bool
-
---------------------------------------------------------------------------------
-
--- computational instructions.
-type Comp m
-  = ( Monad m
-    , References m
-    , Arrays m
-    , IArrays m
-    , Control m
-    , Value (DomainOf m)
-    , Share (DomainOf m)
-    , Cond  (DomainOf m)
-    )
 
 --------------------------------------------------------------------------------
 -- ** General constructs.
@@ -180,25 +153,29 @@ infixl 5 .|.
 class Casting dom
   where
     i2n :: (Syntax' dom a, Syntax' dom b, Integral (Internal a), Num (Internal b)) => a -> b
-  
+
 --------------------------------------------------------------------------------
--- arrays.
-
-class Indexed ix a
-  where
-    type Elem a :: *
-    (!) :: a -> ix -> Elem a
-
-class Slicable ix a
-  where
-    slice :: ix -> ix -> a -> a
-
-class Finite ix a
-  where
-    length :: a -> ix
-    
+-- * Instructions.
 --------------------------------------------------------------------------------
--- ** Commands.
+
+-- | ...
+type SyntaxM  m a = Syntax  (DomainOf m) a
+
+-- | ...
+type SyntaxM' m a = Syntax' (DomainOf m) a
+
+-- | Computational instructions.
+type MonadComp m
+  = ( Monad m
+    , References m
+    , Arrays  m
+--    , IArrays m
+    , Control m
+    )
+                  
+--------------------------------------------------------------------------------
+-- ** References.
+--------------------------------------------------------------------------------
 
 class Monad m => References m
   where
@@ -214,33 +191,50 @@ shareM :: (SyntaxM m a, References m) => a -> m a
 shareM a = initRef a >>= unsafeFreezeRef
 
 --------------------------------------------------------------------------------
+-- ** Arrays.
+--------------------------------------------------------------------------------
 -- todo: 'Ix m' could be replaced by 'SyntaxM ix, Array.Ix ix => ix' in 'Arrays'
 -- if we got rid of the hardcoded 'Data Index' in array definitions.
+--------------------------------------------------------------------------------
+
+class Indexed ix a
+  where
+    type Elem a :: *
+    (!) :: a -> ix Index -> Elem a
+
+class Slicable ix a
+  where
+    slice :: ix Index -> ix Length -> a -> a
+      
+class Finite ix a
+  where
+    length :: a -> ix Length
 
 class Monad m => Arrays m
   where
     type Array m :: * -> *
-    type Ix    m :: *
-    newArr  :: SyntaxM  m a => Ix m -> m (Array m a)
+    newArr  :: SyntaxM  m a => Expr m Length -> m (Array m a)
     initArr :: SyntaxM' m a => [Internal a] -> m (Array m a)
-    getArr  :: SyntaxM  m a => Array m a -> Ix m -> m a
-    setArr  :: SyntaxM  m a => Array m a -> Ix m -> a -> m ()
+    getArr  :: SyntaxM  m a => Array m a -> Expr m Index -> m a
+    setArr  :: SyntaxM  m a => Array m a -> Expr m Index -> a -> m ()
     copyArr :: SyntaxM  m a => Array m a -> Array m a -> m ()
 
 class Arrays m => IArrays m
   where
     type IArray m :: * -> *
-    unsafeFreezeArr :: (SyntaxM m a, Finite (Ix m) (Array  m a)) => Array  m a -> m (IArray m a)
-    unsafeThawArr   :: (SyntaxM m a, Finite (Ix m) (IArray m a)) => IArray m a -> m (Array  m a)
+    unsafeFreezeArr :: (SyntaxM m a, Finite (Expr m) (Array  m a))
+      => Array  m a -> m (IArray m a)
+    unsafeThawArr   :: (SyntaxM m a, Finite (Expr m) (IArray m a))
+      => IArray m a -> m (Array  m a)
 
-freezeArr :: (IArrays m, SyntaxM m a, Finite (Ix m) (Array m a))
-  => Array  m a -> m (IArray m a)
+freezeArr :: (IArrays m, SyntaxM m a, Finite (Expr m) (Array m a))
+  => Array m a -> m (IArray m a)
 freezeArr arr =
   do iarr <- newArr (length arr)
      copyArr iarr arr
      unsafeFreezeArr iarr
 
-thawArr :: (IArrays m, SyntaxM m a, Finite (Ix m) (IArray m a))
+thawArr :: (IArrays m, SyntaxM m a, Finite (Expr m) (IArray m a))
   => IArray m a -> m (Array  m a)
 thawArr iarr =
   do brr <- unsafeThawArr iarr -- haha.
@@ -248,6 +242,8 @@ thawArr iarr =
      copyArr arr brr
      return arr
 
+--------------------------------------------------------------------------------
+-- ** Control.
 --------------------------------------------------------------------------------
 
 class Monad m => Control m

@@ -1,6 +1,9 @@
-{-# language GADTs #-}
-{-# language TypeOperators #-}
-{-# language TypeFamilies #-}
+{-# language GADTs                      #-}
+{-# language TypeOperators              #-}
+{-# language TypeFamilies               #-}
+{-# language MultiParamTypeClasses      #-}
+{-# language FlexibleContexts           #-}
+{-# language FlexibleInstances          #-}
 {-# language GeneralizedNewtypeDeriving #-}
 
 module Feldspar.Software.Representation where
@@ -8,6 +11,7 @@ module Feldspar.Software.Representation where
 import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
+import Feldspar.Storable
 import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
 import Feldspar.Software.Command
@@ -77,5 +81,18 @@ data IArr a = IArr
 -- ... hmm ...
 type instance Expr Software = SExp
 type instance DomainOf Software = SoftwareDomain
+
+--------------------------------------------------------------------------------
+
+instance (Reference Software ~ Ref, Type SoftwarePrimType a) =>
+    Storable Software (SExp a)
+  where
+    type StoreRep Software (SExp a) = Ref (SExp a)
+    type StoreSize Software (SExp a) = ()
+    newStoreRep _ _      = newRef
+    initStoreRep         = initRef
+    readStoreRep         = getRef
+    unsafeFreezeStoreRep = unsafeFreezeRef
+    writeStoreRep        = setRef
 
 --------------------------------------------------------------------------------

@@ -43,7 +43,7 @@ import Language.Syntactic.Functional.Tuple
 import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))
 
 -- operational-higher.
-import Control.Monad.Operational.Higher (Program, Param2, (:+:))
+import Control.Monad.Operational.Higher (ProgramT, Param2)
 
 --------------------------------------------------------------------------------
 -- Short-hand for common data types.
@@ -100,5 +100,11 @@ type family PredicateOf (dom :: * -> *) :: * -> Constraint
 
 -- | Type representation associated with a predicate.
 type family RepresentationOf (pred :: * -> Constraint) :: * -> *
+
+--------------------------------------------------------------------------------
+-- * Storable
+--------------------------------------------------------------------------------
+
+
 
 --------------------------------------------------------------------------------

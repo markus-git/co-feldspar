@@ -115,27 +115,6 @@ instance (Num a, SType' a) => Num (SExp a)
     signum      = error "todo: signum not implemented for `SExp`"
 
 --------------------------------------------------------------------------------
-
-instance Syntax SoftwareDomain a => Indexed (SExp Index) (IArr a)
-  where
-    type Elem (IArr a) = a
-    (!) (IArr off len a) ix = resugar $ mapStruct index a
-      where
-        index :: SoftwarePrimType b => Imp.IArr Index b -> SExp b
-        index arr = sugarSymPrimSoftware (ArrIx arr) (ix + off)
-
-instance Slicable (SExp Index) (Arr a)
-  where
-    slice from len (Arr o l arr) = Arr (o+from) len arr
-
-instance Slicable (SExp Index) (IArr a)
-  where
-    slice from len (IArr o l arr) = IArr (o+from) len arr
-
-instance Finite (SExp Index) (Arr a)  where length = arrLength
-instance Finite (SExp Index) (IArr a) where length = iarrLength
-
---------------------------------------------------------------------------------
 -- * Instructions.
 --------------------------------------------------------------------------------
 
@@ -210,10 +189,28 @@ freezeRef' = withSType (Proxy :: Proxy b) Imp.unsafeFreezeRef
 
 --------------------------------------------------------------------------------
 
+instance Syntax SoftwareDomain a => Indexed SExp (IArr a)
+  where
+    type Elem (IArr a) = a
+    (!) (IArr off len a) ix = resugar $ mapStruct index a
+      where
+        index :: SoftwarePrimType b => Imp.IArr Index b -> SExp b
+        index arr = sugarSymPrimSoftware (ArrIx arr) (ix + off)
+
+instance Slicable SExp (Arr a)
+  where
+    slice from len (Arr o l arr) = Arr (o+from) len arr
+
+instance Slicable SExp (IArr a)
+  where
+    slice from len (IArr o l arr) = IArr (o+from) len arr
+
+instance Finite SExp (Arr a)  where length = arrLength
+instance Finite SExp (IArr a) where length = iarrLength
+
 instance Arrays Software
   where
     type Array Software = Arr
-    type Ix    Software = SExp Index    
     newArr len
       = Software
       $ fmap (Arr 0 len)
@@ -244,16 +241,6 @@ instance Arrays Software
         (unArr arr)
         (unArr brr)
 
--- 'Imp.getArr' specialized to software.
-getArr' :: forall b . SoftwarePrimType b => Imp.Arr Index b -> SExp Index -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
-getArr' = withSType (Proxy :: Proxy b) Imp.getArr
-
--- 'Imp.setArr' specialized to software.
-setArr' :: forall b . SoftwarePrimType b => Imp.Arr Index b -> SExp Index -> SExp b -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
-setArr' = withSType (Proxy :: Proxy b) Imp.setArr
-
---------------------------------------------------------------------------------
-
 instance IArrays Software
   where
     type IArray Software = IArr    
@@ -267,6 +254,14 @@ instance IArrays Software
       $ fmap (Arr (iarrOffset iarr) (length iarr))
       $ mapStructA (Imp.unsafeThawArr)
       $ unIArr iarr
+
+-- 'Imp.getArr' specialized to software.
+getArr' :: forall b . SoftwarePrimType b => Imp.Arr Index b -> SExp Index -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
+getArr' = withSType (Proxy :: Proxy b) Imp.getArr
+
+-- 'Imp.setArr' specialized to software.
+setArr' :: forall b . SoftwarePrimType b => Imp.Arr Index b -> SExp Index -> SExp b -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
+setArr' = withSType (Proxy :: Proxy b) Imp.setArr
 
 --------------------------------------------------------------------------------
 

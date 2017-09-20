@@ -1,6 +1,9 @@
-{-# language GADTs #-}
-{-# language TypeOperators #-}
-{-# language TypeFamilies #-}
+{-# language GADTs                      #-}
+{-# language TypeOperators              #-}
+{-# language TypeFamilies               #-}
+{-# language MultiParamTypeClasses      #-}
+{-# language FlexibleContexts           #-}
+{-# language FlexibleInstances          #-}
 {-# language GeneralizedNewtypeDeriving #-}
 
 module Feldspar.Hardware.Representation where
@@ -8,6 +11,7 @@ module Feldspar.Hardware.Representation where
 import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
+import Feldspar.Storable
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Command
@@ -89,5 +93,18 @@ data SArr a = SArr
 -- ... hmm ...
 type instance Expr Hardware = HExp
 type instance DomainOf Hardware = HardwareDomain
+
+--------------------------------------------------------------------------------
+
+instance (Reference Hardware ~ Ref, Type HardwarePrimType a) =>
+    Storable Hardware (HExp a)
+  where
+    type StoreRep Hardware (HExp a) = Ref (HExp a)
+    type StoreSize Hardware (HExp a) = ()
+    newStoreRep _ _      = newRef
+    initStoreRep         = initRef
+    readStoreRep         = getRef
+    unsafeFreezeStoreRep = unsafeFreezeRef
+    writeStoreRep        = setRef
 
 --------------------------------------------------------------------------------

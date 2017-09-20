@@ -6,52 +6,38 @@
 {-# language TypeFamilies #-}
 {-# language ScopedTypeVariables #-}
 {-# language RankNTypes #-}
-
--- todo : is this bad? comes from how I use `sup` in the `Syntactic` instance for pairs.
+-- todo : is this bad? comes from how I use `sup` in the `Syntactic`
+--        instance for pairs.
 {-# language UndecidableInstances #-}
 
 module Feldspar.Sugar where
 
 import Feldspar.Representation
+import Data.Struct
 
 import Data.Constraint (Constraint)
 import Data.Typeable (Typeable)
 import Data.Proxy (Proxy(..))
-import Data.Struct
 
+-- syntactic.
 import Language.Syntactic.Syntax
 import Language.Syntactic.Sugar
 import Language.Syntactic.Decoration
-
 import Language.Syntactic.Functional.Tuple
 
 --------------------------------------------------------------------------------
--- * ...
+-- ** Tuples.
 --------------------------------------------------------------------------------
 
 -- | Domains that support tuple expressions.
 class Tuples dom
   where
-    pair
-      :: ( Type (PredicateOf dom) a
-         , Type (PredicateOf dom) b
-         , SyntacticN f (ASTF dom a -> ASTF dom b -> ASTF dom (a, b))
-         )
-      => f
-
-    first
-      :: ( Type (PredicateOf dom) a
-         , SyntacticN f (ASTF dom (a, b) -> ASTF dom a)
-         )
-      => f
-
-    second
-      :: ( Type (PredicateOf dom) b
-         , SyntacticN f (ASTF dom (a, b) -> ASTF dom b)
-         )
-      => f
-
---------------------------------------------------------------------------------
+    -- ^ ...
+    pair :: (Type (PredicateOf dom) a, Type (PredicateOf dom) b, SyntacticN f (ASTF dom a -> ASTF dom b -> ASTF dom (a, b))) => f
+    -- ^ ...
+    first :: (Type (PredicateOf dom) a, SyntacticN f (ASTF dom (a, b) -> ASTF dom a)) => f
+    -- ^ ...
+    second :: (Type (PredicateOf dom) b, SyntacticN f (ASTF dom (a, b) -> ASTF dom b)) => f
 
 instance
     ( Syntactic a, Type (PredicateOf (Domain a)) (Internal a)
@@ -67,6 +53,8 @@ instance
     desugar (a, b) = pair (desugar a) (desugar b)
     sugar   ab     = (first ab, second ab)
 
+--------------------------------------------------------------------------------
+-- ** Functions.
 --------------------------------------------------------------------------------
 
 instance
