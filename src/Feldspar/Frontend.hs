@@ -3,6 +3,7 @@
 {-# language FlexibleContexts      #-}
 {-# language ConstraintKinds       #-}
 {-# language ScopedTypeVariables   #-}
+{-# language FunctionalDependencies #-}
 
 module Feldspar.Frontend where
 
@@ -169,7 +170,7 @@ type MonadComp m
   = ( Monad m
     , References m
     , Arrays  m
---    , IArrays m
+    , IArrays m
     , Control m
     )
                   
@@ -197,16 +198,16 @@ shareM a = initRef a >>= unsafeFreezeRef
 -- if we got rid of the hardcoded 'Data Index' in array definitions.
 --------------------------------------------------------------------------------
 
-class Indexed ix a
+class Indexed ix a | a -> ix
   where
     type Elem a :: *
     (!) :: a -> ix Index -> Elem a
 
-class Slicable ix a
+class Slicable ix a | a -> ix
   where
     slice :: ix Index -> ix Length -> a -> a
       
-class Finite ix a
+class Finite ix a | a -> ix
   where
     length :: a -> ix Length
 

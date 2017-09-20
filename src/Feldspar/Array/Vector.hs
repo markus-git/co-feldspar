@@ -36,7 +36,7 @@ import Prelude hiding (take, drop, length)
 --------------------------------------------------------------------------------
 
 -- | A 1-dimensional vector with a concrete representation in memory
-type Manifest m = Array m
+newtype Manifest m a = M { manifest :: Array m a }
 
 --------------------------------------------------------------------------------
 -- ** Pull vectors.
@@ -61,7 +61,7 @@ instance (Expr m ~ e) => Indexed e (Pull m a)
 
 instance (Expr m ~ e) => Slicable e (Pull m a)
   where
-    slice from n = undefined -- todo: need `take` and `drop` vec. operations.
+    slice from n = undefined -- todo: take n . drop from
 
 instance (Expr m ~ e) => Finite e (Pull m a)
   where
@@ -108,12 +108,41 @@ tails vec = Pull (length vec + 1) (`drop` vec)
 inits :: (Pully m vec a, Num (Expr m Length), Ord (Expr m Length)) => vec -> Pull m (Pull m a)
 inits vec = Pull (length vec + 1) (`take` vec)
 
+replicate :: Expr m Length -> a -> Pull m a
+replicate l = Pull l . const
+
+map :: Pully m vec a => (a -> b) -> vec -> Pull m b
+map f vec = Pull (length vec) (f . (vec!))
+
+zip :: Ord (Expr m Length) => (Pully m vec1 a, Pully m vec2 b) => vec1 -> vec2 -> Pull m (a, b)
+zip a b = Pull (length a `min` length b) (\i -> (a!i, b!i))
+
+-- | Back-permute a 'Pull' vector using an index mapping. The supplied mapping
+--   must be a bijection when restricted to the domain of the vector. This
+--   property is not checked, so use with care.
+backPermute :: Pully m vec a
+    => (Expr m Length -> Expr m Index -> Expr m Index) -> (vec -> Pull m a)
+backPermute perm vec = Pull len ((vec!) . perm len)
+  where
+    len = length vec
+
+reverse :: Num (Expr m Index) => Pully m vec a => vec -> Pull m a
+reverse = backPermute $ \len i -> len-i-1
+
+(...) :: Num (Expr m Index)
+    => Expr m Index
+    -> Expr m Index
+    -> Pull m (Expr m Index)
+l ... h = Pull (h-l+1) (+l)
+
+infix 3 ...
+
 --------------------------------------------------------------------------------
 -- ** Push vectors.
 --------------------------------------------------------------------------------
 
 -- | 1-dimensional push vector: a vector representation that supports nested
--- write patterns (e.g. resulting from concatenation) and fusion of operations.
+--   write patterns and fusion of operations.
 data Push m a
   where
     Push :: Expr m Length
@@ -146,11 +175,11 @@ class Pushy m vec a | vec -> a
   where
     -- | Convert a vector to 'Push'
     toPush :: vec -> Push m a
-{-
+
 instance Pushy m (Manifest m a) a
   where
-    toPush = toPush . toPull
--}
+    toPush = undefined -- todo: toPush . toPull . manifest
+
 instance (m1 ~ m2) => Pushy m1 (Push m2 a) a
   where
     toPush = id
@@ -196,10 +225,10 @@ vec1 ++ vec2 = Push (len1 + length v2) $ \write ->
     v2   = toPush vec2
     len1 = length v1
 
--- Concatenate nested vectors to a 'Push' vector
+-- | Concatenate nested vectors to a 'Push' vector.
 concat :: (Pushy m vec1 vec2, Pushy m vec2 a, Num (Expr m Length), MonadComp m)
-    => Expr m Length  -- ^ Length of inner vectors
-    -> vec1
+    => Expr m Length  -- ^ Length of inner vectors.
+    -> vec1           -- ^ Nested vector.
     -> Push m a
 concat c vec = Push (len*c) $ \write ->
     dumpPush v $ \i row ->
@@ -207,6 +236,18 @@ concat c vec = Push (len*c) $ \write ->
         write (i * length row + j) a
   where
     v   = fmap toPush $ toPush vec
+    len = length v
+
+-- | Forward-permute a 'Push' vector using an index mapping. The supplied
+--   mapping must be a bijection when restricted to the domain of the vector.
+--   This property is not checked, so use with care.
+forwardPermute :: Pushy m vec a =>
+    (Expr m Length -> Expr m Index -> Expr m Index) -> vec -> Push m a
+forwardPermute p vec = Push len $ \write ->
+    dumpPush v $ \i a ->
+      write (p len i) a
+  where
+    v   = toPush vec
     len = length v
 
 --------------------------------------------------------------------------------
@@ -221,10 +262,10 @@ class ViewManifest m vec a | vec -> a
 
 instance ViewManifest m (Pull m a) a
 instance ViewManifest m (Push m a) a
-
-instance (Manifest m a ~ man) => ViewManifest m man a
+instance ViewManifest m (Manifest m a) a
   where
     viewManifest = Just
+
 
 
 --------------------------------------------------------------------------------
