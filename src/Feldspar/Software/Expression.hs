@@ -84,7 +84,7 @@ type SType'   = PrimType SoftwarePrimType
 -- | For loop.
 data ForLoop sig
   where
-    ForLoop :: Syntactic st =>
+    ForLoop :: SType st =>
         ForLoop (Length :-> st :-> (Index -> st -> st) :-> Full st)
 
 deriving instance Eq       (ForLoop a)

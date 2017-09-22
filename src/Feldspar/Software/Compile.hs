@@ -185,12 +185,13 @@ translateExp = goAST . unSExp
       , Just (LamT sv) <- prj lams = do
           len'  <- goSmallAST len
           state <- initRefV "state" =<< goAST init
-          ReaderT $ \env -> Imp.for (0, 1, Imp.Excl len') $ \i -> flip runReaderT env $ do
-            s <- case t of
-              Node _ -> unsafeFreezeRefV state
-              _      -> getRefV state
-            s' <- localAlias iv (Node i) $ localAlias sv s $ goAST body
-            setRefV state s'
+          ReaderT $ \env -> Imp.for (0, 1, Imp.Excl len') $ \i ->
+            flip runReaderT env $ do
+              s <- case t of
+                Node _ -> unsafeFreezeRefV state
+                _      -> getRefV state
+              s' <- localAlias iv (Node i) $ localAlias sv s $ goAST body
+              setRefV state s'
           unsafeFreezeRefV state
     go _ arrIx (i :* Syn.Nil)
       | Just (ArrIx arr) <- prj arrIx = do

@@ -58,6 +58,14 @@ class Share dom
       -> (a -> b) -- ^ Body in which to share the value.
       -> b
 
+class Loop dom
+  where
+    loop :: ( Syntax dom st
+            , Syntax dom len, Internal len ~ Length
+            , Syntax dom ix,  Internal ix  ~ Index
+            )
+      => len -> st -> (ix -> st -> st) -> st
+
 class Cond dom
   where
     cond
@@ -242,6 +250,15 @@ thawArr iarr =
      arr <- newArr (length iarr)
      copyArr arr brr
      return arr
+
+unsafeFreezeSlice
+  :: ( IArrays m
+     , SyntaxM m a
+     , Finite   (Expr m) (Array  m a)
+     , Slicable (Expr m) (IArray m a)
+     , Num (Expr m Index))
+  => Expr m Length -> Array m a -> m (IArray m a)
+unsafeFreezeSlice len = fmap (slice 0 len) . unsafeFreezeArr
 
 --------------------------------------------------------------------------------
 -- ** Control.

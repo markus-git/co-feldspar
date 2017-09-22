@@ -80,12 +80,27 @@ type HType'   = PrimType HardwarePrimType
 --------------------------------------------------------------------------------
 -- ** Hardware expression symbols.
 
+-- | For loop.
+data ForLoop sig
+  where
+    ForLoop :: HType st =>
+      ForLoop (Length :-> st :-> (Index -> st -> st) :-> Full st)
+
+deriving instance Eq       (ForLoop a)
+deriving instance Show     (ForLoop a)
+deriving instance Typeable (ForLoop a)
+
+--------------------------------------------------------------------------------
+-- ** Hardware expression symbols.
+
 -- | Hardware symbols.
 type HardwareConstructs =
           HardwarePrimConstructs
   Syn.:+: Tuple
   Syn.:+: Let
   Syn.:+: BindingT
+  -- ^ Hardware specific symbol.
+  Syn.:+: ForLoop
 
 -- | Hardware symbols tagged with their type representation.
 type HardwareDomain = HardwareConstructs :&: TypeRepF HardwarePrimType HardwarePrimTypeRep
@@ -166,5 +181,26 @@ instance FreeExp HExp
     type PredicateExp HExp = PrimType HardwarePrimType
     litE = sugarSymHardware . Lit
     varE = sugarSymHardware . FreeVar
+
+--------------------------------------------------------------------------------
+-- syntactic instances.
+
+instance Eval ForLoop
+  where
+    evalSym ForLoop = \len init body ->
+        foldl (flip body) init $ genericTake len [0..]
+
+instance Symbol ForLoop
+  where
+    symSig (ForLoop) = signature
+
+instance Render ForLoop
+  where
+    renderSym  = show
+    renderArgs = renderArgsSmart
+
+instance EvalEnv ForLoop env
+
+instance StringTree ForLoop
 
 --------------------------------------------------------------------------------

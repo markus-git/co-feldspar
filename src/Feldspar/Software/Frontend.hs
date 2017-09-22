@@ -52,6 +52,10 @@ instance Share SoftwareDomain
   where
     share = sugarSymSoftware (Let "")
 
+instance Loop SoftwareDomain
+  where
+    loop = sugarSymSoftware ForLoop
+
 instance Cond SoftwareDomain
   where
     cond = sugarSymSoftware Cond

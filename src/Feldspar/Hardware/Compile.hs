@@ -180,6 +180,20 @@ translateExp = goAST . unHExp
           liftStruct2 (sugarSymPrim RotateL) <$> goAST a <*> goAST b
       | Just RotateR <- prj op =
           liftStruct2 (sugarSymPrim RotateR) <$> goAST a <*> goAST b
+    go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
+      | Just ForLoop   <- prj loop
+      , Just (LamT iv) <- prj lami
+      , Just (LamT sv) <- prj lams = do
+          len'  <- goSmallAST len
+          state <- initRefV "state" =<< goAST init
+          ReaderT $ \env -> Hard.for 0 (len'-1) $ \i ->
+            flip runReaderT env $ do
+              s <- case t of
+                Node _ -> unsafeFreezeRefV state
+                _      -> getRefV state
+              s' <- localAlias iv (Node i) $ localAlias sv s $ goAST body
+              setRefV state s'
+          unsafeFreezeRefV state
     go _ arrIx (i :* Syn.Nil)
       | Just (ArrIx arr) <- prj arrIx
       = goSmallAST i >>= return . Node . sugarSymPrim (ArrIx arr)
