@@ -36,7 +36,14 @@ import Language.Embedded.Expression
 -- * Software expressions.
 --------------------------------------------------------------------------------
 
-type instance PredicateOf      SoftwareDomain   = SoftwarePrimType
+type instance Pred SoftwareDomain = SoftwarePrimType
+
+--------------------------------------------------------------------------------
+-- hmm...
+
+type instance ExprOf   (SExp a) = SExp
+type instance PredOf   SExp     = SoftwarePrimType
+type instance DomainOf SExp     = SoftwareDomain
 type instance RepresentationOf SoftwarePrimType = SoftwarePrimTypeRep
 
 --------------------------------------------------------------------------------

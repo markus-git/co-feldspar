@@ -35,71 +35,66 @@ import Language.Embedded.Imperative.Frontend.General hiding (Ref, Arr, IArr)
 import qualified Language.Embedded.Imperative     as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
 
-import Prelude hiding (length, Word)
+import Prelude hiding (length, Word, (<=))
+import qualified Prelude
 
 --------------------------------------------------------------------------------
 -- * Expressions.
 --------------------------------------------------------------------------------
 
---------------------------------------------------------------------------------
--- ** General constructs.
-
-instance Value SoftwareDomain
+instance Value SExp
   where
     value = sugarSymSoftware . Lit
 
-instance Share SoftwareDomain
+instance Share SExp
   where
     share = sugarSymSoftware (Let "")
 
-instance Loop SoftwareDomain
+instance Loop SExp
   where
     loop = sugarSymSoftware ForLoop
 
-instance Cond SoftwareDomain
+instance Cond SExp
   where
     cond = sugarSymSoftware Cond
 
---------------------------------------------------------------------------------
--- ** Primitive functions.
-
-instance Equality SoftwareDomain
+instance Equality SExp
   where
-    (==) = sugarSymSoftware Eq
+    (==) = sugarSymPrimSoftware Eq
 
-instance Ordered SoftwareDomain
+instance Ordered SExp
   where
-    (<)  = sugarSymSoftware Lt
-    (<=) = sugarSymSoftware Lte
-    (>)  = sugarSymSoftware Gt
-    (>=) = sugarSymSoftware Gte
+    (<)  = sugarSymPrimSoftware Lt
+    (<=) = sugarSymPrimSoftware Lte
+    (>)  = sugarSymPrimSoftware Gt
+    (>=) = sugarSymPrimSoftware Gte
 
-instance Logical SoftwareDomain
+instance Logical SExp
   where
-    not  = sugarSymSoftware Not
-    (&&) = sugarSymSoftware And
-    (||) = sugarSymSoftware Or
+    not  = sugarSymPrimSoftware Not
+    (&&) = sugarSymPrimSoftware And
+    (||) = sugarSymPrimSoftware Or
 
-instance Multiplicative SoftwareDomain
+instance Multiplicative SExp
   where
-    mult = sugarSymSoftware Mul
-    div  = sugarSymSoftware Div
-    mod  = sugarSymSoftware Mod
+    mult = sugarSymPrimSoftware Mul
+    div  = sugarSymPrimSoftware Div
+    mod  = sugarSymPrimSoftware Mod
 
-instance Bitwise SoftwareDomain
+instance Bitwise SExp
   where
-    complement = sugarSymSoftware BitCompl
-    (.&.)      = sugarSymSoftware BitAnd
-    (.|.)      = sugarSymSoftware BitOr
-    xor        = sugarSymSoftware BitXor
-    sll        = sugarSymSoftware ShiftL
-    srl        = sugarSymSoftware ShiftR
-    rol        = sugarSymSoftware RotateL
-    ror        = sugarSymSoftware RotateR
+    complement = sugarSymPrimSoftware BitCompl
+    (.&.) = sugarSymPrimSoftware BitAnd
+    (.|.) = sugarSymPrimSoftware BitOr
+    xor   = sugarSymPrimSoftware BitXor
+    sll   = sugarSymPrimSoftware ShiftL
+    srl   = sugarSymPrimSoftware ShiftR
+    rol   = sugarSymPrimSoftware RotateL
+    ror   = sugarSymPrimSoftware RotateR
 
-instance Casting SoftwareDomain
+instance Casting SExp
   where
-    i2n = sugarSymSoftware I2N
+    i2n = sugarSymPrimSoftware I2N
 
 --------------------------------------------------------------------------------
 
@@ -111,10 +106,10 @@ instance (Bounded a, SType a) => Bounded (SExp a)
 instance (Num a, SType' a) => Num (SExp a)
   where
     fromInteger = value . fromInteger
-    (+)         = sugarSymSoftware Add
-    (-)         = sugarSymSoftware Sub
-    (*)         = sugarSymSoftware Mul
-    negate      = sugarSymSoftware Neg
+    (+)         = sugarSymPrimSoftware Add
+    (-)         = sugarSymPrimSoftware Sub
+    (*)         = sugarSymPrimSoftware Mul
+    negate      = sugarSymPrimSoftware Neg
     abs         = error "todo: abs not implemeted for `SExp`"
     signum      = error "todo: signum not implemented for `SExp`"
 
@@ -141,7 +136,9 @@ resugar = Syntactic.resugar
 --------------------------------------------------------------------------------
 
 -- Swap an `Imp.FreePred` constraint with a `SoftwarePrimType` one.
-withSType :: forall a b . Proxy a -> (Imp.FreePred SExp a => b) -> (SoftwarePrimType a => b)
+withSType :: forall a b . Proxy a
+  -> (Imp.FreePred SExp a => b)
+  -> (SoftwarePrimType  a => b)
 withSType _ f = case softwareDict (softwareRep :: SoftwarePrimTypeRep a) of
   Dict -> f
 
@@ -193,7 +190,7 @@ freezeRef' = withSType (Proxy :: Proxy b) Imp.unsafeFreezeRef
 
 --------------------------------------------------------------------------------
 
-instance Syntax SoftwareDomain a => Indexed SExp (IArr a)
+instance Syntax SExp a => Indexed SExp (IArr a)
   where
     type Elem (IArr a) = a
     (!) (IArr off len a) ix = resugar $ mapStruct index a
@@ -205,12 +202,9 @@ instance Slicable SExp (Arr a)
   where
     slice from len (Arr o l arr) = Arr (o+from) len arr
 
-instance Slicable SExp (IArr a)
+instance Finite SExp (Arr a)
   where
-    slice from len (IArr o l arr) = IArr (o+from) len arr
-
-instance Finite SExp (Arr a)  where length = arrLength
-instance Finite SExp (IArr a) where length = iarrLength
+    length = arrLength
 
 instance Arrays Software
   where
@@ -245,6 +239,28 @@ instance Arrays Software
         (unArr arr)
         (unArr brr)
 
+-- 'Imp.getArr' specialized to software.
+getArr' :: forall b . SoftwarePrimType b
+  => Imp.Arr Index b -> SExp Index
+  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
+getArr' = withSType (Proxy :: Proxy b) Imp.getArr
+
+-- 'Imp.setArr' specialized to software.
+setArr' :: forall b . SoftwarePrimType b
+  => Imp.Arr Index b -> SExp Index -> SExp b
+  -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
+setArr' = withSType (Proxy :: Proxy b) Imp.setArr
+
+--------------------------------------------------------------------------------
+
+instance Slicable SExp (IArr a)
+  where
+    slice from len (IArr o l arr) = IArr (o+from) len arr
+
+instance Finite SExp (IArr a)
+  where
+    length = iarrLength
+
 instance IArrays Software
   where
     type IArray Software = IArr    
@@ -258,14 +274,6 @@ instance IArrays Software
       $ fmap (Arr (iarrOffset iarr) (length iarr))
       $ mapStructA (Imp.unsafeThawArr)
       $ unIArr iarr
-
--- 'Imp.getArr' specialized to software.
-getArr' :: forall b . SoftwarePrimType b => Imp.Arr Index b -> SExp Index -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) (SExp b)
-getArr' = withSType (Proxy :: Proxy b) Imp.getArr
-
--- 'Imp.setArr' specialized to software.
-setArr' :: forall b . SoftwarePrimType b => Imp.Arr Index b -> SExp Index -> SExp b -> Oper.Program SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) ()
-setArr' = withSType (Proxy :: Proxy b) Imp.setArr
 
 --------------------------------------------------------------------------------
 
@@ -362,4 +370,5 @@ nil = SoftNil
 
 infixr 1 >:, >>:
 -}
+
 --------------------------------------------------------------------------------
