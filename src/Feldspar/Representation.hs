@@ -20,11 +20,14 @@ module Feldspar.Representation
   , PrimType
   -- type families.
   , Expr
-  , DomainOf
-  , PredicateOf
-  , RepresentationOf
+  , Pred
   -- external.
   , Inhabited(..)
+  -- hmm...
+  , ExprOf
+  , PredOf
+  , DomainOf
+  , RepresentationOf
   ) where
 
 import Data.Struct
@@ -46,13 +49,15 @@ import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))
 import Control.Monad.Operational.Higher (ProgramT, Param2)
 
 --------------------------------------------------------------------------------
--- Short-hand for common data types.
-
-type Length = Word32
-type Index  = Word32
-
---------------------------------------------------------------------------------
 -- * Co-Feldspar types.
+--------------------------------------------------------------------------------
+
+-- | Expression associated with a program monad.
+type family Expr (m :: * -> *) :: * -> *
+
+-- | Predicate associated with a program monad.
+type family Pred (m :: * -> *) :: * -> Constraint
+
 --------------------------------------------------------------------------------
 
 -- | Representation of supported feldspar types as typed binary trees over
@@ -87,24 +92,20 @@ class    (Type pred a, pred a) => PrimType pred a
 instance (Type pred a, pred a) => PrimType pred a
 
 --------------------------------------------------------------------------------
--- ** Co-Feldspar type families.
+-- Short-hand for common data types.
 
--- | ... hmm ...
-type family Expr (lang :: * -> *) :: * -> *
+type Length = Word32
+type Index  = Word32
 
--- | Domain associated with a language.
-type family DomainOf (lang :: * -> *) :: * -> *
+--------------------------------------------------------------------------------
+-- hmm...
 
--- | Predicate associated with a domain.
-type family PredicateOf (dom :: * -> *) :: * -> Constraint
+type family ExprOf (val :: *) :: * -> *
 
--- | Type representation associated with a predicate.
+type family PredOf (exp :: * -> *) :: * -> Constraint
+
+type family DomainOf (exp :: * -> *) :: * -> *
+
 type family RepresentationOf (pred :: * -> Constraint) :: * -> *
-
---------------------------------------------------------------------------------
--- * Storable
---------------------------------------------------------------------------------
-
-
 
 --------------------------------------------------------------------------------

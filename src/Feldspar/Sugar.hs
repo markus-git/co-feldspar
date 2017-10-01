@@ -32,16 +32,20 @@ import Language.Syntactic.Functional.Tuple
 -- | Domains that support tuple expressions.
 class Tuples dom
   where
-    -- ^ ...
-    pair :: (Type (PredicateOf dom) a, Type (PredicateOf dom) b, SyntacticN f (ASTF dom a -> ASTF dom b -> ASTF dom (a, b))) => f
-    -- ^ ...
-    first :: (Type (PredicateOf dom) a, SyntacticN f (ASTF dom (a, b) -> ASTF dom a)) => f
-    -- ^ ...
-    second :: (Type (PredicateOf dom) b, SyntacticN f (ASTF dom (a, b) -> ASTF dom b)) => f
+    pair   :: ( Type (Pred dom) a
+              , Type (Pred dom) b
+              , SyntacticN f (ASTF dom a -> ASTF dom b -> ASTF dom (a, b)))
+           => f
+    first  :: ( Type (Pred dom) a
+              , SyntacticN f (ASTF dom (a, b) -> ASTF dom a))
+           => f
+    second :: ( Type (Pred dom) b
+              , SyntacticN f (ASTF dom (a, b) -> ASTF dom b))
+           => f
 
 instance
-    ( Syntactic a, Type (PredicateOf (Domain a)) (Internal a)
-    , Syntactic b, Type (PredicateOf (Domain b)) (Internal b)
+    ( Syntactic a, Type (Pred (Domain a)) (Internal a)
+    , Syntactic b, Type (Pred (Domain b)) (Internal b)
     , Domain a ~ Domain b
     , Tuples (Domain a)
     )
