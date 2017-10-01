@@ -157,7 +157,6 @@ softwareDict rep = case rep of
   FloatST  -> Dict
 
 --------------------------------------------------------------------------------
--- ** General instructions.
 
 instance References Software
   where
@@ -189,14 +188,6 @@ freezeRef' :: forall b . SoftwarePrimType b => Imp.Ref b -> Oper.Program Softwar
 freezeRef' = withSType (Proxy :: Proxy b) Imp.unsafeFreezeRef
 
 --------------------------------------------------------------------------------
-
-instance Syntax SExp a => Indexed SExp (IArr a)
-  where
-    type Elem (IArr a) = a
-    (!) (IArr off len a) ix = resugar $ mapStruct index a
-      where
-        index :: SoftwarePrimType b => Imp.IArr Index b -> SExp b
-        index arr = sugarSymPrimSoftware (ArrIx arr) (ix + off)
 
 instance Slicable SExp (Arr a)
   where
@@ -252,6 +243,14 @@ setArr' :: forall b . SoftwarePrimType b
 setArr' = withSType (Proxy :: Proxy b) Imp.setArr
 
 --------------------------------------------------------------------------------
+
+instance Syntax SExp a => Indexed SExp (IArr a)
+  where
+    type Elem (IArr a) = a
+    (!) (IArr off len a) ix = resugar $ mapStruct index a
+      where
+        index :: SoftwarePrimType b => Imp.IArr Index b -> SExp b
+        index arr = sugarSymPrimSoftware (ArrIx arr) (ix + off)
 
 instance Slicable SExp (IArr a)
   where
@@ -317,9 +316,9 @@ feof = Software . Imp.feof
 -- | Put a primitive value to a handle.
 fput :: (Formattable a, SType' a)
     => Handle
-    -> String  -- Prefix
-    -> SExp a  -- Expression to print
-    -> String  -- Suffix
+    -> String  -- ^ Prefix.
+    -> SExp a  -- ^ Expression to print.
+    -> String  -- ^ Suffix.
     -> Software ()
 fput h pre e post = Software $ Imp.fput h pre e post
 

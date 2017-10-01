@@ -41,65 +41,59 @@ import Prelude hiding (length)
 -- * Expressions.
 --------------------------------------------------------------------------------
 
---------------------------------------------------------------------------------
--- ** General constructs.
-
-instance Value HardwareDomain
+instance Value HExp
   where
     value = sugarSymHardware . Lit
 
-instance Share HardwareDomain
+instance Share HExp
   where
     share = sugarSymHardware (Let "")
 
-instance Loop HardwareDomain
+instance Loop HExp
   where
     loop = sugarSymHardware ForLoop
 
-instance Cond HardwareDomain
+instance Cond HExp
   where
     cond = sugarSymHardware Cond
 
---------------------------------------------------------------------------------
--- ** Primitive functions.
-
-instance Equality HardwareDomain
+instance Equality HExp
   where
-    (==) = sugarSymHardware Eq
+    (==) = sugarSymPrimHardware Eq
 
-instance Ordered HardwareDomain
+instance Ordered HExp
   where
-    (<)  = sugarSymHardware Lt
-    (<=) = sugarSymHardware Lte
-    (>)  = sugarSymHardware Gt
-    (>=) = sugarSymHardware Gte
+    (<)  = sugarSymPrimHardware Lt
+    (<=) = sugarSymPrimHardware Lte
+    (>)  = sugarSymPrimHardware Gt
+    (>=) = sugarSymPrimHardware Gte
 
-instance Logical HardwareDomain
+instance Logical HExp
   where
-    not  = sugarSymHardware Not
-    (&&) = sugarSymHardware And
-    (||) = sugarSymHardware Or
+    not  = sugarSymPrimHardware Not
+    (&&) = sugarSymPrimHardware And
+    (||) = sugarSymPrimHardware Or
 
-instance Multiplicative HardwareDomain
+instance Multiplicative HExp
   where
-    mult = sugarSymHardware Mul
-    div  = sugarSymHardware Div
-    mod  = sugarSymHardware Mod
+    mult = sugarSymPrimHardware Mul
+    div  = sugarSymPrimHardware Div
+    mod  = sugarSymPrimHardware Mod
 
-instance Bitwise HardwareDomain
+instance Bitwise HExp
   where
-    complement = sugarSymHardware BitCompl
-    (.&.)      = sugarSymHardware BitAnd
-    (.|.)      = sugarSymHardware BitOr
-    xor        = sugarSymHardware BitXor
-    sll        = sugarSymHardware ShiftL
-    srl        = sugarSymHardware ShiftR
-    rol        = sugarSymHardware RotateL
-    ror        = sugarSymHardware RotateR
+    complement = sugarSymPrimHardware BitCompl
+    (.&.) = sugarSymPrimHardware BitAnd
+    (.|.) = sugarSymPrimHardware BitOr
+    xor   = sugarSymPrimHardware BitXor
+    sll   = sugarSymPrimHardware ShiftL
+    srl   = sugarSymPrimHardware ShiftR
+    rol   = sugarSymPrimHardware RotateL
+    ror   = sugarSymPrimHardware RotateR
 
-instance Casting HardwareDomain
+instance Casting HExp
   where
-    i2n = sugarSymHardware I2N
+    i2n = sugarSymPrimHardware I2N
 
 --------------------------------------------------------------------------------
 
@@ -141,7 +135,9 @@ resugar = Syntactic.resugar
 --------------------------------------------------------------------------------
 
 -- Swap an `Imp.FreePred` constraint with a `HardwarePrimType` one.
-withHType :: forall a b . Proxy a -> (Imp.PredicateExp HExp a => b) -> (HardwarePrimType a => b)
+withHType :: forall a b . Proxy a
+  -> (Imp.PredicateExp HExp a => b)
+  -> (HardwarePrimType      a => b)
 withHType _ f = case hardwareDict (hardwareRep :: HardwarePrimTypeRep a) of
   Dict -> f
 
@@ -160,7 +156,6 @@ hardwareDict rep = case rep of
   Word64HT  -> Dict
 
 --------------------------------------------------------------------------------
--- ** General instructions.
 
 instance References Hardware
   where
@@ -193,26 +188,17 @@ freezeRef' = withHType (Proxy :: Proxy b) Imp.unsafeFreezeVariable
 
 --------------------------------------------------------------------------------
 
-
-instance Syntax HardwareDomain a => Indexed HExp (IArr a)
-  where
-    type Elem (IArr a) = a
-    (!) (IArr off len a) ix = resugar $ mapStruct index a
-      where
-        index :: HardwarePrimType b => Imp.IArray Index b -> HExp b
-        index arr = sugarSymPrimHardware (ArrIx arr) (ix + off)
-
 instance Slicable HExp (Arr a)
   where
     slice from len (Arr o l arr) = Arr (o+from) len arr
 
-instance Slicable HExp (IArr a)
+instance Finite HExp (Arr a)
   where
-    slice from len (IArr o l arr) = IArr (o+from) len arr
+    length = arrLength
 
-instance Finite HExp (Arr a)  where length = arrLength
-instance Finite HExp (IArr a) where length = iarrLength
-instance Finite HExp (SArr a) where length = sarrLength
+instance Finite HExp (SArr a)
+  where
+    length = sarrLength
 
 instance Arrays Hardware
   where
@@ -244,6 +230,32 @@ instance Arrays Hardware
           Imp.copyVArray (a, arrOffset arr) (b, arrOffset brr) (length brr))
         (unArr arr)
         (unArr brr)
+
+-- 'Imp.getVArr' specialized to hardware.
+getArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
+getArr' = withHType (Proxy :: Proxy b) Imp.getVArray
+
+-- 'Imp.setVArr' specialized to hardware.
+setArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
+setArr' = withHType (Proxy :: Proxy b) Imp.setVArray
+
+--------------------------------------------------------------------------------
+
+instance Syntax HExp a => Indexed HExp (IArr a)
+  where
+    type Elem (IArr a) = a
+    (!) (IArr off len a) ix = resugar $ mapStruct index a
+      where
+        index :: HardwarePrimType b => Imp.IArray Index b -> HExp b
+        index arr = sugarSymPrimHardware (ArrIx arr) (ix + off)
+
+instance Slicable HExp (IArr a)
+  where
+    slice from len (IArr o l arr) = IArr (o+from) len arr
+
+instance Finite HExp (IArr a)
+  where
+    length = iarrLength
       
 instance IArrays Hardware
   where
@@ -258,14 +270,6 @@ instance IArrays Hardware
       $ fmap (Arr (iarrOffset iarr) (length iarr))
       $ mapStructA (Imp.unsafeThawVArray)
       $ unIArr iarr
-
--- 'Imp.getVArr' specialized to hardware.
-getArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
-getArr' = withHType (Proxy :: Proxy b) Imp.getVArray
-
--- 'Imp.setVArr' specialized to hardware.
-setArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
-setArr' = withHType (Proxy :: Proxy b) Imp.setVArray
 
 --------------------------------------------------------------------------------
 
@@ -284,17 +288,9 @@ instance Control Hardware
     for lower upper body
       = Hardware
       $ Imp.for
-          (desugar' lower)
-          (desugar' upper)
-          (unHardware . body . sugar')
-
--- desugar into a hardware expression over an integer.
-desugar' :: forall a . (SyntaxM' Hardware a, Integral (Internal a)) => a -> HExp Integer
-desugar' a = i2n (resugar a :: HExp (Internal a))
-
--- sugar from a hardware expression over an integer.
-sugar' :: forall a . (SyntaxM' Hardware a, Integral (Internal a)) => HExp Integer -> a
-sugar' e = resugar (i2n e :: HExp (Internal a))
+          (resugar lower)
+          (resugar upper)
+          (unHardware . body . resugar)
 
 --------------------------------------------------------------------------------
 -- ** Hardware instructions.
@@ -321,7 +317,7 @@ setSignal s = Hardware . (Imp.setSignal s)
 
 --------------------------------------------------------------------------------
 -- *** Signal arrays.
---
+--------------------------------------------------------------------------------
 -- todo: These functions could use some cleaning up. 'Internal' is not really
 --       necessary here, its better to assume 'SArr (HExp a)'.
 --------------------------------------------------------------------------------
@@ -344,11 +340,11 @@ copyArray arr brr = Hardware $ sequence_ $ zipListStruct (\a b -> Imp.copyArray 
 
 --------------------------------------------------------------------------------
 
--- 'Imp.getVArr' specialized to hardware.
+-- 'Imp.getArray' specialized to hardware.
 getSArr' :: forall b . HardwarePrimType b => Imp.Array Index b -> HExp Index -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
 getSArr' = withHType (Proxy :: Proxy b) Imp.getArray
 
--- 'Imp.setVArr' specialized to hardware.
+-- 'Imp.setArray' specialized to hardware.
 setSArr' :: forall b . HardwarePrimType b => Imp.Array Index b -> HExp Index -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
 setSArr' = withHType (Proxy :: Proxy b) Imp.setArray
 

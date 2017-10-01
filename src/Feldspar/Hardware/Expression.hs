@@ -36,7 +36,14 @@ import Language.Embedded.Hardware.Interface
 -- * Hardware expressions.
 --------------------------------------------------------------------------------
 
-type instance PredicateOf      HardwareDomain   = HardwarePrimType
+type instance Pred HardwareDomain = HardwarePrimType
+
+--------------------------------------------------------------------------------
+-- hmm...
+
+type instance ExprOf   (HExp a) = HExp
+type instance PredOf   HExp     = HardwarePrimType
+type instance DomainOf HExp     = HardwareDomain
 type instance RepresentationOf HardwarePrimType = HardwarePrimTypeRep
 
 --------------------------------------------------------------------------------
