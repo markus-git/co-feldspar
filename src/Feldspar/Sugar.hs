@@ -9,6 +9,7 @@
 -- todo : is this bad? comes from how I use `sup` in the `Syntactic`
 --        instance for pairs.
 {-# language UndecidableInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Feldspar.Sugar where
 
@@ -19,10 +20,15 @@ import Data.Constraint (Constraint)
 import Data.Typeable (Typeable)
 import Data.Proxy (Proxy(..))
 
+import qualified Language.Haskell.TH as TH
+
 -- syntactic.
+import Language.Syntactic
+import Language.Syntactic.TH
 import Language.Syntactic.Syntax
 import Language.Syntactic.Sugar
 import Language.Syntactic.Decoration
+import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
 
 --------------------------------------------------------------------------------
@@ -64,19 +70,20 @@ instance
 instance
     ( Syntactic a
     , Syntactic b
+    , Domain a ~ (expr :&: TypeRepF pred (RepresentationOf pred))
+    , Domain b ~ (expr :&: TypeRepF pred (RepresentationOf pred))
+    , BindingT :<: expr
+    , Type pred (Internal a)
     )
     => Syntactic (a -> b)
   where
     type Domain   (a -> b) = Domain a
     type Internal (a -> b) = Internal a -> Internal b
 
-    desugar = error "desugar not yet implemented for (a -> b)"
-    sugar   = error "sugar not implemented for (a -> b)"
-{-
-    desugar = lamT_template varSym lamSym (desugar . f . sugar)
+    desugar f = lamT_template varSym lamSym (desugar . f . sugar)
       where
-        varSym v = inj (VarT v) :&: ValT typeRep
-        lamSym v = Sym (inj (LamT v) :&: FunT typeRep (getDecor b)) :$ b
--}
+        varSym v   = inj (VarT v) :&: ValT typeRep
+        lamSym v b = Sym (inj (LamT v) :&: FunT typeRep (getDecor b)) :$ b
+    sugar = error "sugar not implemented for (a -> b)"
 
 --------------------------------------------------------------------------------
