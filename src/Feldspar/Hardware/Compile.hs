@@ -195,14 +195,15 @@ translateExp = goAST . unHExp
               setRefV state s'
           unsafeFreezeRefV state
     go _ arrIx (i :* Syn.Nil)
-      | Just (ArrIx arr) <- prj arrIx
-      = goSmallAST i >>= return . Node . sugarSymPrim (ArrIx arr)
+      | Just (ArrIx arr) <- prj arrIx = do
+          i' <- goSmallAST i
+          return $ Node $ sugarSymPrim (ArrIx arr) i'
     go _ s _ = error $ "hardware translation handling for symbol " ++ Syn.renderSym s ++ " is missing."
 
 unsafeTranslateSmallExp :: Monad m => HExp a -> TargetT m (Prim a)
-unsafeTranslateSmallExp a =
-  do Node b <- translateExp a
-     return b
+unsafeTranslateSmallExp a = do
+  Node b <- translateExp a
+  return b
 
 translate :: Hardware a -> ProgH a
 translate = flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp . unHardware

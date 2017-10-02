@@ -18,7 +18,7 @@ import Data.Word hiding (Word)
 
 import qualified Data.Bits as Bits
 
--- syntactci.
+-- syntactic.
 import Language.Syntactic as S hiding (Equality)
 
 -- operational-higher.

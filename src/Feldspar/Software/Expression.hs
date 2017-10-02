@@ -102,10 +102,10 @@ deriving instance Typeable (ForLoop a)
 
 -- | Software symbols.
 type SoftwareConstructs = 
-          SoftwarePrimConstructs
-  Syn.:+: Tuple
+          BindingT
   Syn.:+: Let
-  Syn.:+: BindingT
+  Syn.:+: Tuple
+  Syn.:+: SoftwarePrimConstructs
   -- ^ Software specific symbol.
   Syn.:+: ForLoop
 

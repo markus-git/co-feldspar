@@ -180,6 +180,9 @@ translateExp = goAST . unSExp
       | Just RotateR <- prj op =
           liftStruct2 (sugarSymPrim RotateR) <$> goAST a <*> goAST b
     go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
+      | Just ForLoop <- prj loop = error "?"
+      | otherwise                = error ("err: " ++ Syn.renderSym loop)
+    go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
       | Just ForLoop   <- prj loop
       , Just (LamT iv) <- prj lami
       , Just (LamT sv) <- prj lams = do

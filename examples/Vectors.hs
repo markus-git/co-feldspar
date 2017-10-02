@@ -30,10 +30,13 @@ sumLast5 = sum . take 5 . reverse
 
 --------------------------------------------------------------------------------
 
+ex1 :: IO ()
+ex1 = scomp (sumLast5 inp)
+  where
+    inp :: SPull (SExp Word32)
+    inp = 0 ... 10
+
 scomp :: SExp Word32 -> IO ()
 scomp e = Soft.icompile (printf "%d" e)
-
-si1 :: SPull (SExp Word32)
-si1 = 0 ... 10
 
 --------------------------------------------------------------------------------
