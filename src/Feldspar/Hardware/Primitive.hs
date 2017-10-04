@@ -11,6 +11,9 @@
 
 module Feldspar.Hardware.Primitive where
 
+import Feldspar.Representation
+import Data.Struct
+
 import Data.Array ((!))
 import Data.Bits (Bits)
 import Data.Int
@@ -18,7 +21,6 @@ import Data.Word
 import Data.List (genericTake)
 import Data.Typeable hiding (TypeRep)
 import Data.Constraint hiding (Sub)
-
 import qualified Data.Bits as Bits
 
 -- syntactic.
@@ -28,17 +30,16 @@ import Language.Syntactic.Functional.Tuple
 
 -- hardware-edsl.
 import Language.Embedded.Hardware.Interface
-import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))
 import qualified Language.Embedded.Hardware.Command as Imp (IArray(..))
 
-import Data.Struct
-
-import Feldspar.Representation
-
 --------------------------------------------------------------------------------
--- * Hardware Types.
+-- * Hardware primitives.
 --------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- * Hardware primitive types.
+
+-- | Representation of supported, primitive software types.
 data HardwarePrimTypeRep a
   where
     -- booleans
@@ -62,7 +63,7 @@ deriving instance Typeable (HardwarePrimTypeRep a)
 
 --------------------------------------------------------------------------------
 
--- | Class of supported software types.
+-- | Class of supported, primitive hardware types.
 class (Eq a, Show a, Typeable a, Inhabited a) => HardwarePrimType a
   where
     hardwareRep :: HardwarePrimTypeRep a
@@ -78,8 +79,7 @@ instance HardwarePrimType Word16  where hardwareRep = Word16HT
 instance HardwarePrimType Word32  where hardwareRep = Word32HT
 instance HardwarePrimType Word64  where hardwareRep = Word64HT
 
---------------------------------------------------------------------------------
-
+-- | Compare two primitive hardware types for equality.
 hardwarePrimTypeEq :: HardwarePrimTypeRep a -> HardwarePrimTypeRep b -> Maybe (Dict (a ~ b))
 hardwarePrimTypeEq (BoolHT)    (BoolHT)    = Just Dict
 hardwarePrimTypeEq (IntegerHT) (IntegerHT) = Just Dict
@@ -93,9 +93,11 @@ hardwarePrimTypeEq (Word32HT)  (Word32HT)  = Just Dict
 hardwarePrimTypeEq (Word64HT)  (Word64HT)  = Just Dict
 hardwarePrimTypeEq _           _           = Nothing
 
+-- | Construct the primitive hardware type representation of 'a'.
 hardwarePrimTypeOf :: HardwarePrimType a => a -> HardwarePrimTypeRep a
 hardwarePrimTypeOf _ = hardwareRep
 
+-- | Construct a primitive hardware type witness from its representation.
 hardwarePrimWitType :: HardwarePrimTypeRep a -> Dict (HardwarePrimType a)
 hardwarePrimWitType BoolHT    = Dict
 hardwarePrimWitType IntegerHT = Dict
@@ -109,12 +111,12 @@ hardwarePrimWitType Word32HT  = Dict
 hardwarePrimWitType Word64HT  = Dict
 
 --------------------------------------------------------------------------------
--- * ... prim ...
---------------------------------------------------------------------------------
+-- ** Hardware primitive expressions.
 
 -- | Hardware primitive symbols.
 data HardwarePrim sig
   where
+    -- ^ free variables and literals.
     FreeVar :: (HardwarePrimType a) => String -> HardwarePrim (Full a)
     Lit     :: (Show a, Eq a)       => a      -> HardwarePrim (Full a)
 
@@ -122,7 +124,7 @@ data HardwarePrim sig
     Cond :: HardwarePrim (Bool :-> a :-> a :-> Full a)
     
     -- ^ array indexing.
-    ArrIx :: (HardwarePrimType a) => Imp.IArray a -> HardwarePrim (Integer :-> Full a)
+    ArrIx :: (HardwarePrimType a) => Imp.IArray Index a -> HardwarePrim (Index :-> Full a)
             
     -- ^ numerical operations.
     Neg :: (HardwarePrimType a, Num a) => HardwarePrim (a :-> Full a)
@@ -173,8 +175,7 @@ type HardwarePrimDomain = HardwarePrimConstructs :&: HardwarePrimTypeRep
 -- | Hardware primitive expressions.
 newtype Prim a = Prim { unPrim :: ASTF HardwarePrimDomain a }
 
---------------------------------------------------------------------------------
-
+-- | Evaluate a closed, hardware primitive expression.
 evalPrim :: Prim a -> a
 evalPrim = go . unPrim
   where
@@ -182,15 +183,7 @@ evalPrim = go . unPrim
     go (Sym (s :&: _)) = evalSym s
     go (f :$ a)        = go f $ go a
 
---------------------------------------------------------------------------------
-
-instance Syntactic (Prim a)
-  where
-    type Domain   (Prim a) = HardwarePrimDomain
-    type Internal (Prim a) = a
-    desugar = unPrim
-    sugar   = Prim
-
+-- | Sugar a hardware primitive symbol as a smart constructor.
 sugarSymPrim
   :: ( Signature sig
      , fi  ~ SmartFun dom sig
@@ -206,6 +199,13 @@ sugarSymPrim = sugarSymDecor hardwareRep
 
 --------------------------------------------------------------------------------
 
+instance Syntactic (Prim a)
+  where
+    type Domain   (Prim a) = HardwarePrimDomain
+    type Internal (Prim a) = a
+    desugar = unPrim
+    sugar   = Prim
+
 instance FreeExp Prim
   where
     type PredicateExp Prim = HardwarePrimType
@@ -217,6 +217,7 @@ instance EvaluateExp Prim
     evalE = evalPrim
 
 --------------------------------------------------------------------------------
+-- front-end.
 
 instance (HardwarePrimType a, Num a) => Num (Prim a)
   where
@@ -260,7 +261,7 @@ instance Eval HardwarePrim
     evalSym Gt          = (>)
     evalSym Gte         = (>=)
     evalSym (ArrIx (Imp.IArrayE a)) = \i -> a ! i
-    evalSym (ArrIx _)               = error "eval of array variable"
+    evalSym (ArrIx _)   = error "eval of array variable"
 
 instance Symbol HardwarePrim
   where

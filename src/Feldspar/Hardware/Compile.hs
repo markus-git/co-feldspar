@@ -1,20 +1,17 @@
-{-# language GADTs #-}
-{-# language TypeOperators #-}
-{-# language FlexibleContexts #-}
-{-# language ConstraintKinds #-}
+{-# language GADTs               #-}
+{-# language TypeOperators       #-}
+{-# language FlexibleContexts    #-}
+{-# language ConstraintKinds     #-}
 {-# language ScopedTypeVariables #-}
 
-module Feldspar.Hardware.Compile (compile, icompile, icompileWrap) where
+module Feldspar.Hardware.Compile where
 
 import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Primitive.Backend
+import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Representation
--- ...
-import Feldspar.Hardware.Frontend (component, input, ret, process)
---import Feldspar.Software.Representation ()
-
 import Data.Struct
 
 import Control.Monad.Identity
@@ -35,35 +32,13 @@ import qualified Language.Syntactic as Syn
 
 -- hardware-edsl.
 import Language.Embedded.Hardware (Signal, FreeExp (..))
-import qualified Language.Embedded.Hardware         as Hard
-import qualified Language.Embedded.Hardware.Command as Hard
+import qualified Language.Embedded.Hardware as Hard
 
 --------------------------------------------------------------------------------
 -- * Hardware compiler.
 --------------------------------------------------------------------------------
 
-compile :: Hardware a -> String
-compile = Hard.compile . translate
-
-icompile :: Hardware a -> IO ()
-icompile = Hard.icompile . translate
-
---------------------------------------------------------------------------------
-
-icompileWrap :: Hardware () -> IO ()
-icompileWrap = Hard.icompile . translate . wrap
-
---------------------------------------------------------------------------------
-
--- todo: use wrap from hardware-edsl.
-wrap :: Hardware () -> Hardware ()
-wrap prg = void $ component $
-  ret $ process [] $ prg
-
---------------------------------------------------------------------------------
--- ** Instructions.
---------------------------------------------------------------------------------
-
+-- | Target hardware instructions.
 type TargetCMD
     =        Hard.VariableCMD
     Oper.:+: Hard.ArrayCMD
@@ -75,17 +50,14 @@ type TargetCMD
     Oper.:+: Hard.ConstantCMD
     Oper.:+: Hard.SignalCMD
 
+-- | Target monad during translation.
 type TargetT m = ReaderT Env (ProgramT TargetCMD (Oper.Param2 Prim HardwarePrimType) m)
 
+-- | Monad for translated programs.
 type ProgH = Program TargetCMD (Oper.Param2 Prim HardwarePrimType)
 
 --------------------------------------------------------------------------------
-
--- ...
-
---------------------------------------------------------------------------------
--- ** Expressions.
---------------------------------------------------------------------------------
+-- ** Compilation of expressions.
 
 -- | Struct expression.
 type VExp = Struct HardwarePrimType Prim
@@ -195,30 +167,43 @@ translateExp = goAST . unHExp
       | Just Gt  <- prj op = liftStruct2 (sugarSymPrim Gt)  <$> goAST a <*> goAST b
       | Just Gte <- prj op = liftStruct2 (sugarSymPrim Gte) <$> goAST a <*> goAST b
       | Just BitAnd <- prj op =
-          liftStruct2 (sugarSymPrim BitAnd) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitAnd)  <$> goAST a <*> goAST b
       | Just BitOr  <- prj op =
-          liftStruct2 (sugarSymPrim BitOr) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitOr)   <$> goAST a <*> goAST b
       | Just BitXor <- prj op =
-          liftStruct2 (sugarSymPrim BitXor) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitXor)  <$> goAST a <*> goAST b
       | Just ShiftL <- prj op =
-          liftStruct2 (sugarSymPrim ShiftL) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim ShiftL)  <$> goAST a <*> goAST b
       | Just ShiftR <- prj op =
-          liftStruct2 (sugarSymPrim ShiftR) <$> goAST a <*> goAST b          
+          liftStruct2 (sugarSymPrim ShiftR)  <$> goAST a <*> goAST b          
       | Just RotateL <- prj op =
           liftStruct2 (sugarSymPrim RotateL) <$> goAST a <*> goAST b
       | Just RotateR <- prj op =
           liftStruct2 (sugarSymPrim RotateR) <$> goAST a <*> goAST b
+    go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
+      | Just ForLoop   <- prj loop
+      , Just (LamT iv) <- prj lami
+      , Just (LamT sv) <- prj lams = do
+          len'  <- goSmallAST len
+          state <- initRefV "state" =<< goAST init
+          ReaderT $ \env -> Hard.for 0 (len'-1) $ \i ->
+            flip runReaderT env $ do
+              s <- case t of
+                Node _ -> unsafeFreezeRefV state
+                _      -> getRefV state
+              s' <- localAlias iv (Node i) $ localAlias sv s $ goAST body
+              setRefV state s'
+          unsafeFreezeRefV state
     go _ arrIx (i :* Syn.Nil)
-      | Just (ArrIx arr) <- prj arrIx
-      = goSmallAST i >>= return . Node . sugarSymPrim (ArrIx arr)
+      | Just (ArrIx arr) <- prj arrIx = do
+          i' <- goSmallAST i
+          return $ Node $ sugarSymPrim (ArrIx arr) i'
     go _ s _ = error $ "hardware translation handling for symbol " ++ Syn.renderSym s ++ " is missing."
 
 unsafeTranslateSmallExp :: Monad m => HExp a -> TargetT m (Prim a)
-unsafeTranslateSmallExp a =
-  do Node b <- translateExp a
-     return b
-
---------------------------------------------------------------------------------
+unsafeTranslateSmallExp a = do
+  Node b <- translateExp a
+  return b
 
 translate :: Hardware a -> ProgH a
 translate = flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp . unHardware

@@ -6,56 +6,52 @@
 {-# language TypeFamilies #-}
 {-# language ScopedTypeVariables #-}
 {-# language RankNTypes #-}
-
--- todo : is this bad? comes from how I use `sup` in the `Syntactic` instance for pairs.
+-- todo : is this bad? comes from how I use `sup` in the `Syntactic`
+--        instance for pairs.
 {-# language UndecidableInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Feldspar.Sugar where
 
 import Feldspar.Representation
+import Data.Struct
 
 import Data.Constraint (Constraint)
 import Data.Typeable (Typeable)
 import Data.Proxy (Proxy(..))
-import Data.Struct
 
+import qualified Language.Haskell.TH as TH
+
+-- syntactic.
+import Language.Syntactic
+import Language.Syntactic.TH
 import Language.Syntactic.Syntax
 import Language.Syntactic.Sugar
 import Language.Syntactic.Decoration
-
+import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
 
 --------------------------------------------------------------------------------
--- * ...
+-- ** Tuples.
 --------------------------------------------------------------------------------
 
 -- | Domains that support tuple expressions.
 class Tuples dom
   where
-    pair
-      :: ( Type (PredicateOf dom) a
-         , Type (PredicateOf dom) b
-         , SyntacticN f (ASTF dom a -> ASTF dom b -> ASTF dom (a, b))
-         )
-      => f
-
-    first
-      :: ( Type (PredicateOf dom) a
-         , SyntacticN f (ASTF dom (a, b) -> ASTF dom a)
-         )
-      => f
-
-    second
-      :: ( Type (PredicateOf dom) b
-         , SyntacticN f (ASTF dom (a, b) -> ASTF dom b)
-         )
-      => f
-
---------------------------------------------------------------------------------
+    pair   :: ( Type (Pred dom) a
+              , Type (Pred dom) b
+              , SyntacticN f (ASTF dom a -> ASTF dom b -> ASTF dom (a, b)))
+           => f
+    first  :: ( Type (Pred dom) a
+              , SyntacticN f (ASTF dom (a, b) -> ASTF dom a))
+           => f
+    second :: ( Type (Pred dom) b
+              , SyntacticN f (ASTF dom (a, b) -> ASTF dom b))
+           => f
 
 instance
-    ( Syntactic a, Type (PredicateOf (Domain a)) (Internal a)
-    , Syntactic b, Type (PredicateOf (Domain b)) (Internal b)
+    ( Syntactic a, Type (Pred (Domain a)) (Internal a)
+    , Syntactic b, Type (Pred (Domain b)) (Internal b)
     , Domain a ~ Domain b
     , Tuples (Domain a)
     )
@@ -68,23 +64,26 @@ instance
     sugar   ab     = (first ab, second ab)
 
 --------------------------------------------------------------------------------
+-- ** Functions.
+--------------------------------------------------------------------------------
 
 instance
     ( Syntactic a
     , Syntactic b
+    , Domain a ~ (expr :&: TypeRepF pred (RepresentationOf pred))
+    , Domain b ~ (expr :&: TypeRepF pred (RepresentationOf pred))
+    , BindingT :<: expr
+    , Type pred (Internal a)
     )
     => Syntactic (a -> b)
   where
     type Domain   (a -> b) = Domain a
     type Internal (a -> b) = Internal a -> Internal b
 
-    desugar = error "desugar not yet implemented for (a -> b)"
-    sugar   = error "sugar not implemented for (a -> b)"
-{-
-    desugar = lamT_template varSym lamSym (desugar . f . sugar)
+    desugar f = lamT_template varSym lamSym (desugar . f . sugar)
       where
-        varSym v = inj (VarT v) :&: ValT typeRep
-        lamSym v = Sym (inj (LamT v) :&: FunT typeRep (getDecor b)) :$ b
--}
+        varSym v   = inj (VarT v) :&: ValT typeRep
+        lamSym v b = Sym (inj (LamT v) :&: FunT typeRep (getDecor b)) :$ b
+    sugar = error "sugar not implemented for (a -> b)"
 
 --------------------------------------------------------------------------------

@@ -3,7 +3,6 @@ module Feldspar
   , module Feldspar.Frontend
   , module Data.Int
   , module Data.Word
-  , Inhabited
   , module Language.Syntactic
   ) where
 
@@ -16,6 +15,3 @@ import Data.Word hiding (Word)
 
 -- syntactic.
 import Language.Syntactic (Syntactic, Domain, Internal)
-
--- hardware-edsl.
-import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))

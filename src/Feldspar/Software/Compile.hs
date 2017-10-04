@@ -1,27 +1,15 @@
-{-# language GADTs #-}
-{-# language TypeOperators #-}
-{-# language FlexibleContexts #-}
-{-# language ConstraintKinds #-}
+{-# language GADTs               #-}
+{-# language TypeOperators       #-}
+{-# language FlexibleContexts    #-}
 {-# language ScopedTypeVariables #-}
-{-# language TypeSynonymInstances #-}
-{-# language FlexibleInstances #-}
-{-# language MultiParamTypeClasses #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 module Feldspar.Software.Compile where
 
-import Feldspar.Sugar
 import Feldspar.Representation
-import Feldspar.Common
-
 import Feldspar.Software.Primitive
 import Feldspar.Software.Primitive.Backend
+import Feldspar.Software.Expression
 import Feldspar.Software.Representation
--- todo : hmm...
-import Feldspar.Software.Frontend
-
-import Feldspar.Hardware.Representation (Sig)
-
 import Data.Struct
 
 import Control.Monad.Identity
@@ -44,206 +32,29 @@ import qualified Control.Monad.Operational.Higher as Oper
 -- imperative-edsl.
 import Language.Embedded.Expression
 import Language.Embedded.Imperative hiding (Ref, (:+:)(..), (:<:)(..))
-import Language.Embedded.Concurrent
-import qualified Language.Embedded.Imperative     as Imp
-import qualified Language.Embedded.Imperative.CMD as Imp
-import qualified Language.Embedded.Backend.C      as Imp
-import qualified Language.C.Monad as C
-
--- language-c-quot
-import Language.C.Quote.GCC
-import qualified Language.C.Syntax as C
-
--- hardware-edsl
-import qualified Language.Embedded.Hardware.Command.CMD as Imp
+import qualified Language.Embedded.Imperative as Imp
 
 --------------------------------------------------------------------------------
 -- * Software compiler.
 --------------------------------------------------------------------------------
 
-compile :: Software a -> String
-compile = Imp.compile . translate
-
-icompile :: Software a -> IO ()
-icompile = Imp.icompile . translate
-
---------------------------------------------------------------------------------
--- ** Instructions.
---------------------------------------------------------------------------------
-
+-- | Target software instructions.
 type TargetCMD
     =        RefCMD
     Oper.:+: ArrCMD
     Oper.:+: ControlCMD
-    Oper.:+: ThreadCMD
-    Oper.:+: ChanCMD
     Oper.:+: PtrCMD
     Oper.:+: FileCMD
     Oper.:+: C_CMD
-    -- ...
-    Oper.:+: MMapCMD
 
--- | Target monad during translation
+-- | Target monad during translation.
 type TargetT m = ReaderT Env (ProgramT TargetCMD (Oper.Param2 Prim SoftwarePrimType) m)
 
--- | Monad for translated program
+-- | Monad for translated programs.
 type ProgC = Program TargetCMD (Oper.Param2 Prim SoftwarePrimType)
 
 --------------------------------------------------------------------------------
-
-instance (Imp.CompExp exp, Imp.CompTypeClass ct)
-  => Oper.Interp MMapCMD C.CGen (Param2 exp ct)
-  where
-    interp = compMMapCMD
-{-
-class Oper.Interp (instr :: (k1 -> *, k) -> k1 -> *)
-                  (m :: k1 -> *)
-                  (fs :: k) where
-  Oper.interp :: forall (a :: k1). instr ('(,) m fs) a -> m a
-
-data RefCMD (fs :: (k, (* -> *, (* -> Constraint, *)))) a where
-  Imp.NewRef :: forall k (pred :: * -> Constraint) a1 (prog :: k) (exp :: * -> *).
-                pred a1 =>
-                String -> RefCMD ('(,) prog (Param2 exp pred)) (Imp.Ref a1)
--}
-
-compMMapCMD
-  :: forall exp ct a
-   . (Imp.CompExp exp, Imp.CompTypeClass ct)
-  => MMapCMD (Param3 C.CGen exp ct) a
-  -> C.CGen a
-compMMapCMD cmd@(MMap n sig) =
-  do C.addInclude "<stdio.h>"
-     C.addInclude "<stdlib.h>"
-     C.addInclude "<stddef.h>"
-     C.addInclude "<unistd.h>"
-     C.addInclude "<sys/mman.h>"
-     C.addInclude "<fcntl.h>"
-     C.addGlobal [cedecl| unsigned page_size = 0; |]
-     C.addGlobal [cedecl| int mem_fd = -1; |]
-     C.addGlobal mmapDef
-     mem <- C.gensym "mem"
-     C.addLocal [cdecl| int * $id:mem = f_map($string:n); |]
-     soften mem 0 sig
-  where
-    soften :: String -> Int -> Sig b -> C.CGen (Address (Soften b))
-    soften _ _ (SigRet _)       = return AddrRet
-    soften m i (SigSignal n _ sf) = do
-      ref <- Imp.RefComp <$> C.gensym "proc"
-      C.addLocal [cdecl| int $id:ref = *($id:m + $int:i); |]
-      adr <- soften m (i+1) (sf dummy)
-      return $ AddrRef ref (const adr)
-    soften m i (SigArray n _ len af) = do
-      ref <- Imp.RefComp <$> C.gensym "proc"
-      C.addLocal [cdecl| int $id:ref = *($id:m + $int:i); |]
-      adr <- soften m (i+1) (af dummy)
-      return $ AddrArr ref len (const adr)
-    -- todo : I should remove this one.
-    dummy :: b
-    dummy = error "co-feldspar.soften: evaluated signature."
-    -- todo : get types of 'channel -> ref/arr'.
-    proxySig :: (c b -> Signature fs d) -> Proxy b
-    proxySig _ = (Proxy::Proxy b)
-
-compMMapCMD cmd@(Call addr args) =
-  do res <- apply addr args
-     return $ result res addr
-  where
-    result :: forall b . String -> Address b -> Result b
-    result s (AddrRet) = ()
-    result s (AddrRef _ (rf :: Imp.Ref c -> Address d)) =
-      case rf dummy of
-        a@(AddrRet)       -> Ref (Node (Imp.RefComp s)) :: Result b
-        a@(AddrRef _ _)   -> result s a
-        a@(AddrArr _ _ _) -> result s a
-    result s (AddrArr _ l (af :: Imp.Arr Index c -> Address d)) =
-      case af dummy of
-        a@(AddrRet)       -> Arr 0 (fromIntegral l) (Node (Imp.ArrComp s))
-        a@(AddrRef _ _)   -> result s a
-        a@(AddrArr _ _ _) -> result s a
-    -- todo : return a new reference instead of the channel one, so users
-    --        cannot do wierd things with it.
-    --
-    -- todo : the type I use is temporary, this function shuold have the following
-    --        type instead:
-    --
-    -- apply :: Address b -> SArg (Argument b) -> C.CGen (Result b)
-    --
-    -- todo : avoid the extra compilation steps here by instead invocing the
-    --        compiler from the respective languages. That is, create a instruction
-    --        like below and call 'Oper.interp'. This requires 'Adddress' to have
-    --        its predicate be a parameter (like instructions with 'fs' do).
-    --
-    -- let ri :: Imp.RefCMD (Imp.Param3 C.CGen exp ct) (Imp.Ref x)
-    --     ri  = Imp.NewRef "res"
-    --
-    apply :: Address b -> SArg c -> C.CGen String
-    apply (AddrRef
-             (ref :: (Imp.Ref Int32))
-             (rf  :: (Imp.Ref x -> Address y)))
-          (SoftNil) =
-      do out <- C.gensym "res"
-         C.addLocal [cdecl| int $id:out; |]
-         C.addStm [cstm| $id:out = $id:ref; |]
-         return out
-    apply (AddrRef ref rf) (SoftRef arg as) =
-      do C.addStm [cstm| $id:ref = (int) $id:arg; |]
-         apply (rf dummy) as
-    apply (AddrArr ref len af) (SoftNil) =
-      do sym <- C.gensym "res"
-         let sym' = '_':sym
-         count <- Imp.RefComp <$> C.gensym "v"
-         C.addLocal [cdecl| int $id:count; |]
-         C.addLocal [cdecl| int $id:sym'[ $int:len ]; |]
-         C.addLocal [cdecl| int * $id:sym = $id:sym'; |]
-         C.addStm   [cstm|
-             for($id:count=0;$id:count<$int:len;$id:count++) {
-               $id:sym[$id:count] = $id:ref;
-             } |]
-         return sym
-    apply (AddrArr ref len af) (SoftArr arg as) =
-      do count <- Imp.RefComp <$> C.gensym "v"
-         C.addLocal [cdecl| int $id:count; |]
-         C.addStm   [cstm|
-             for($id:count=0;$id:count<$int:len;$id:count++) {
-               $id:ref = (int) $id:arg[$id:count];
-             } |]
-         apply (af dummy) as
-    -- todo : ...
-    proxyAddr :: (c b -> Address d) -> Proxy b
-    proxyAddr _ = Proxy::Proxy b
-    -- todo : I should remove this one.
-    dummy :: b
-    dummy = error "co-feldspar.apply: evaluated signature."
-
-mmapDef :: C.Definition
-mmapDef =  [cedecl|
-int * f_map(unsigned addr) {
-  unsigned page_addr;
-  unsigned offset;
-  void * ptr;
-  if(!page_size) {
-    page_size = sysconf(_SC_PAGESIZE);
-  }
-  if(mem_fd < 1) {
-    mem_fd = open ("/dev/mem", O_RDWR);
-    if (mem_fd < 1) {
-      perror("f_map");
-    }
-  }
-  page_addr = (addr & (~(page_size-1)));
-  offset = addr - page_addr;
-  ptr = mmap(NULL, page_size, PROT_READ|PROT_WRITE, MAP_SHARED, mem_fd, page_addr);
-  if(ptr == MAP_FAILED || !ptr) {
-    perror("f_map");
-  }
-  return (int*) (ptr + offset);
-}
-|]
-
---------------------------------------------------------------------------------
--- ** Expressions.
---------------------------------------------------------------------------------
+-- ** Compilation of expressions.
 
 -- | Struct expression.
 type VExp = Struct SoftwarePrimType Prim
@@ -296,6 +107,17 @@ translateExp = goAST . unSExp
        -> SoftwareConstructs sig
        -> Syn.Args (AST SoftwareDomain) sig
        -> TargetT m (VExp (Syn.DenResult sig))
+{-
+    go t lit Syn.Nil
+      | Just (Lit a) <- prj lit
+      = return $ mapStruct (constExp . runIdentity) $ toStruct t a
+    go t lt (a :* (lam :$ body) :* Syn.Nil)
+      | Just (Let tag) <- prj lt
+      = case prj lam of
+          Just (LamT v) -> error "!!"
+          Nothing       -> error ":<"
+    go _ s _ = error $ "software translation handling for symbol " ++ Syn.renderSym s ++ " is missing. (" ++ show s ++ ")"
+-}
     go t lit Syn.Nil
       | Just (Lit a) <- prj lit
       = return $ mapStruct (constExp . runIdentity) $ toStruct t a
@@ -355,15 +177,15 @@ translateExp = goAST . unSExp
       | Just Gt  <- prj op = liftStruct2 (sugarSymPrim Gt)  <$> goAST a <*> goAST b
       | Just Gte <- prj op = liftStruct2 (sugarSymPrim Gte) <$> goAST a <*> goAST b
       | Just BitAnd <- prj op =
-          liftStruct2 (sugarSymPrim BitAnd) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitAnd)  <$> goAST a <*> goAST b
       | Just BitOr  <- prj op =
-          liftStruct2 (sugarSymPrim BitOr) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitOr)   <$> goAST a <*> goAST b
       | Just BitXor <- prj op =
-          liftStruct2 (sugarSymPrim BitXor) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitXor)  <$> goAST a <*> goAST b
       | Just ShiftL <- prj op =
-          liftStruct2 (sugarSymPrim ShiftL) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim ShiftL)  <$> goAST a <*> goAST b
       | Just ShiftR <- prj op =
-          liftStruct2 (sugarSymPrim ShiftR) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim ShiftR)  <$> goAST a <*> goAST b
       | Just RotateL <- prj op =
           liftStruct2 (sugarSymPrim RotateL) <$> goAST a <*> goAST b
       | Just RotateR <- prj op =
@@ -374,12 +196,13 @@ translateExp = goAST . unSExp
       , Just (LamT sv) <- prj lams = do
           len'  <- goSmallAST len
           state <- initRefV "state" =<< goAST init
-          ReaderT $ \env -> Imp.for (0, 1, Imp.Excl len') $ \i -> flip runReaderT env $ do
-            s <- case t of
-              Node _ -> unsafeFreezeRefV state
-              _      -> getRefV state
-            s' <- localAlias iv (Node i) $ localAlias sv s $ goAST body
-            setRefV state s'
+          ReaderT $ \env -> Imp.for (0, 1, Imp.Excl len') $ \i ->
+            flip runReaderT env $ do
+              s <- case t of
+                Node _ -> unsafeFreezeRefV state
+                _      -> getRefV state
+              s' <- localAlias iv (Node i) $ localAlias sv s $ goAST body
+              setRefV state s'
           unsafeFreezeRefV state
     go _ arrIx (i :* Syn.Nil)
       | Just (ArrIx arr) <- prj arrIx = do
@@ -387,14 +210,24 @@ translateExp = goAST . unSExp
           return $ Node $ sugarSymPrim (ArrIx arr) i'
     go _ s _ = error $ "software translation handling for symbol " ++ Syn.renderSym s ++ " is missing."
 
+
 unsafeTranslateSmallExp :: Monad m => SExp a -> TargetT m (Prim a)
 unsafeTranslateSmallExp a = do
   Node b <- translateExp a
   return b
 
---------------------------------------------------------------------------------
-
 translate :: Software a -> ProgC a
 translate = flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp . unSoftware
 
+--------------------------------------------------------------------------------
+{-
+instance (Show (a sig), Show (b sig)) => Show ((Syn.:+:) a b sig)
+  where
+    show (Syn.InjL a) = "InjL (" ++ show a ++ ")"
+    show (Syn.InjR b) = "InjR (" ++ show b ++ ")"
+
+instance Show (BindingT sig) where show _ = "BindingT"
+instance Show (Let sig)      where show _ = "Let"
+instance Show (Tuple sig)    where show _ = "Tuple"
+-}
 --------------------------------------------------------------------------------

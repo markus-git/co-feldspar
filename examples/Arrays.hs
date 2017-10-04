@@ -22,41 +22,35 @@ import Feldspar.Hardware as Hard (icompileWrap)
 
 arrays
   :: forall m dom expr
-   . ( Comp m
-     , dom  ~ DomainOf m
-     , expr ~ Expr m
-
-     -- *** todo: ...
-     , Num (Ix m)
-     , Elem (IArray m (expr Int8)) ~ expr Int8
-     , Finite (Ix m) (Array m (expr Int8))
-
-     -- *** todo: ...
-     , Indexed dom (expr Index) (IArray m (expr Int8))
-
-     -- *** todo: ...
-     , Equality dom, Ordered dom
-     , Ord (Internal (expr Int8)), Boolean (Internal (expr Bool))
-     , Syntax' dom (expr Bool)
-     , Syntax' dom (expr Int8)
-
+   . ( MonadComp m
      -- ...
-     , Num (expr Int8)     
-     , Syntax dom (expr Int8)
+     , Finite   (Expr m) (Array  m (Expr m Int8))
+     , Indexed  (Expr m) (IArray m (Expr m Int8))
+     , Equality (Expr m)
+     , Ordered  (Expr m)
+     -- ...
+     , Num (Expr m Int8)
+     , Num (Expr m Length)
+     -- ...
+     , Elem (IArray m (Expr m Int8)) ~ Expr m Int8
+     -- ...
+     , SyntaxM' m (Expr m Bool)
+     , SyntaxM' m (Expr m Int8)
+     , Primitive (Expr m) Int8
      )
   => m ()
 arrays =
-  do arr :: Array m (expr Int8) <- newArr 2
+  do arr :: Array m (Expr m Int8) <- newArr 2
      setArr arr 0 0
      setArr arr 1 1
 
      v <- getArr arr 1
-     ref :: Reference m (expr Int8) <- initRef v
+     ref :: Reference m (Expr m Int8) <- initRef v
 
-     iarr :: IArray m (expr Int8) <- freezeArr arr
-     iff (v < 2 :: expr Bool)
+     iarr :: IArray m (Expr m Int8) <- freezeArr arr
+     iff (v < 2 :: Expr m Bool)
        (setArr arr 1 2)
        (setArr arr 1 3)
-     setRef ref (iarr ! (1 :: expr Index))
+     setRef ref (iarr ! (1 :: Expr m Index))
      
 --------------------------------------------------------------------------------

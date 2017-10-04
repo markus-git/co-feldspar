@@ -1,46 +1,32 @@
-{-# language TypeOperators #-}
-{-# language StandaloneDeriving #-}
-{-# language GADTs #-}
-{-# language FlexibleInstances #-}
-{-# language MultiParamTypeClasses #-}
-{-# language UndecidableInstances #-}
-{-# language TypeFamilies #-}
+{-# language GADTs                      #-}
+{-# language TypeOperators              #-}
+{-# language TypeFamilies               #-}
+{-# language MultiParamTypeClasses      #-}
+{-# language FlexibleContexts           #-}
+{-# language FlexibleInstances          #-}
 {-# language GeneralizedNewtypeDeriving #-}
-{-# language FlexibleContexts #-}
-{-# language ScopedTypeVariables #-}
-{-# language PolyKinds #-}
-
-{-# language InstanceSigs #-}
-{-# language Rank2Types #-}
-{-# language ConstraintKinds #-}
 
 module Feldspar.Software.Representation where
 
 import Feldspar.Sugar
 import Feldspar.Representation
-import Feldspar.Common
 import Feldspar.Frontend
-
+import Feldspar.Storable
 import Feldspar.Software.Primitive
-
-import Feldspar.Hardware.Representation (Sig)
-
+import Feldspar.Software.Expression
+import Feldspar.Software.Command
 import Data.Struct
 
 import Data.Int
 import Data.Word
 import Data.List (genericTake)
 import Data.Typeable (Typeable)
-import Data.Proxy
 import Data.Constraint
-
-import Control.Monad.Reader (ReaderT(..), runReaderT, lift)
 
 -- syntactic.
 import Language.Syntactic hiding (Signature, Args)
 import Language.Syntactic.Functional hiding (Lam)
 import Language.Syntactic.Functional.Tuple
-
 import qualified Language.Syntactic as Syn
 
 -- operational-higher.
@@ -51,9 +37,11 @@ import qualified Language.Embedded.Expression as Imp
 import qualified Language.Embedded.Imperative as Imp
 
 -- hardware-edsl
-import Language.Embedded.Hardware.Expression.Represent (Inhabited(..))
 import qualified Language.Embedded.Hardware.Command   as H
 import qualified Language.Embedded.Hardware.Interface as H
+
+-- debug.
+--import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- * Programs.
@@ -61,13 +49,12 @@ import qualified Language.Embedded.Hardware.Interface as H
 
 -- | Software instructions.
 type SoftwareCMD
+    -- ^ Computational instructions.
          = Imp.RefCMD
   Oper.:+: Imp.ControlCMD
   Oper.:+: Imp.ArrCMD
-    -- ^ Computational instructions.
-  Oper.:+: Imp.FileCMD
     -- ^ Software specific instructions.
-  Oper.:+: MMapCMD
+  Oper.:+: Imp.FileCMD
 
 -- | Monad for building software programs in Feldspar.
 newtype Software a = Software { unSoftware :: Program SoftwareCMD (Param2 SExp SoftwarePrimType) a }
@@ -92,229 +79,67 @@ data IArr a = IArr
   , unIArr     :: Struct SoftwarePrimType (Imp.IArr Index) (Internal a)
   }
 
-
---------------------------------------------------------------------------------
--- ** Instructions.
---------------------------------------------------------------------------------
-
--- todo : must it really be closed?
-type family Soften a where
-  Soften () = ()
-  Soften (H.Signal a -> b) = Imp.Ref a       -> Soften b
-  Soften (H.Array  a -> b) = Imp.Arr Index a -> Soften b
-
--- todo : these two families could probably be better.
-type family Result a where
-  Result ()                    = ()
-  Result (Imp.Ref a -> ())       = Ref (SExp a)
-  Result (Imp.Ref a -> b)        = Result b
-  Result (Imp.Arr Index a -> ()) = Arr (SExp a)
-  Result (Imp.Arr Index a -> b)  = Result b
-
--- todo : yep, most likely.
-type family Argument a where
-  Argument ()        = ()
-  Argument (a -> ()) = ()
-  Argument (a -> b)  = a -> Argument b
-
---------------------------------------------------------------------------------
-
-data MMapCMD fs a
-  where
-    MMap :: String -> Sig a
-         -> MMapCMD (Param3 prog exp pred) (Address (Soften a))
-    Call :: Address a -> SArg (Argument a)
-         -> MMapCMD (Param3 prog exp pred) (Result a)
-
--- todo : I ignore translations for the signature. I think this is correct,
---        since the software side should not touch the hardware program inside,
---        but I should double check this later. This todo goes for all
---        instance declarations below.
-instance Oper.HFunctor MMapCMD
-  where
-    hfmap _ (MMap n sig)     = MMap n sig
-    hfmap _ (Call addr args) = Call addr args
-
-instance Oper.HBifunctor MMapCMD
-  where
-    hbimap _ _ (MMap n sig)     = MMap n sig
-    hbimap _ _ (Call addr args) = Call addr args
-
-instance (MMapCMD Imp.:<: instr) => Oper.Reexpressible MMapCMD instr env
-  where
-    reexpressInstrEnv reexp (MMap n sig) = ReaderT $ \env ->
-      Oper.singleInj $ MMap n sig
-    reexpressInstrEnv reexp (Call addr args) = ReaderT $ \env ->
-      Oper.singleInj $ Call addr args
-
---------------------------------------------------------------------------------
--- ** Expression.
---------------------------------------------------------------------------------
-
--- | For loop.
-data ForLoop sig
-  where
-    ForLoop :: Syntactic st =>
-        ForLoop (Length :-> st :-> (Index -> st -> st) :-> Full st)
-
-deriving instance Eq       (ForLoop a)
-deriving instance Show     (ForLoop a)
-deriving instance Typeable (ForLoop a)
-
---------------------------------------------------------------------------------
-
--- | Software symbols.
-type SoftwareConstructs = 
-          SoftwarePrimConstructs
-  Syn.:+: ForLoop
-  Syn.:+: Tuple
-  Syn.:+: Let
-  Syn.:+: BindingT
-
--- | Software symbols tagged with their type representation.
-type SoftwareDomain = SoftwareConstructs :&: TypeRepF SoftwarePrimType SoftwarePrimTypeRep
-
--- | Software expressions.
-newtype SExp a = SExp { unSExp :: ASTF SoftwareDomain a }
-
--- | Evaluate a closed expression
-eval :: (Syntactic a, Domain a ~ SoftwareDomain) => a -> Internal a
-eval = evalClosed . desugar
-
 --------------------------------------------------------------------------------
 
 -- ... hmm ...
 type instance Expr Software = SExp
-
--- ...
-type instance DomainOf         Software         = SoftwareDomain
-type instance PredicateOf      SoftwareDomain   = SoftwarePrimType
-type instance RepresentationOf SoftwarePrimType = SoftwarePrimTypeRep
+type instance DomainOf Software = SoftwareDomain
 
 --------------------------------------------------------------------------------
 
-instance Syntactic (SExp a)
+instance (Reference Software ~ Ref, Type SoftwarePrimType a) =>
+    Storable Software (SExp a)
   where
-    type Domain   (SExp a) = SoftwareDomain
-    type Internal (SExp a) = a
+    type StoreRep Software (SExp a) = Ref (SExp a)
+    type StoreSize Software (SExp a) = ()
+    newStoreRep _ _      = newRef
+    initStoreRep         = initRef
+    readStoreRep         = getRef
+    unsafeFreezeStoreRep = unsafeFreezeRef
+    writeStoreRep        = setRef
 
-    desugar = unSExp
-    sugar   = SExp
+--------------------------------------------------------------------------------
+-- *** Temporary hot-fix until GHC fixes their class resolution for DTC ***
 
-instance Syntactic (Struct SoftwarePrimType SExp a)
+bug :: String -> Bool
+bug = const True
+--bug msg = trace msg True
+
+instance {-# OVERLAPPING #-} Project sub SoftwareConstructs =>
+    Project sub (AST SoftwareDomain)
   where
-    type Domain   (Struct SoftwarePrimType SExp a) = SoftwareDomain
-    type Internal (Struct SoftwarePrimType SExp a) = a
+    prj (Sym s) | bug "Sym" = Syn.prj s
+    prj _ = Nothing
 
-    desugar (Node a)     = unSExp a
-    desugar (Branch a b) = sugarSymDecor (ValT $ Branch ta tb) Pair a' b'
-      where
-        a' = desugar a
-        b' = desugar b
-        ValT ta = getDecor a'
-        ValT tb = getDecor b'
-    
-    sugar a = case getDecor a of
-      ValT (Node _)       -> Node $ SExp a
-      ValT (Branch ta tb) -> Branch (sugarSymDecor (ValT ta) Fst a) (sugarSymDecor (ValT tb) Snd a)
-
---------------------------------------------------------------------------------
-
-sugarSymSoftware
-  :: ( Syn.Signature sig
-       , fi             ~ SmartFun SoftwareDomain sig
-       , sig            ~ SmartSig fi
-       , SoftwareDomain ~ SmartSym fi
-       , SyntacticN f fi
-       , sub :<: SoftwareConstructs
-       , Type SoftwarePrimType (DenResult sig)
-       )
-    => sub sig -> f
-sugarSymSoftware = sugarSymDecor $ ValT $ typeRep
-
---------------------------------------------------------------------------------
-
-sugarSymPrimSoftware
-    :: ( Syn.Signature sig
-       , fi             ~ SmartFun SoftwareDomain sig
-       , sig            ~ SmartSig fi
-       , SoftwareDomain ~ SmartSym fi
-       , SyntacticN f fi
-       , sub :<: SoftwareConstructs
-       , SoftwarePrimType (DenResult sig)
-       )
-    => sub sig -> f
-sugarSymPrimSoftware = sugarSymDecor $ ValT $ Node softwareRep
-
---------------------------------------------------------------------------------
-
-instance Tuples SoftwareDomain
+instance {-# OVERLAPPING #-} Project sub SoftwareConstructs =>
+    Project sub SoftwareDomain
   where
-    pair   = sugarSymSoftware Pair
-    first  = sugarSymSoftware Fst
-    second = sugarSymSoftware Snd
+    prj (expr :&: info) | bug "(:&:)" = Syn.prj expr
+    prj _ = Nothing
 
---------------------------------------------------------------------------------
--- imperative-edsl instances.
-
-instance Imp.FreeExp SExp
+instance {-# OVERLAPPING #-} Project BindingT SoftwareConstructs
   where
-    type FreePred SExp = PrimType SoftwarePrimType
-    constExp = sugarSymSoftware . Lit
-    varExp   = sugarSymSoftware . FreeVar
+    prj (InjL a) | bug "BindingT" = Just a
+    prj _ = Nothing
 
---------------------------------------------------------------------------------
--- syntactic instances.
-
-instance Eval ForLoop
+instance {-# OVERLAPPING #-} Project Let SoftwareConstructs
   where
-    evalSym ForLoop = \len init body ->
-        foldl (flip body) init $ genericTake len [0..]
+    prj (InjR (InjL a)) | bug "Let" = Just a
+    prj _ = Nothing
 
-instance Symbol ForLoop
+instance {-# OVERLAPPING #-} Project Tuple SoftwareConstructs
   where
-    symSig (ForLoop) = signature
+    prj (InjR (InjR (InjL a))) | bug "Tuple" = Just a
+    prj _ = Nothing
 
-instance Render ForLoop
+instance {-# OVERLAPPING #-} Project SoftwarePrimConstructs SoftwareConstructs
   where
-    renderSym  = show
-    renderArgs = renderArgsSmart
+    prj (InjR (InjR (InjR (InjL a)))) | bug "Prim" = Just a
+    prj _ = Nothing
 
-instance EvalEnv ForLoop env
-
-instance StringTree ForLoop
-
--------------------------------------------------------------------------------- 
--- ** Types.
---------------------------------------------------------------------------------
-
--- ... software type representation ...
-type STypeRep = TypeRep SoftwarePrimType SoftwarePrimTypeRep
-
---------------------------------------------------------------------------------
-
-instance Type SoftwarePrimType Bool   where typeRep = Node BoolST
-instance Type SoftwarePrimType Int8   where typeRep = Node Int8ST
-instance Type SoftwarePrimType Int16  where typeRep = Node Int16ST
-instance Type SoftwarePrimType Int32  where typeRep = Node Int32ST
-instance Type SoftwarePrimType Int64  where typeRep = Node Int64ST
-instance Type SoftwarePrimType Word8  where typeRep = Node Word8ST
-instance Type SoftwarePrimType Word16 where typeRep = Node Word16ST
-instance Type SoftwarePrimType Word32 where typeRep = Node Word32ST
-instance Type SoftwarePrimType Word64 where typeRep = Node Word64ST
-instance Type SoftwarePrimType Float  where typeRep = Node FloatST
-
---------------------------------------------------------------------------------
-
-softwareTypeEq :: STypeRep a -> STypeRep b -> Maybe (Dict (a ~ b))
-softwareTypeEq (Node t)       (Node u) = softwarePrimTypeEq t u
-softwareTypeEq (Branch t1 u1) (Branch t2 u2) = do
-  Dict <- softwareTypeEq t1 t2
-  Dict <- softwareTypeEq u1 u2
-  return Dict
-softwareTypeEq _ _ = Nothing
-
-softwareTypeRep :: Struct SoftwarePrimType c a -> STypeRep a
-softwareTypeRep = mapStruct (const softwareRep)
+instance {-# OVERLAPPING #-} Project ForLoop SoftwareConstructs
+  where
+    prj (InjR (InjR (InjR (InjR a)))) | bug "Loop" = Just a
+    prj _ = Nothing
 
 --------------------------------------------------------------------------------

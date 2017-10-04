@@ -1,15 +1,9 @@
-{-# language TypeFamilies #-}
-{-# language TypeSynonymInstances #-}
-{-# language FlexibleInstances #-}
-{-# language UndecidableInstances #-}
+{-# language TypeFamilies          #-}
 {-# language MultiParamTypeClasses #-}
-{-# language ConstraintKinds #-}
-{-# language ScopedTypeVariables #-}
-{-# language FlexibleContexts #-}
-
+{-# language FlexibleContexts      #-}
+{-# language ConstraintKinds       #-}
+{-# language ScopedTypeVariables   #-}
 {-# language FunctionalDependencies #-}
-
-{-# language TypeOperators #-}
 
 module Feldspar.Frontend where
 
@@ -21,11 +15,10 @@ import Data.Constraint
 import Data.Struct
 import Data.Proxy
 import Data.Word hiding (Word)
---import Data.Ix
 
 import qualified Data.Bits as Bits
 
--- syntactci.
+-- syntactic.
 import Language.Syntactic as S hiding (Equality)
 
 -- operational-higher.
@@ -35,171 +28,167 @@ import qualified Control.Monad.Operational.Higher as Oper (Program, Param2)
 import qualified Language.Embedded.Imperative     as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 
-import Prelude hiding (length, Word)
+import Prelude hiding (length, Word, (<=))
 
 --------------------------------------------------------------------------------
--- * Expressions.
+--
 --------------------------------------------------------------------------------
-
--- | Short-hand for a `Syntactic` instance over typed values from `dom`.
-type Syntax  dom a = (Syntactic a, dom ~ Domain a, Type (PredicateOf dom) (Internal a), Tuples dom)
-
--- | Short-hand for a `Syntactic` instance over typed primitive values from `dom`.
-type Syntax' dom a = (Syntactic a, PrimType (PredicateOf dom) (Internal a), dom ~ Domain a)
 
 -- | ...
-type SyntaxM  m a = Syntax  (DomainOf m) a
+type Syn (dom :: * -> *) (pred :: * -> Constraint) (exp :: * -> *) (a :: *) =
+  (
+    Syntactic a
+  , Domain a ~ dom
+  , Type pred (Internal a)
+  , Tuples dom
+  )
 
 -- | ...
-type SyntaxM' m a = Syntax' (DomainOf m) a
+type Syn' dom pred exp a = (Syn dom pred exp a, PrimType pred (Internal a))
 
 -- | ...
-type Boolean a = a ~ Bool
+type Syntax  exp a = (Syn  (DomainOf exp) (PredOf exp) exp a, ExprOf a ~ exp)
+
+-- | ...
+type Syntax' exp a = (Syn' (DomainOf exp) (PredOf exp) exp a, ExprOf a ~ exp)
+
+-- | ...
+type Primitive exp a = PredOf exp a
 
 --------------------------------------------------------------------------------
 
--- computational instructions.
-type Comp m
-  = ( Monad m
-    , References m
-    , Arrays m
-    , IArrays m
-    , Control m
-    , Value (DomainOf m)
-    , Share (DomainOf m)
-    , Cond  (DomainOf m)
-    )
+-- | ...
+type SyntaxM  m a = Syntax  (Expr m) a
+
+-- | ...
+type SyntaxM' m a = Syntax' (Expr m) a
 
 --------------------------------------------------------------------------------
--- ** General constructs.
+-- Expressions.
 --------------------------------------------------------------------------------
 
-class Value dom
+class Value exp
   where
-    value :: Syntax dom a => Internal a -> a
+    value :: Syntax exp a => Internal a -> a
 
-class Share dom
+class Share exp
   where
-    share :: (Syntax dom a, Syntax dom b)
-      => a        -- ^ Value to share.
-      -> (a -> b) -- ^ Body in which to share the value.
-      -> b
+    share :: (Syntax exp a, Syntax exp b) => a -> (a -> b) -> b
 
-class Cond dom
+class Loop exp
   where
-    cond
-      :: (Syntax dom a, Syntax dom b, Boolean (Internal b))
-      => b -- ^ condition.
-      -> a -- ^ true branch.
-      -> a -- ^ false branch.
-      -> a
+    loop :: (Syntax exp st) => exp Length -> st -> (exp Index -> st -> st) -> st
+
+class Cond exp
+  where
+    cond :: (Syntax exp a) => exp Bool -> a -> a -> a
 
 -- | Condition operator; use as follows:
 --
 -- @
 -- cond1 `?` a $
 -- cond2 `?` b $
--- cond3 `?` c $
 --         default
 -- @
-(?) :: (Cond dom, Syntax dom a, Syntax dom b, Boolean (Internal b))
-    => b  -- ^ Condition
-    -> a  -- ^ True branch
-    -> a  -- ^ False branch
-    -> a
+(?) :: (Cond exp, Syntax exp a) => exp Bool -> a -> a -> a
 (?) = cond
 
 infixl 1 ?
 
---------------------------------------------------------------------------------
--- ** Primitive functions.
---------------------------------------------------------------------------------
-
-class Equality dom
+class Equality exp
   where
-    (==) :: (Syntax' dom a, Syntax' dom b, Eq (Internal a), Boolean (Internal b)) => a -> a -> b
+    (==) :: (Eq a, Primitive exp a) => exp a -> exp a -> exp Bool
 
 infix 4 ==
   
-class Equality dom => Ordered dom
+class Equality exp => Ordered exp
   where
-    (<)  :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
-    (<=) :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
-    (>)  :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
-    (>=) :: (Syntax' dom a, Syntax' dom b, Ord (Internal a), Boolean (Internal b)) => a -> a -> b
+    (<)  :: (Ord a, Primitive exp a) => exp a -> exp a -> exp Bool
+    (<=) :: (Ord a, Primitive exp a) => exp a -> exp a -> exp Bool
+    (>)  :: (Ord a, Primitive exp a) => exp a -> exp a -> exp Bool
+    (>=) :: (Ord a, Primitive exp a) => exp a -> exp a -> exp Bool
 
 infix 4 <, >, <=, >=
-    
-class Logical dom
+
+min :: (Cond exp, Ordered exp, Syntax exp (exp a), Ord a, Primitive exp a)
+    => exp a -> exp a -> exp a
+min a b = cond (a <= b) a b
+
+class Logical exp
   where
-    not  :: (Syntax' dom a, Boolean (Internal a)) => a -> a
-    (&&) :: (Syntax' dom a, Boolean (Internal a)) => a -> a -> a
-    (||) :: (Syntax' dom a, Boolean (Internal a)) => a -> a -> a
+    not  :: exp Bool -> exp Bool
+    (&&) :: exp Bool -> exp Bool -> exp Bool
+    (||) :: exp Bool -> exp Bool -> exp Bool
 
 infix 3 &&
 infix 2 ||
 
-class Multiplicative dom
+class Multiplicative exp
   where
-    mult :: (Syntax' dom a, Integral (Internal a)) => a -> a -> a
-    div  :: (Syntax' dom a, Integral (Internal a)) => a -> a -> a
-    mod  :: (Syntax' dom a, Integral (Internal a)) => a -> a -> a
+    mult :: (Integral a, Primitive exp a) => exp a -> exp a -> exp a
+    div  :: (Integral a, Primitive exp a) => exp a -> exp a -> exp a
+    mod  :: (Integral a, Primitive exp a) => exp a -> exp a -> exp a
   
-class Bitwise dom
+class Bitwise exp
   where
-    complement :: (Syntax' dom a, Bits (Internal a)) => a -> a
-    (.&.) :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
-    (.|.) :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
-    xor   :: (Syntax' dom a, Bits (Internal a)) => a -> a -> a
-    sll   :: (Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
-    srl   :: (Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
-    rol   :: (Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
-    ror   :: (Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
-
-shiftL :: (Bitwise dom, Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
-shiftL = sll
-
-shiftR :: (Bitwise dom, Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
-shiftR = srl
-
-rotateL :: (Bitwise dom, Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
-rotateL = rol
-
-rotateR :: (Bitwise dom, Syntax' dom a, Syntax' dom b, Bits (Internal a), Integral (Internal b)) => a -> b -> a
-rotateR = ror
-
-bitSize :: forall a. FiniteBits (Internal a) => a -> Word64
-bitSize _ = fromIntegral $ Bits.finiteBitSize (a :: Internal a)
-  where a = error "Bits.finiteBitSize evaluated its argument"
+    complement :: (Bits a, Primitive exp a) => exp a -> exp a
+    (.&.) :: (Bits a, Primitive exp a) => exp a -> exp a -> exp a
+    (.|.) :: (Bits a, Primitive exp a) => exp a -> exp a -> exp a
+    xor   :: (Bits a, Primitive exp a) => exp a -> exp a -> exp a
+    sll   :: ( Bits a,     Primitive exp a
+             , Integral b, Primitive exp b)
+          => exp a -> exp b -> exp a
+    srl   :: ( Bits a,     Primitive exp a
+             , Integral b, Primitive exp b)
+          => exp a -> exp b -> exp a
+    rol   :: ( Bits a,     Primitive exp a
+             , Integral b, Primitive exp b)
+          => exp a -> exp b -> exp a
+    ror   :: ( Bits a,     Primitive exp a
+             , Integral b, Primitive exp b)
+          => exp a -> exp b -> exp a
 
 infixl 8 `sll`, `srl`, `rol`, `ror`
-infixl 8 `shiftL`, `shiftR`, `rotateL`, `rotateR`
 infixl 7 .&.
 infixl 6 `xor`
 infixl 5 .|.
 
-class Casting dom
+shiftL  :: (Bitwise exp, Bits a, Primitive exp a, Integral b, Primitive exp b) => exp a -> exp b -> exp a
+shiftL = sll
+
+shiftR  :: (Bitwise exp, Bits a, Primitive exp a, Integral b, Primitive exp b) => exp a -> exp b -> exp a
+shiftR = srl
+
+rotateL :: (Bitwise exp, Bits a, Primitive exp a, Integral b, Primitive exp b) => exp a -> exp b -> exp a
+rotateL = rol
+
+rotateR :: (Bitwise exp, Bits a, Primitive exp a, Integral b, Primitive exp b) => exp a -> exp b -> exp a
+rotateR = ror
+
+infixl 8 `shiftL`, `shiftR`, `rotateL`, `rotateR`
+
+bitSize :: forall exp a. FiniteBits a => exp a -> Word64
+bitSize _ = fromIntegral $ Bits.finiteBitSize (a :: a)
+  where a = error "Bits.finiteBitSize evaluated its argument"
+
+class Casting exp
   where
-    i2n :: (Syntax' dom a, Syntax' dom b, Integral (Internal a), Num (Internal b)) => a -> b
-  
+    i2n :: (Integral a, Primitive exp a, Num b, Primitive exp b) => exp a -> exp b
+
 --------------------------------------------------------------------------------
--- arrays.
-
-class Indexed dom ix a
-  where
-    type Elem a :: *
-    (!) :: Syntax dom (Elem a) => a -> ix -> Elem a
-
-class Slicable ix a
-  where
-    slice :: ix -> ix -> a -> a
-
-class Finite ix a
-  where
-    length :: a -> ix
-    
+-- Instructions.
 --------------------------------------------------------------------------------
--- ** Commands.
+
+-- | Computational instructions.
+type MonadComp m
+  = ( Monad m
+    , References m
+    , Arrays m
+    , IArrays m
+    , Control m
+    )
+
+--------------------------------------------------------------------------------
 
 class Monad m => References m
   where
@@ -208,40 +197,51 @@ class Monad m => References m
     newRef  :: SyntaxM m a => m (Reference m a)
     getRef  :: SyntaxM m a => Reference m a -> m a
     setRef  :: SyntaxM m a => Reference m a -> a -> m ()
-    unsafeFreezeRef
-            :: SyntaxM m a => Reference m a -> m a
+    unsafeFreezeRef :: SyntaxM m a => Reference m a -> m a
 
 shareM :: (SyntaxM m a, References m) => a -> m a
 shareM a = initRef a >>= unsafeFreezeRef
 
 --------------------------------------------------------------------------------
--- todo: 'Ix m' could be replaced by 'SyntaxM ix, Array.Ix ix => ix' in 'Arrays'
--- if we got rid of the hardcoded 'Data Index' in array definitions.
+
+class Indexed exp a | a -> exp
+  where
+    type Elem a :: *
+    (!) :: a -> exp Index -> Elem a
+
+class Slicable exp a | a -> exp
+  where
+    slice :: exp Index -> exp Length -> a -> a
+
+class Finite exp a | a -> exp
+  where
+    length :: a -> exp Length
 
 class Monad m => Arrays m
   where
     type Array m :: * -> *
-    type Ix    m :: *
-    newArr  :: SyntaxM  m a => Ix m -> m (Array m a)
     initArr :: SyntaxM' m a => [Internal a] -> m (Array m a)
-    getArr  :: SyntaxM  m a => Array m a -> Ix m -> m a
-    setArr  :: SyntaxM  m a => Array m a -> Ix m -> a -> m ()
+    newArr  :: SyntaxM  m a => Expr m Length -> m (Array m a)
+    getArr  :: SyntaxM  m a => Array m a -> Expr m Index -> m a
+    setArr  :: SyntaxM  m a => Array m a -> Expr m Index -> a -> m ()
     copyArr :: SyntaxM  m a => Array m a -> Array m a -> m ()
 
 class Arrays m => IArrays m
   where
     type IArray m :: * -> *
-    unsafeFreezeArr :: (SyntaxM m a, Finite (Ix m) (Array  m a)) => Array  m a -> m (IArray m a)
-    unsafeThawArr   :: (SyntaxM m a, Finite (Ix m) (IArray m a)) => IArray m a -> m (Array  m a)
+    unsafeFreezeArr :: (SyntaxM m a, Finite (Expr m) (Array  m a))
+      => Array  m a -> m (IArray m a)
+    unsafeThawArr   :: (SyntaxM m a, Finite (Expr m) (IArray m a))
+      => IArray m a -> m (Array  m a)
 
-freezeArr :: (IArrays m, SyntaxM m a, Finite (Ix m) (Array m a))
-  => Array  m a -> m (IArray m a)
+freezeArr :: (IArrays m, SyntaxM m a, Finite (Expr m) (Array m a))
+  => Array m a -> m (IArray m a)
 freezeArr arr =
   do iarr <- newArr (length arr)
      copyArr iarr arr
      unsafeFreezeArr iarr
 
-thawArr :: (IArrays m, SyntaxM m a, Finite (Ix m) (IArray m a))
+thawArr :: (IArrays m, SyntaxM m a, Finite (Expr m) (IArray m a))
   => IArray m a -> m (Array  m a)
 thawArr iarr =
   do brr <- unsafeThawArr iarr -- haha.
@@ -249,23 +249,37 @@ thawArr iarr =
      copyArr arr brr
      return arr
 
+unsafeFreezeSlice
+  :: ( IArrays m
+     , SyntaxM m a
+     , Finite   (Expr m) (Array  m a)
+     , Slicable (Expr m) (IArray m a)
+     , Num (Expr m Index))
+  => Expr m Length -> Array m a -> m (IArray m a)
+unsafeFreezeSlice len = fmap (slice 0 len) . unsafeFreezeArr
+
 --------------------------------------------------------------------------------
 
 class Monad m => Control m
   where
-    iff :: (SyntaxM  m a, Boolean  (Internal a))
-      => a    -- ^ condition
-      -> m () -- ^ true branch
-      -> m () -- ^ false branch
+    -- | Conditional statement.
+    iff ::
+         Expr m Bool     -- ^ Condition.
+      -> m ()            -- ^ True branch.
+      -> m ()            -- ^ False branch.
       -> m ()
-    while :: (SyntaxM  m a, Boolean  (Internal a))
-      => m a  -- ^ check
-      -> m () -- ^ body
+
+    -- | While-loop.
+    while ::
+         m (Expr m Bool) -- ^ Condition.
+      -> m ()            -- ^ Loop body.
       -> m ()
-    for :: (SyntaxM' m a, Integral (Internal a))
-      => a    -- ^ lower bound (inclusive)
-      -> a    -- ^ upper bound (inclusive)
-      -> (a -> m ()) -- ^ step function
+
+    -- | For-loop.
+    for :: (Integral a, SyntaxM' m (Expr m a))
+      => Expr m a           -- ^ Lower bound (inclusive).
+      -> Expr m a           -- ^ Upper bound (inclusive).
+      -> (Expr m a -> m ()) -- ^ Step function.
       -> m ()
 
 --------------------------------------------------------------------------------

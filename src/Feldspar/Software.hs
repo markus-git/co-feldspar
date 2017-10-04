@@ -3,7 +3,6 @@ module Feldspar.Software
   , module Feldspar.Software.Frontend
   , Software
   , Ref, Arr, IArr
-  , Address, SArg, Soften, Result, Argument
   , SExp
   , SType, SType'
   , compile
@@ -11,9 +10,23 @@ module Feldspar.Software
   ) where
 
 import Feldspar
-import Feldspar.Common
-
 import Feldspar.Software.Representation
 import Feldspar.Software.Primitive
+import Feldspar.Software.Expression
 import Feldspar.Software.Frontend
 import Feldspar.Software.Compile
+
+-- imperative-edsl.
+import qualified Language.Embedded.Backend.C  as Imp
+
+--------------------------------------------------------------------------------
+-- Interpretation of software programs.
+--------------------------------------------------------------------------------
+
+compile :: Software a -> String
+compile = Imp.compile . translate
+
+icompile :: Software a -> IO ()
+icompile = Imp.icompile . translate
+
+--------------------------------------------------------------------------------
