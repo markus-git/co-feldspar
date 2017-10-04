@@ -16,43 +16,33 @@ import Feldspar.Hardware as Hard (icompileWrap)
 -- * Basic example of how our hardware software co-design works.
 --------------------------------------------------------------------------------
 
-example
-  :: forall m dom expr
-   . ( MonadComp m
-     , Equality (Expr m)
-     , Ordered  (Expr m)
-     , Logical  (Expr m)
-       -- ^ Supported Haskell expressions.
-     , Num (Expr m Int8)
-       -- ^ Our expressions are of a know kind co-feldspar and correctly typed.
-     , SyntaxM m (Expr m Int8)
-     , SyntaxM m (Expr m Int8, Expr m Int8)
-     )
+example :: forall m
+  . ( MonadComp m
+    , SyntaxM m (Expr m Int8)
+    -- ...
+    , Value (Expr m)
+    , Share (Expr m)
+    , Num (Expr m Int8)
+    )
   => m ()
-example =
-  do r :: Reference m (Expr m Int8) <- initRef 2
-     k :: Reference m (Expr m Int8, Expr m Int8) <- newRef
-     a <- getRef r
-     setRef k (a, a + a)
+example = do initRef (exampleExpr :: Expr m Int8); return ()
 
--- example compiles with:
---   - Soft.icompile example
---   - Hard.icompile example
---
+exampleExpr :: forall expr
+   . ( Value expr
+     , Share expr
+     , Num (expr Int8)
+     -- ...
+     , Syntax expr (expr Int8)
+     )
+  => expr Int8
+exampleExpr = share (5 :: expr Int8) (\a -> a + a :: expr Int8)
+
 --------------------------------------------------------------------------------
 
-soft :: Software ()
-soft = example
+soft :: IO ()
+soft = Soft.icompile example
 
--- example compiles with:
---   - Soft.icompile soft
---
---------------------------------------------------------------------------------
+hard :: IO ()
+hard = Hard.icompileWrap example
 
-hard :: Hardware ()
-hard = example
-
--- example compiles with:
---   - Hard.icompile hard
---
 --------------------------------------------------------------------------------
