@@ -102,10 +102,10 @@ deriving instance Typeable (ForLoop a)
 
 -- | Hardware symbols.
 type HardwareConstructs =
-          HardwarePrimConstructs
-  Syn.:+: Tuple
+          BindingT
   Syn.:+: Let
-  Syn.:+: BindingT
+  Syn.:+: Tuple
+  Syn.:+: HardwarePrimConstructs
   -- ^ Hardware specific symbol.
   Syn.:+: ForLoop
 

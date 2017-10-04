@@ -40,6 +40,9 @@ import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Embedded.Hardware.Command   as H
 import qualified Language.Embedded.Hardware.Interface as H
 
+-- debug.
+--import Debug.Trace
+
 --------------------------------------------------------------------------------
 -- * Programs.
 --------------------------------------------------------------------------------
@@ -94,5 +97,49 @@ instance (Reference Software ~ Ref, Type SoftwarePrimType a) =>
     readStoreRep         = getRef
     unsafeFreezeStoreRep = unsafeFreezeRef
     writeStoreRep        = setRef
+
+--------------------------------------------------------------------------------
+-- *** Temporary hot-fix until GHC fixes their class resolution for DTC ***
+
+bug :: String -> Bool
+bug = const True
+--bug msg = trace msg True
+
+instance {-# OVERLAPPING #-} Project sub SoftwareConstructs =>
+    Project sub (AST SoftwareDomain)
+  where
+    prj (Sym s) | bug "Sym" = Syn.prj s
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project sub SoftwareConstructs =>
+    Project sub SoftwareDomain
+  where
+    prj (expr :&: info) | bug "(:&:)" = Syn.prj expr
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project BindingT SoftwareConstructs
+  where
+    prj (InjL a) | bug "BindingT" = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project Let SoftwareConstructs
+  where
+    prj (InjR (InjL a)) | bug "Let" = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project Tuple SoftwareConstructs
+  where
+    prj (InjR (InjR (InjL a))) | bug "Tuple" = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project SoftwarePrimConstructs SoftwareConstructs
+  where
+    prj (InjR (InjR (InjR (InjL a)))) | bug "Prim" = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project ForLoop SoftwareConstructs
+  where
+    prj (InjR (InjR (InjR (InjR a)))) | bug "Loop" = Just a
+    prj _ = Nothing
 
 --------------------------------------------------------------------------------

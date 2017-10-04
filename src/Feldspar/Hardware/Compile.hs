@@ -167,15 +167,15 @@ translateExp = goAST . unHExp
       | Just Gt  <- prj op = liftStruct2 (sugarSymPrim Gt)  <$> goAST a <*> goAST b
       | Just Gte <- prj op = liftStruct2 (sugarSymPrim Gte) <$> goAST a <*> goAST b
       | Just BitAnd <- prj op =
-          liftStruct2 (sugarSymPrim BitAnd) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitAnd)  <$> goAST a <*> goAST b
       | Just BitOr  <- prj op =
-          liftStruct2 (sugarSymPrim BitOr) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitOr)   <$> goAST a <*> goAST b
       | Just BitXor <- prj op =
-          liftStruct2 (sugarSymPrim BitXor) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitXor)  <$> goAST a <*> goAST b
       | Just ShiftL <- prj op =
-          liftStruct2 (sugarSymPrim ShiftL) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim ShiftL)  <$> goAST a <*> goAST b
       | Just ShiftR <- prj op =
-          liftStruct2 (sugarSymPrim ShiftR) <$> goAST a <*> goAST b          
+          liftStruct2 (sugarSymPrim ShiftR)  <$> goAST a <*> goAST b          
       | Just RotateL <- prj op =
           liftStruct2 (sugarSymPrim RotateL) <$> goAST a <*> goAST b
       | Just RotateR <- prj op =

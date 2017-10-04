@@ -40,6 +40,9 @@ import Control.Monad.Operational.Higher as Oper hiding ((:<:))
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
 
+-- debug.
+--import Debug.Trace
+
 --------------------------------------------------------------------------------
 -- * Programs.
 --------------------------------------------------------------------------------
@@ -106,5 +109,50 @@ instance (Reference Hardware ~ Ref, Type HardwarePrimType a) =>
     readStoreRep         = getRef
     unsafeFreezeStoreRep = unsafeFreezeRef
     writeStoreRep        = setRef
+
+--------------------------------------------------------------------------------
+-- *** Temporary hot-fix until GHC fixes their class resolution for DTC ***
+
+
+bug :: String -> Bool
+bug = const True
+--bug msg = trace msg True
+
+instance {-# OVERLAPPING #-} Project sub HardwareConstructs =>
+    Project sub (AST HardwareDomain)
+  where
+    prj (Sym s) | bug "Sym" = Syn.prj s
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project sub HardwareConstructs =>
+    Project sub HardwareDomain
+  where
+    prj (expr :&: info) | bug "(:&:)" = Syn.prj expr
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project BindingT HardwareConstructs
+  where
+    prj (InjL a) | bug "BindingT" = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project Let HardwareConstructs
+  where
+    prj (InjR (InjL a)) | bug "Let" = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project Tuple HardwareConstructs
+  where
+    prj (InjR (InjR (InjL a))) | bug "Tuple" = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project HardwarePrimConstructs HardwareConstructs
+  where
+    prj (InjR (InjR (InjR (InjL a)))) | bug "Prim" = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project ForLoop HardwareConstructs
+  where
+    prj (InjR (InjR (InjR (InjR a)))) | bug "Loop" = Just a
+    prj _ = Nothing
 
 --------------------------------------------------------------------------------

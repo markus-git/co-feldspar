@@ -107,6 +107,17 @@ translateExp = goAST . unSExp
        -> SoftwareConstructs sig
        -> Syn.Args (AST SoftwareDomain) sig
        -> TargetT m (VExp (Syn.DenResult sig))
+{-
+    go t lit Syn.Nil
+      | Just (Lit a) <- prj lit
+      = return $ mapStruct (constExp . runIdentity) $ toStruct t a
+    go t lt (a :* (lam :$ body) :* Syn.Nil)
+      | Just (Let tag) <- prj lt
+      = case prj lam of
+          Just (LamT v) -> error "!!"
+          Nothing       -> error ":<"
+    go _ s _ = error $ "software translation handling for symbol " ++ Syn.renderSym s ++ " is missing. (" ++ show s ++ ")"
+-}
     go t lit Syn.Nil
       | Just (Lit a) <- prj lit
       = return $ mapStruct (constExp . runIdentity) $ toStruct t a
@@ -166,22 +177,19 @@ translateExp = goAST . unSExp
       | Just Gt  <- prj op = liftStruct2 (sugarSymPrim Gt)  <$> goAST a <*> goAST b
       | Just Gte <- prj op = liftStruct2 (sugarSymPrim Gte) <$> goAST a <*> goAST b
       | Just BitAnd <- prj op =
-          liftStruct2 (sugarSymPrim BitAnd) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitAnd)  <$> goAST a <*> goAST b
       | Just BitOr  <- prj op =
-          liftStruct2 (sugarSymPrim BitOr) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitOr)   <$> goAST a <*> goAST b
       | Just BitXor <- prj op =
-          liftStruct2 (sugarSymPrim BitXor) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim BitXor)  <$> goAST a <*> goAST b
       | Just ShiftL <- prj op =
-          liftStruct2 (sugarSymPrim ShiftL) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim ShiftL)  <$> goAST a <*> goAST b
       | Just ShiftR <- prj op =
-          liftStruct2 (sugarSymPrim ShiftR) <$> goAST a <*> goAST b
+          liftStruct2 (sugarSymPrim ShiftR)  <$> goAST a <*> goAST b
       | Just RotateL <- prj op =
           liftStruct2 (sugarSymPrim RotateL) <$> goAST a <*> goAST b
       | Just RotateR <- prj op =
           liftStruct2 (sugarSymPrim RotateR) <$> goAST a <*> goAST b
-    go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
-      | Just ForLoop <- prj loop = error "?"
-      | otherwise                = error ("err: " ++ Syn.renderSym loop)
     go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
       | Just ForLoop   <- prj loop
       , Just (LamT iv) <- prj lami
@@ -202,6 +210,7 @@ translateExp = goAST . unSExp
           return $ Node $ sugarSymPrim (ArrIx arr) i'
     go _ s _ = error $ "software translation handling for symbol " ++ Syn.renderSym s ++ " is missing."
 
+
 unsafeTranslateSmallExp :: Monad m => SExp a -> TargetT m (Prim a)
 unsafeTranslateSmallExp a = do
   Node b <- translateExp a
@@ -210,4 +219,15 @@ unsafeTranslateSmallExp a = do
 translate :: Software a -> ProgC a
 translate = flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp . unSoftware
 
+--------------------------------------------------------------------------------
+{-
+instance (Show (a sig), Show (b sig)) => Show ((Syn.:+:) a b sig)
+  where
+    show (Syn.InjL a) = "InjL (" ++ show a ++ ")"
+    show (Syn.InjR b) = "InjR (" ++ show b ++ ")"
+
+instance Show (BindingT sig) where show _ = "BindingT"
+instance Show (Let sig)      where show _ = "Let"
+instance Show (Tuple sig)    where show _ = "Tuple"
+-}
 --------------------------------------------------------------------------------
