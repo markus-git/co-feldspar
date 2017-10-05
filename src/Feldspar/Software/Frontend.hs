@@ -326,6 +326,14 @@ fput h pre e post = Software $ Imp.fput h pre e post
 fget :: (Formattable a, SType' a) => Handle -> Software (SExp a)
 fget = Software . Imp.fget
 
+-- | Handle to \stdin\.
+stdin :: Handle
+stdin = Imp.stdin
+
+-- | Handle to \stdout\.
+stdout :: Handle
+stdout = Imp.stdout
+
 --------------------------------------------------------------------------------
 -- *** Printing.
 

@@ -31,7 +31,7 @@ import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 import Prelude hiding (length, Word, (<=))
 
 --------------------------------------------------------------------------------
---
+-- * ...
 --------------------------------------------------------------------------------
 
 -- | ...
@@ -64,7 +64,7 @@ type SyntaxM  m a = Syntax  (Expr m) a
 type SyntaxM' m a = Syntax' (Expr m) a
 
 --------------------------------------------------------------------------------
--- Expressions.
+-- * Expressions.
 --------------------------------------------------------------------------------
 
 class Value exp
@@ -176,7 +176,7 @@ class Casting exp
     i2n :: (Integral a, Primitive exp a, Num b, Primitive exp b) => exp a -> exp b
 
 --------------------------------------------------------------------------------
--- Instructions.
+-- * Instructions.
 --------------------------------------------------------------------------------
 
 -- | Computational instructions.
@@ -225,6 +225,8 @@ class Monad m => Arrays m
     getArr  :: SyntaxM  m a => Array m a -> Expr m Index -> m a
     setArr  :: SyntaxM  m a => Array m a -> Expr m Index -> a -> m ()
     copyArr :: SyntaxM  m a => Array m a -> Array m a -> m ()
+
+--------------------------------------------------------------------------------
 
 class Arrays m => IArrays m
   where
