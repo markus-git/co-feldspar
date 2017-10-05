@@ -9,11 +9,12 @@ import Feldspar.Hardware as Hard
 -- hmm...
 import Language.Embedded.Hardware.Command (Mode(..))
 
+
 --------------------------------------------------------------------------------
--- * Hello World! (Software)
+-- * Hello World! (Software).
 --------------------------------------------------------------------------------
 
--- \Hello world\ program that runs in the 'Software' monad.
+-- \Hello world\ program that runs in the `Software` monad.
 helloWorld :: Software ()
 helloWorld = printf "Hello world!\n"
 
@@ -33,16 +34,14 @@ test3 = putStrLn $ Soft.compile helloWorld
 test4 = Soft.icompile helloWorld
 
 -- Compare output written to \stdout\ from a Co-Feldspar program with that of a
--- reference Haskell 'IO' program. The final, empty string argument will be fed
+-- reference Haskell `IO` program. The final, empty string argument will be fed
 -- into both the Co-Feldspar and Haskell programs.
 test5 = Soft.compareCompiled helloWorld (putStrLn "Hello world!") ""
 
--- Same as above, but we obtain the Haskell reference through 'runIO' instead.
+-- Same as above, but we obtain the Haskell reference through `runIO` instead.
 test6 = Soft.compareCompiled helloWorld (runIO helloWorld) ""
 
-
---------------------------------------------------------------------------------
-
+-- Run all tests so far in order.
 testAll =
   do test1
      test2
@@ -53,17 +52,17 @@ testAll =
 
 
 --------------------------------------------------------------------------------
--- * Adder (Hardware)
+-- * Adder (Hardware).
 --------------------------------------------------------------------------------
 
--- A simple adder that runs in the 'Hardware' monad.
+-- A simple adder that runs in the `Hardware` monad.
 adder :: Signal Int32 -> Signal Int32 -> Signal Int32 -> Hardware ()
 adder a b c =
   do va <- getSignal a
      vb <- getSignal b
      setSignal c (va + vb)
 
--- Explicit entity/architecture wrapper.
+-- Explicit entity/architecture wrapper for `adder`.
 component :: Hardware ()
 component =
   do (a, b, c) <- entity "a" $ do
@@ -71,10 +70,10 @@ component =
        b :: Signal Int32 <- newPort In
        c :: Signal Int32 <- newPort Out
        return (a, b, c)
-
      architecture "a" "behav" $ do
        process (a .: b .: []) $ do
          adder a b c
+
 
 --------------------------------------------------------------------------------
 
@@ -91,5 +90,6 @@ test9 = Hard.icompileWrap $
      b <- newSignal
      c <- newSignal
      adder a b c
+
 
 --------------------------------------------------------------------------------
