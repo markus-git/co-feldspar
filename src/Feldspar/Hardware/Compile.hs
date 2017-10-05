@@ -14,6 +14,9 @@ import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Representation
 import Data.Struct
 
+-- hmm..
+import Feldspar.Hardware.Frontend (entity, architecture, process)
+
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Data.Constraint hiding (Sub)
@@ -32,7 +35,9 @@ import qualified Language.Syntactic as Syn
 
 -- hardware-edsl.
 import Language.Embedded.Hardware (Signal, FreeExp (..))
+import Language.Embedded.Hardware.Command (Signal)
 import qualified Language.Embedded.Hardware as Hard
+import qualified Language.Embedded.Hardware.Command as Hard
 
 --------------------------------------------------------------------------------
 -- * Hardware compiler.
@@ -207,5 +212,25 @@ unsafeTranslateSmallExp a = do
 
 translate :: Hardware a -> ProgH a
 translate = flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp . unHardware
+
+--------------------------------------------------------------------------------
+-- * Interpretation of hardware programs.
+--------------------------------------------------------------------------------
+
+compile :: Hardware a -> String
+compile = Hard.compile . translate
+
+icompile :: Hardware a -> IO ()
+icompile = Hard.icompile . translate
+
+icompileWrap :: Hardware () -> IO ()
+icompileWrap = Hard.icompile . translate . wrap
+
+-- todo: use wrap from hardware-edsl.
+wrap :: Hardware () -> Hardware ()
+wrap prg = do
+  entity       "empty" $ return ()
+  architecture "empty" "behav" $
+    process [] $ prg
 
 --------------------------------------------------------------------------------

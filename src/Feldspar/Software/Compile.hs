@@ -33,6 +33,7 @@ import qualified Control.Monad.Operational.Higher as Oper
 import Language.Embedded.Expression
 import Language.Embedded.Imperative hiding (Ref, (:+:)(..), (:<:)(..))
 import qualified Language.Embedded.Imperative as Imp
+import qualified Language.Embedded.Backend.C  as Imp
 
 --------------------------------------------------------------------------------
 -- * Software compiler.
@@ -217,17 +218,33 @@ unsafeTranslateSmallExp a = do
   return b
 
 translate :: Software a -> ProgC a
-translate = flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp . unSoftware
+translate = flip runReaderT Map.empty
+          . Oper.reexpressEnv unsafeTranslateSmallExp
+          . unSoftware
 
 --------------------------------------------------------------------------------
-{-
-instance (Show (a sig), Show (b sig)) => Show ((Syn.:+:) a b sig)
-  where
-    show (Syn.InjL a) = "InjL (" ++ show a ++ ")"
-    show (Syn.InjR b) = "InjR (" ++ show b ++ ")"
+-- * Interpretation of software programs.
+--------------------------------------------------------------------------------
 
-instance Show (BindingT sig) where show _ = "BindingT"
-instance Show (Let sig)      where show _ = "Let"
-instance Show (Tuple sig)    where show _ = "Tuple"
--}
+runIO :: Software a -> IO a
+runIO = Imp.runIO . translate
+
+captureIO :: Software a -> String -> IO String
+captureIO = Imp.captureIO . translate
+
+compile :: Software a -> String
+compile = Imp.compile . translate
+
+icompile :: Software a -> IO ()
+icompile = Imp.icompile . translate
+
+runCompiled :: Software a -> IO ()
+runCompiled = Imp.runCompiled . translate
+
+withCompiled :: Software a -> ((String -> IO String) -> IO b) -> IO b
+withCompiled = Imp.withCompiled . translate
+
+compareCompiled :: Software a -> IO a -> String -> IO ()
+compareCompiled = Imp.compareCompiled . translate
+
 --------------------------------------------------------------------------------
