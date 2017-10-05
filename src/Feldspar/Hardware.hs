@@ -4,7 +4,7 @@ module Feldspar.Hardware
   , Hardware
   , Ref, Arr, IArr, SArr, Signal
   , HExp
-  , HType, HType'
+  , HType, HType', HardwarePrimType
   , compile
   , icompile
   , icompileWrap

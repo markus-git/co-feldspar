@@ -4,7 +4,7 @@ module Feldspar.Software
   , Software
   , Ref, Arr, IArr
   , SExp
-  , SType, SType'
+  , SType, SType', SoftwarePrimType
   , runIO
   , captureIO
   , compile
