@@ -63,3 +63,38 @@ instance forall m a b . (Storable m a, Storable m b) => Storable m (a,b)
     writeStoreRep (la,lb) (a,b)  = writeStoreRep la a >> writeStoreRep lb b
 
 --------------------------------------------------------------------------------
+-- ** User interface.
+--------------------------------------------------------------------------------
+
+-- | Memory for storing values.
+newtype Store m a = Store { unStore :: StoreRep m a }
+
+-- | Create a fresh 'Store'.
+newStore :: forall a m . (MonadComp m, Storable m a)
+  => StoreSize m a
+  -> m (Store m a)
+newStore = fmap Store . newStoreRep (Proxy :: Proxy a)
+
+-- | Store a value to a fresh 'Store'.
+initStore :: (MonadComp m, Storable m a) => a -> m (Store m a)
+initStore = fmap Store . initStoreRep
+
+-- | Read from a 'Store'.
+readStore :: (MonadComp m, Storable m a) => Store m a -> m a
+readStore = readStoreRep . unStore
+
+-- | Write to a 'Store'.
+writeStore :: (MonadComp m, Storable m a) => Store m a -> a -> m ()
+writeStore = writeStoreRep . unStore
+
+-- | Unsafe freezeing of a 'Store'. This operation is only safe if the 'Store'
+--   is not updated as long as the returned value is alive.
+unsafeFreezeStore :: (MonadComp m, Storable m a) => Store m a -> m a
+unsafeFreezeStore = unsafeFreezeStoreRep . unStore
+
+-- | Update a 'Store' in-place, that is, a update that won't produce any
+--   temporary variable to store values read from the 'Store'.
+inplace :: (MonadComp m, Storable m a) => Store m a -> (a -> a) -> m ()
+inplace store f = writeStore store . f =<< unsafeFreezeStore store
+
+--------------------------------------------------------------------------------
