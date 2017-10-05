@@ -31,7 +31,7 @@ import qualified Language.Syntactic as Syntactic
 import qualified Control.Monad.Operational.Higher as Oper
 
 -- hardware-edsl.
-import Language.Embedded.Hardware.Command (Signal, Ident, Mode)
+import Language.Embedded.Hardware.Command (Signal, Ident, Mode, ToIdent)
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
 
@@ -351,7 +351,7 @@ setSArr' = withHType (Proxy :: Proxy b) Imp.setArray
 --------------------------------------------------------------------------------
 -- *** Structural entities.
 
-entity  :: String -> Hardware () -> Hardware ()
+entity  :: String -> Hardware a -> Hardware a
 entity name = Hardware . (Imp.entity name) . unHardware
 
 architecture :: String -> String -> Hardware () -> Hardware ()
@@ -369,6 +369,13 @@ initPort m e = Hardware $ Imp.initPort m e
 -- | Declare a port.
 newPort :: HardwarePrimType a => Mode -> Hardware (Signal a)
 newPort m  = Hardware $ Imp.newPort m
+
+--------------------------------------------------------------------------------
+
+(.:) :: ToIdent a => a -> [Ident] -> [Ident]
+(.:) x xs = Imp.toIdent x : xs
+
+infixr .:
 
 --------------------------------------------------------------------------------
 -- *** Components.
