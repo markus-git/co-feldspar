@@ -31,7 +31,7 @@ import qualified Language.Syntactic as Syntactic
 import qualified Control.Monad.Operational.Higher as Oper
 
 -- hardware-edsl.
-import Language.Embedded.Hardware.Command (Signal, Ident)
+import Language.Embedded.Hardware.Command (Signal, Ident, Mode)
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
 
@@ -359,6 +359,16 @@ architecture entity name = Hardware . (Imp.architecture entity name) . unHardwar
 
 process :: [Ident] -> Hardware () -> Hardware ()
 process is = Hardware . (Imp.process is) . unHardware
+
+--------------------------------------------------------------------------------
+
+-- | Declare a port signal and assig its initial value.
+initPort :: HardwarePrimType a => Mode -> HExp a -> Hardware (Signal a)
+initPort m e = Hardware $ Imp.initPort m e
+
+-- | Declare a port.
+newPort :: HardwarePrimType a => Mode -> Hardware (Signal a)
+newPort m  = Hardware $ Imp.newPort m
 
 --------------------------------------------------------------------------------
 -- *** Components.
