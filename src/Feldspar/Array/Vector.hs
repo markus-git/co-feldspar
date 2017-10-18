@@ -131,7 +131,7 @@ inits vec = Pull (length vec + 1) (`take` vec)
 replicate :: Expr m Length -> a -> Pull m a
 replicate l = Pull l . const
 
-map :: Pully m vec a => (a -> b) -> vec -> Pull m b
+map :: (a -> b) -> Pull m a -> Pull m b
 map f vec = Pull (length vec) (f . (vec!))
 
 zip :: ( Cond (Expr m)
@@ -144,9 +144,9 @@ zip a b = Pull (length a `min` length b) (\i -> (a!i, b!i))
 -- | Back-permute a 'Pull' vector using an index mapping. The supplied mapping
 --   must be a bijection when restricted to the domain of the vector. This
 --   property is not checked, so use with care.
-backPermute
-    :: (Expr m Length -> Expr m Index -> Expr m Index)
-    -> (Pull m a -> Pull m a)
+backPermute ::
+     (Expr m Length -> Expr m Index -> Expr m Index)
+  -> (Pull m a -> Pull m a)
 backPermute perm vec = Pull len ((vec!) . perm len)
   where
     len = length vec
