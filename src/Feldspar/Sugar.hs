@@ -67,12 +67,15 @@ instance
 -- ** Functions.
 --------------------------------------------------------------------------------
 
+-- *** todo: replace current fix with comments once DTC bug is fixed.
 instance
     ( Syntactic a
     , Syntactic b
-    , Domain a ~ (expr :&: TypeRepF pred (RepresentationOf pred))
-    , Domain b ~ (expr :&: TypeRepF pred (RepresentationOf pred))
-    , BindingT :<: expr
+--    , Domain a ~ (expr :&: TypeRepF pred (RepresentationOf pred))
+--    , Domain b ~ (expr :&: TypeRepF pred (RepresentationOf pred))
+    , (Domain a) ~ ((BindingT :+: sym) :&: TypeRepF pred (RepresentationOf pred))
+    , (Domain b) ~ ((BindingT :+: sym) :&: TypeRepF pred (RepresentationOf pred))
+--    , BindingT :<: expr
     , Type pred (Internal a)
     )
     => Syntactic (a -> b)
@@ -80,10 +83,30 @@ instance
     type Domain   (a -> b) = Domain a
     type Internal (a -> b) = Internal a -> Internal b
 
-    desugar f = lamT_template varSym lamSym (desugar . f . sugar)
+    desugar f = bepa varSym lamSym (desugar . f . sugar)
+--                lamT_template varSym lamSym (desugar . f . sugar)
       where
-        varSym v   = inj (VarT v) :&: ValT typeRep
-        lamSym v b = Sym (inj (LamT v) :&: FunT typeRep (getDecor b)) :$ b
+--        varSym v   = inj (VarT v) :&: ValT typeRep
+--        lamSym v b = Sym (inj (LamT v) :&: FunT typeRep (getDecor b)) :$ b
+        varSym v   = InjL (VarT v) :&: ValT typeRep
+        lamSym v b = Sym (InjL (LamT v) :&: FunT typeRep (getDecor b)) :$ b
+
     sugar = error "sugar not implemented for (a -> b)"
+
+--------------------------------------------------------------------------------
+
+apa :: (sym ~ ((BindingT :+: sym0) :&: decor)) => AST sym a -> Name
+apa (Sym ((InjL (LamT n)) :&: _) :$ _) = n
+apa (s :$ a) = apa s `Prelude.max` apa a
+apa _ = 0
+
+bepa :: (sym ~ ((BindingT :+: sym0) :&: decor))
+  => (Name -> sym (Full a))
+  -> (Name -> ASTF sym b -> ASTF sym (a -> b))
+  -> (ASTF sym a -> ASTF sym b) -> ASTF sym (a -> b)
+bepa mkVar mkLam f = mkLam v body
+  where
+    body = f $ Sym $ mkVar v
+    v    = succ $ apa body
 
 --------------------------------------------------------------------------------

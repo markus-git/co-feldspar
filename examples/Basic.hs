@@ -35,7 +35,10 @@ exampleExpr :: forall expr
      , Syntax expr (expr Int8)
      )
   => expr Int8
-exampleExpr = share (5 :: expr Int8) (\a -> a + a :: expr Int8)
+exampleExpr =
+  share (5 :: expr Int8) $ \a ->
+  share (4 :: expr Int8) $ \b ->
+  a + b :: expr Int8
 
 --------------------------------------------------------------------------------
 

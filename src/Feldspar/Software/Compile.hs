@@ -6,9 +6,9 @@
 module Feldspar.Software.Compile where
 
 import Feldspar.Representation
-import Feldspar.Software.Primitive
+import Feldspar.Software.Primitive hiding (bug)
 import Feldspar.Software.Primitive.Backend
-import Feldspar.Software.Expression
+import Feldspar.Software.Expression hiding (bug)
 import Feldspar.Software.Representation
 import Data.Struct
 
@@ -34,6 +34,9 @@ import Language.Embedded.Expression
 import Language.Embedded.Imperative hiding (Ref, (:+:)(..), (:<:)(..))
 import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Embedded.Backend.C  as Imp
+
+-- debug.
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- * Software compiler.
@@ -95,6 +98,9 @@ lookAlias t v = do
 
 --------------------------------------------------------------------------------
 
+bug :: Monad m => String -> m ()
+bug s = trace s (return ())
+
 translateExp :: forall m a . Monad m => SExp a -> TargetT m (VExp a)
 translateExp = goAST . unSExp
   where
@@ -108,17 +114,6 @@ translateExp = goAST . unSExp
        -> SoftwareConstructs sig
        -> Syn.Args (AST SoftwareDomain) sig
        -> TargetT m (VExp (Syn.DenResult sig))
-{-
-    go t lit Syn.Nil
-      | Just (Lit a) <- prj lit
-      = return $ mapStruct (constExp . runIdentity) $ toStruct t a
-    go t lt (a :* (lam :$ body) :* Syn.Nil)
-      | Just (Let tag) <- prj lt
-      = case prj lam of
-          Just (LamT v) -> error "!!"
-          Nothing       -> error ":<"
-    go _ s _ = error $ "software translation handling for symbol " ++ Syn.renderSym s ++ " is missing. (" ++ show s ++ ")"
--}
     go t lit Syn.Nil
       | Just (Lit a) <- prj lit
       = return $ mapStruct (constExp . runIdentity) $ toStruct t a
@@ -130,11 +125,13 @@ translateExp = goAST . unSExp
       = return $ Node $ sugarSymPrim $ FreeVar v
     go t var Syn.Nil
       | Just (VarT v) <- prj var
-      = lookAlias t v
+      = do bug ("lookup for: " ++ show v) -- ***
+           lookAlias t v
     go t lt (a :* (lam :$ body) :* Syn.Nil)
       | Just (Let tag) <- prj lt
       , Just (LamT v)  <- prj lam
-      = do let base = if null tag then "let" else tag
+      = do bug ("lambda for: " ++ show v)
+           let base = if null tag then "let" else tag
            r  <- initRefV base =<< goAST a
            a' <- unsafeFreezeRefV r
            localAlias v a' $ goAST body
@@ -194,7 +191,8 @@ translateExp = goAST . unSExp
     go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
       | Just ForLoop   <- prj loop
       , Just (LamT iv) <- prj lami
-      , Just (LamT sv) <- prj lams = do
+      , Just (LamT sv) <- prj lams
+      , trace ("names: (" ++ show iv ++ ", " ++ show sv ++ ")") True = do
           len'  <- goSmallAST len
           state <- initRefV "state" =<< goAST init
           ReaderT $ \env -> Imp.for (0, 1, Imp.Excl len') $ \i ->

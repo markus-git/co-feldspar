@@ -77,11 +77,11 @@ class Share exp
 
 class Loop exp
   where
-    loop :: (Syntax exp st) => exp Length -> st -> (exp Index -> st -> st) -> st
+    loop :: Syntax exp st => exp Length -> st -> (exp Index -> st -> st) -> st
 
 class Cond exp
   where
-    cond :: (Syntax exp a) => exp Bool -> a -> a -> a
+    cond :: Syntax exp a => exp Bool -> a -> a -> a
 
 -- | Condition operator; use as follows:
 --

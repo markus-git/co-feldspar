@@ -27,6 +27,7 @@ import qualified Data.Bits as Bits
 import Language.Syntactic
 import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
+import qualified Language.Syntactic as Syn
 
 -- imperative-edsl.
 import Language.Embedded.Expression

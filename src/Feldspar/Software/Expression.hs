@@ -14,7 +14,7 @@ module Feldspar.Software.Expression where
 
 import Feldspar.Sugar
 import Feldspar.Representation
-import Feldspar.Software.Primitive
+import Feldspar.Software.Primitive hiding (bug)
 import Data.Struct
 
 import Data.Int
@@ -209,5 +209,45 @@ instance Render ForLoop
 instance EvalEnv ForLoop env
 
 instance StringTree ForLoop
+
+--------------------------------------------------------------------------------
+-- *** Temporary fix until GHC fixes their class resolution for DTC ***
+
+instance {-# OVERLAPPING #-} Project sub SoftwareConstructs =>
+    Project sub (AST SoftwareDomain)
+  where
+    prj (Sym s) = Syn.prj s
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project sub SoftwareConstructs =>
+    Project sub SoftwareDomain
+  where
+    prj (expr :&: info) = Syn.prj expr
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project BindingT SoftwareConstructs
+  where
+    prj (InjL a) = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project Let SoftwareConstructs
+  where
+    prj (InjR (InjL a)) = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project Tuple SoftwareConstructs
+  where
+    prj (InjR (InjR (InjL a))) = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project SoftwarePrimConstructs SoftwareConstructs
+  where
+    prj (InjR (InjR (InjR (InjL a)))) = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project ForLoop SoftwareConstructs
+  where
+    prj (InjR (InjR (InjR (InjR a)))) = Just a
+    prj _ = Nothing
 
 --------------------------------------------------------------------------------
