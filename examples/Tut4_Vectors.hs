@@ -1,3 +1,5 @@
+{-# language TypeFamilies        #-}
+{-# language FlexibleContexts    #-}
 {-# language ScopedTypeVariables #-}
 
 module Tut4_Vectors where
@@ -7,7 +9,7 @@ import Feldspar.Array.Vector
 import Feldspar.Software as Soft
 import Feldspar.Hardware as Hard
 
-import Prelude hiding (sum, take, reverse)
+import Prelude hiding (map, zipWith, sum, take, reverse, (++))
 
 --------------------------------------------------------------------------------
 -- * Vectors.
@@ -78,12 +80,145 @@ test2 = Soft.runCompiled sumLast5Prog
 
 --------------------------------------------------------------------------------
 
-ex :: IO ()
-ex = Soft.icompile $
-  do let len = 5 :: SExp Length
-         st  = 0 :: SExp Word32
-     printf "ex1: %d\n" (loop len st (\i _ -> i))
-     --
-     printf "ex2: %d\n" (share st (\i -> share len (\_ -> i)))
+-- Compute the sum of the square of the numbers from 1 to n:
+sumSq :: SExp Word32 -> SExp Word32
+sumSq n = sum $ map (\x -> x*x) (1...n :: SPull Word32)
+-- The type `Word32` is used quite often our examples, and the vector library as
+-- well. As the type is often used, at least on the software side, to represent
+-- an index or length, it goes under the aliases: `Index` and `Length`.
+
+sumSqProg :: Software ()
+sumSqProg = printf "square sum: %d\n" (sumSq 4)
+
+test3 = Soft.icompile sumSqProg
+-- Note that, as with our previous example, there are no arrays declared in the
+-- generated code, only scalars.
+
+--------------------------------------------------------------------------------
+
+-- Dot product of two vectors:
+dotProd :: ( Num a      -- Lets use any number type instead of `Word32` ...
+           , SyntaxM m a -- ... as long as its well-typed in `m`.
+           -- Expressions over `Length` must be well typed.
+           , SyntaxM' m (Expr m Length)
+           , Primitive (Expr m) Length
+           -- Expressions must support: 
+           , Loop    (Expr m) -- as `sum` uses a loop.
+           , Cond    (Expr m) -- as `zip` needs to check with input is smallest.
+           , Ordered (Expr m) -- as `zip` needs to compare input lengths.
+           )
+  => Pull m a -> Pull m a -> a
+dotProd a b = sum $ zipWith (*) a b
+-- todo: I should put these common constraints in a class like MonadComp.
+
+dotProdProg :: Software ()
+dotProdProg =
+  do arr :: SArray Word16 <- initArr [1, 2, 3, 4]
+     brr :: SPull  Word16 <- toPull <$> unsafeFreezeArr arr
+
+     crr :: SArray Word16 <- initArr [4, 3, 2, 1]
+     drr :: SPull  Word16 <- toPull <$> unsafeFreezeArr crr
+
+     printf "dotProd: %d\n" (dotProd brr drr)
+-- todo: clean up/automate conversion from/to pull and regular arrays.
+     
+test4 = Soft.icompile dotProdProg
+
+
+--------------------------------------------------------------------------------
+
+-- Pull vectors support arbitrary reading patterns. For example, `sumLast5`
+-- demonstrated how to read a part from the end of a vector.
+--
+-- Push vectors, on the other hand, support arbitrary write patterns. For
+-- example `++` creates a vector that writes its content using two separate
+-- loops -- one for the left operand and one for the right operand.
+--
+-- The following function appends two modified compies of a vector to each
+-- other:
+apa :: ( Num a
+       , MonadComp m
+       , SyntaxM m a
+       -- todo: yep, should hide these.
+       , Num (Expr m Length)
+       , SyntaxM' m (Expr m Length)
+       , Primitive (Expr m) Length
+       -- hmm...
+       , Integral (Internal (Expr m Length))
+       )
+  => Pull m a -> Push m a
+apa vec = reverse vec ++ map (*2) vec
+
+apaProg :: Software ()
+apaProg =
+  do arr :: SArray  Word16 <- initArr [1, 2, 3, 4]
+     brr :: SPull   Word16 <- toPull <$> unsafeFreezeArr arr
+     -- todo: hmm... hide or explain mainfest arrays.
+     crr :: SIArray Word16 <- manifest <$> manifestFresh (apa brr)
+     return ()
+
+test5 = Soft.icompile apaProg
+
+--------------------------------------------------------------------------------
+
+-- Manifest vectors have a direct representation in memory; i.e. they correspond
+-- to an array in the generated code. Manifest vectors can be created in
+-- different ways; e.g.:
+--
+-- > By freezing a mutable vector.
+-- > By writing another vector to memory using `manifestArr` or `manifestFresh`.
+--
+-- Writing a vector to memory is often forced by the types. For example, if we
+-- want to compose `sumLast5` with `quirk` we find that the types don't match:
+manifestApa :: forall m a .
+  ( Num a
+  , MonadComp m
+  , SyntaxM m a
+    -- ...
+  , Arrays m
+  , IArrays m
+  , Indexed  (Expr m) (IArray m a)
+  , Finite   (Expr m) (Array  m a)
+  , Finite   (Expr m) (IArray m a)
+  , Slicable (Expr m) (IArray m a)
+  , Elem (IArray m a) ~ a
+    -- ...
+  , Loop    (Expr m)
+  , Cond    (Expr m)
+  , Ordered (Expr m)
+    -- ...
+  , Num (Expr m Length)
+  , SyntaxM' m (Expr m Length)
+  , Primitive (Expr m) Length
+    -- hmm...
+  , Integral (Internal (Expr m Length))
+  )
+  => Pull m a -> m a
+manifestApa vec =
+  do vec2 <- manifestFresh (apa vec)
+     -- todo: yep, need to automate this stuff.
+     return $ sumLast5' (toPull $ manifest $ vec2)
+  where
+    sumLast5' :: Pull m a -> a
+    sumLast5' = sum . take 5 . reverse
+-- Here, `vec2` is a manifest vector. One problem with this example is the use
+-- of `manifestFresh` which silently allocates a fresh array to hold the
+-- manifest vector. This array will be allocated on the stack and not freed
+-- until the end of the current block in the generated code.
+--
+-- An alternative to `manifestFresh` is `manifestArr` which takes the location
+-- to which the vector should be written as an argument. This allows reusing the
+-- same array for different manifest vectors. However, such reuse is dangerous
+-- since each call to `manifestArr` with a given location will invalidate
+-- earlier manifest vectors using that location.
+
+manifestApaProg :: Software ()
+manifestApaProg =
+  do arr :: SArray  Word16 <- initArr [1, 2, 3, 4]
+     brr :: SPull   Word16 <- toPull <$> unsafeFreezeArr arr
+     out <- manifestApa brr
+     printf "manifest apa: %d\n" out
+
+test6 = Soft.icompile manifestApaProg
 
 --------------------------------------------------------------------------------
