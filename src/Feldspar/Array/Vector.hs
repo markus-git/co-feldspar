@@ -7,15 +7,20 @@
 {-# language FunctionalDependencies #-}
 {-# language DefaultSignatures      #-}
 
+{-# language ScopedTypeVariables    #-}
+
 module Feldspar.Array.Vector where
 
 import Feldspar
 import Feldspar.Frontend (Arrays)
 import Feldspar.Storable
 
+import Data.List (genericLength)
+
 import Control.Monad ((<=<), void)
 
 import Prelude hiding (take, drop, reverse, length, zip, zipWith, sum, min)
+import qualified Prelude as P
 
 --------------------------------------------------------------------------------
 -- * 1-dimensional vector library.
@@ -40,6 +45,22 @@ import Prelude hiding (take, drop, reverse, length, zip, zipWith, sum, min)
 
 -- | A 1-dimensional vector with a concrete representation in memory
 newtype Manifest m a = M { manifest :: IArray m a }
+
+listManifest :: forall m a .
+  ( MonadComp m
+  , SyntaxM m a
+  , Value (Expr m)
+  --
+  , Manifestable m (Push m a) a
+  --
+  , SyntaxM' m (Expr m Length)
+  , Primitive (Expr m) Length
+  , Num (Internal (Expr m Length))
+  , Enum (Internal (Expr m Length))
+  )
+  => [a]
+  -> m (Manifest m a)
+listManifest as = manifestFresh (listPush as :: Push m a)
 
 --------------------------------------------------------------------------------
 -- ** Pull vectors.
@@ -268,18 +289,33 @@ toPushM = return . toPush
 -- *** Push operations.
 --------------------------------------------------------------------------------
 
+-- | Create a 'Push' vector from a list of elements.
+listPush :: ( MonadComp m
+            , SyntaxM m a
+            , Value (Expr m)
+            -- todo: these really should be part of some 'Vector' class.
+            , SyntaxM' m (Expr m Length)
+            , Primitive (Expr m) Length
+            , Num (Internal (Expr m Length))
+            , Enum (Internal (Expr m Length))
+            )
+  => [a]
+  -> Push m a
+listPush as = Push (value $ genericLength as) $ \write ->
+  sequence_ [write (value i) a | (i, a) <- P.zip [0..] as]
+
 -- | Dump the contents of a 'Push' vector.
 dumpPush
-    :: Push m a                     -- ^ Vector to dump.
-    -> (Expr m Index -> a -> m ())  -- ^ Function that writes one element.
-    -> m ()
+  :: Push m a                     -- ^ Vector to dump.
+  -> (Expr m Index -> a -> m ())  -- ^ Function that writes one element.
+  -> m ()
 dumpPush (Push _ dump) = dump
 
 -- | Append two vectors to make a 'Push' vector.
 (++) :: (Pushy m vec1 a, Pushy m vec2 a, Num (Expr m Length), Monad m)
-    => vec1
-    -> vec2
-    -> Push m a
+  => vec1
+  -> vec2
+  -> Push m a
 vec1 ++ vec2 = Push (len1 + length v2) $ \write ->
     dumpPush v1 write >> dumpPush v2 (write . (+len1))
   where
@@ -289,9 +325,9 @@ vec1 ++ vec2 = Push (len1 + length v2) $ \write ->
 
 -- | Concatenate nested vectors to a 'Push' vector.
 concat :: (Pushy m vec1 vec2, Pushy m vec2 a, Num (Expr m Length), MonadComp m)
-    => Expr m Length  -- ^ Length of inner vectors.
-    -> vec1           -- ^ Nested vector.
-    -> Push m a
+  => Expr m Length  -- ^ Length of inner vectors.
+  -> vec1           -- ^ Nested vector.
+  -> Push m a
 concat c vec = Push (len*c) $ \write ->
     dumpPush v $ \i row ->
       dumpPush row $ \j a ->
@@ -303,8 +339,8 @@ concat c vec = Push (len*c) $ \write ->
 -- | Forward-permute a 'Push' vector using an index mapping. The supplied
 --   mapping must be a bijection when restricted to the domain of the vector.
 --   This property is not checked, so use with care.
-forwardPermute :: Pushy m vec a =>
-    (Expr m Length -> Expr m Index -> Expr m Index) -> vec -> Push m a
+forwardPermute :: Pushy m vec a
+  => (Expr m Length -> Expr m Index -> Expr m Index) -> vec -> Push m a
 forwardPermute p vec = Push len $ \write ->
     dumpPush v $ \i a ->
       write (p len i) a
