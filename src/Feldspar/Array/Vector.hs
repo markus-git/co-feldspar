@@ -8,6 +8,7 @@
 {-# language DefaultSignatures      #-}
 
 {-# language ScopedTypeVariables    #-}
+{-# language ConstraintKinds        #-}
 
 module Feldspar.Array.Vector where
 
@@ -38,6 +39,18 @@ import qualified Prelude as P
 -- <http://dx.doi.org/10.1145/2103736.2103740>.
 --
 --------------------------------------------------------------------------------
+
+-- | Collection of constraints for a monad `m` to support Pull/Push vectors.
+type Vectors m = (
+  -- expressions needed to implement most Pull/Push vectors operations:
+    Value   (Expr m)
+  , Cond    (Expr m)
+  , Ordered (Expr m)
+  , Loop    (Expr m)
+  -- constraints needed to support indexing:
+  , SyntaxM' m (Expr m Length)
+  , Primitive (Expr m) Length
+  )
 
 --------------------------------------------------------------------------------
 -- ** Manifest vectors.
