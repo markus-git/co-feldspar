@@ -204,18 +204,20 @@ shareM a = initRef a >>= unsafeFreezeRef
 
 --------------------------------------------------------------------------------
 
-class Indexed exp a | a -> exp
+class Finite exp arr
   where
-    type Elem a :: *
-    (!) :: a -> exp Index -> Elem a
+    length :: arr -> exp Length
 
-class Slicable exp a | a -> exp
+class Indexed exp arr
   where
-    slice :: exp Index -> exp Length -> a -> a
+    type ArrElem arr :: *
+    (!) :: arr -> exp Index -> ArrElem arr
 
-class Finite exp a | a -> exp
+class Slicable exp arr
   where
-    length :: a -> exp Length
+    slice :: exp Index -> exp Length -> arr -> arr
+
+--------------------------------------------------------------------------------
 
 class Monad m => Arrays m
   where
@@ -236,15 +238,23 @@ class Arrays m => IArrays m
     unsafeThawArr   :: (SyntaxM m a, Finite (Expr m) (IArray m a))
       => IArray m a -> m (Array  m a)
 
-freezeArr :: (IArrays m, SyntaxM m a, Finite (Expr m) (Array m a))
+freezeArr ::
+     ( IArrays m
+     , SyntaxM m a
+     , Finite (Expr m) (Array m a)
+     )
   => Array m a -> m (IArray m a)
 freezeArr arr =
   do iarr <- newArr (length arr)
      copyArr iarr arr
      unsafeFreezeArr iarr
 
-thawArr :: (IArrays m, SyntaxM m a, Finite (Expr m) (IArray m a))
-  => IArray m a -> m (Array  m a)
+thawArr ::
+     ( IArrays m
+     , SyntaxM m a
+     , Finite (Expr m) (IArray m a)
+     )
+  => IArray m a -> m (Array m a)
 thawArr iarr =
   do brr <- unsafeThawArr iarr -- haha.
      arr <- newArr (length iarr)
@@ -256,7 +266,8 @@ unsafeFreezeSlice
      , SyntaxM m a
      , Finite   (Expr m) (Array  m a)
      , Slicable (Expr m) (IArray m a)
-     , Num (Expr m Index))
+     , Num (Expr m Index)
+     )
   => Expr m Length -> Array m a -> m (IArray m a)
 unsafeFreezeSlice len = fmap (slice 0 len) . unsafeFreezeArr
 
