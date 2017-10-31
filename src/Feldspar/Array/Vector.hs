@@ -240,15 +240,13 @@ instance Functor (Push m)
 instance (Num (Expr m Length)) => Applicative (Push m)
   where
     pure a = Push 1 $ \write -> write 0 a
-    vec1 <*> vec2 = undefined
-{-
     vec1 <*> vec2 = Push (len1*len2) $ \write -> do
         dumpPush vec2 $ \i2 a ->
           dumpPush vec1 $ \i1 f ->
             write (i1*len2 + i2) (f a)
       where
         (len1,len2) = (length vec1, length vec2)
--}
+
 
 instance (Expr m ~ exp) => Finite exp (Push m a)
   where
@@ -271,6 +269,7 @@ instance (MonadComp m, VectorM m, Pully (Expr m) (IArray m a) a)
   where
     toPush = toPush . toPull
 
+-- ToDo: `exp ~ ...` hmm...
 instance (MonadComp m, VectorM m, exp ~ Expr m)
     => Pushy m (Pull exp a) a
   where
@@ -406,15 +405,18 @@ class ViewManifest m vec a => Manifestable m vec a | vec -> a
     default manifestStore
         :: ( MonadComp m
            , SyntaxM   m a
-           , Pushy     m vec a
-           , Finite   (Expr m) (Array m a)
+           , VectorM   m
+           , Finite   (Expr m) (Array  m a)
            , Slicable (Expr m) (IArray m a)
            , Num (Expr m Length)
+           -- ToDo: Why isn't this free?
+           , Pushy m vec a
            )
         => Array m a
         -> vec
         -> m ()
-    manifestStore loc = void . manifestArr loc . toPush
+    manifestStore loc v = void $ manifestArr loc (toPush v :: Push m a)
+      -- void . manifestArr loc . toPush
 
 instance (MonadComp m, SyntaxM m a, Finite (Expr m) (IArray m a))
     => Manifestable m (Manifest m a) a
@@ -423,6 +425,7 @@ instance (MonadComp m, SyntaxM m a, Finite (Expr m) (IArray m a))
     manifestFresh     = return
     manifestStore loc = copyArr loc <=< unsafeThawArr . manifest
 
+  -- ToDo: `exp ~ ...` hmm...
 instance (
     MonadComp m
   , SyntaxM   m a
