@@ -76,23 +76,21 @@ instance Slicable exp (IArray m a) => Slicable exp (Manifest m a)
   where
     slice ix len (M arr) = M $ slice ix len arr
 
-{-
 listManifest :: forall m a .
   ( MonadComp m
-  , SyntaxM m a
-  , Value (Expr m)
-  --
-  , Manifestable m (Push m a) a
-  --
-  , SyntaxM' m (Expr m Length)
-  , Primitive (Expr m) Length
-  , Num (Internal (Expr m Length))
+  , SyntaxM   m a
+  , VectorM   m
+  -- ToDo: These two constraints are quite common.
+  , Finite   (Expr m) (Array  m a)
+  , Slicable (Expr m) (IArray m a)
+  -- ToDo: Inherited from `listPush`.
+  , Num  (Internal (Expr m Length))
   , Enum (Internal (Expr m Length))
   )
   => [a]
   -> m (Manifest m a)
 listManifest as = manifestFresh (listPush as :: Push m a)
--}
+
 --------------------------------------------------------------------------------
 -- * Pull vectors.
 --------------------------------------------------------------------------------
