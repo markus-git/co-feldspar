@@ -246,7 +246,7 @@ setArr' = withSType (Proxy :: Proxy b) Imp.setArr
 
 instance Syntax SExp a => Indexed SExp (IArr a)
   where
-    type IndexedElem (IArr a) = a
+    type ArrElem (IArr a) = a
     (!) (IArr off len a) ix = resugar $ mapStruct index a
       where
         index :: SoftwarePrimType b => Imp.IArr Index b -> SExp b

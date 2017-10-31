@@ -243,7 +243,7 @@ setArr' = withHType (Proxy :: Proxy b) Imp.setVArray
 
 instance Syntax HExp a => Indexed HExp (IArr a)
   where
-    type IndexedElem (IArr a) = a
+    type ArrElem (IArr a) = a
     (!) (IArr off len a) ix = resugar $ mapStruct index a
       where
         index :: HardwarePrimType b => Imp.IArray Index b -> HExp b
