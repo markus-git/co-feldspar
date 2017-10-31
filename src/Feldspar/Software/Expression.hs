@@ -223,7 +223,6 @@ instance {-# OVERLAPPING #-} Project sub SoftwareConstructs =>
     Project sub SoftwareDomain
   where
     prj (expr :&: info) = Syn.prj expr
-    prj _ = Nothing
 
 instance {-# OVERLAPPING #-} Project BindingT SoftwareConstructs
   where

@@ -118,7 +118,6 @@ instance {-# OVERLAPPING #-} Project sub HardwareConstructs =>
     Project sub HardwareDomain
   where
     prj (expr :&: info) = Syn.prj expr
-    prj _ = Nothing
 
 instance {-# OVERLAPPING #-} Project BindingT HardwareConstructs
   where
