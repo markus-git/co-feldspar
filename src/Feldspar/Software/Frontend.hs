@@ -11,6 +11,7 @@ module Feldspar.Software.Frontend where
 import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
+import Feldspar.Array.Vector hiding (reverse)
 import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
 import Feldspar.Software.Representation
@@ -273,6 +274,18 @@ instance IArrays Software
       $ fmap (Arr (iarrOffset iarr) (length iarr))
       $ mapStructA (Imp.unsafeThawArr)
       $ unIArr iarr
+
+--------------------------------------------------------------------------------
+
+instance Syntax SExp (SExp a) => Pushy Software (IArr (SExp a)) (SExp a)
+  where
+    toPush iarr = toPush (M iarr :: Manifest Software (SExp a))
+
+instance ViewManifest Software (IArr (SExp a)) (SExp a)
+  where
+    viewManifest = Just . M
+
+instance Manifestable Software (IArr (SExp a)) (SExp a)
 
 --------------------------------------------------------------------------------
 

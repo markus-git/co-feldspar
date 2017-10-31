@@ -78,8 +78,7 @@ data IArr a = IArr
 
 --------------------------------------------------------------------------------
 
--- ... hmm ...
-type instance Expr Software = SExp
+type instance Expr     Software = SExp
 type instance DomainOf Software = SoftwareDomain
 
 --------------------------------------------------------------------------------
