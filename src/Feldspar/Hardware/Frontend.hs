@@ -11,6 +11,7 @@ module Feldspar.Hardware.Frontend where
 import Feldspar.Representation
 import Feldspar.Frontend
 import Feldspar.Sugar
+import Feldspar.Array.Vector
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Representation
@@ -270,6 +271,18 @@ instance IArrays Hardware
       $ fmap (Arr (iarrOffset iarr) (length iarr))
       $ mapStructA (Imp.unsafeThawVArray)
       $ unIArr iarr
+
+--------------------------------------------------------------------------------
+
+instance Syntax HExp (HExp a) => Pushy Hardware (IArr (HExp a)) (HExp a)
+  where
+    toPush iarr = toPush (M iarr :: Manifest Hardware (HExp a))
+
+instance ViewManifest Hardware (IArr (HExp a)) (HExp a)
+  where
+    viewManifest = Just . M
+
+instance Manifestable Hardware (IArr (HExp a)) (HExp a)    
 
 --------------------------------------------------------------------------------
 
