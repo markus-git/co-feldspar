@@ -74,8 +74,10 @@ setStore
      )
   => Store m a -> vec -> m ()
 setStore st@Store {..} vec = case viewManifest vec of
-    Just (M iarr :: Manifest m a) | unsafeArrEq activeBuf iarr -> return ()
+    Just (M iarr :: Manifest m a) | unsafeArrEq activeBuf iarr
+      -> return ()
     _ -> manifestStore freeBuf vec >> swapStore st
+-- todo: Should check for offset and length differences as well.
 
 -- | Write the contents of a vector to a 'Store' and get it back as a
 --   'Manifest' vector.

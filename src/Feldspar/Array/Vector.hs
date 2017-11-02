@@ -407,14 +407,13 @@ class ViewManifest m vec a => Manifestable m vec a | vec -> a
            , Finite   (Expr m) (Array  m a)
            , Slicable (Expr m) (IArray m a)
            , Num (Expr m Length)
-           -- ToDo: Why isn't this free?
+           -- todo: Why isn't this free?
            , Pushy m vec a
            )
         => Array m a
         -> vec
         -> m ()
     manifestStore loc v = void $ manifestArr loc (toPush v :: Push m a)
-      -- void . manifestArr loc . toPush
 
 instance (MonadComp m, SyntaxM m a, Finite (Expr m) (IArray m a))
     => Manifestable m (Manifest m a) a

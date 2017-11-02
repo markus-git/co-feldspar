@@ -12,6 +12,7 @@ import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
 import Feldspar.Storable
+import Feldspar.Array.Buffered (ArraysEq(..))
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Command
@@ -39,6 +40,9 @@ import Control.Monad.Operational.Higher as Oper hiding ((:<:))
 -- hardware-edsl.
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
+
+import Prelude hiding ((==))
+import qualified Prelude as P
 
 --------------------------------------------------------------------------------
 -- * Programs.
@@ -86,6 +90,17 @@ data SArr a = SArr
   , sarrLength :: HExp Length
   , unSArr     :: Struct HardwarePrimType (Imp.Array Index) (Internal a)
   }
+
+--------------------------------------------------------------------------------
+
+instance ArraysEq Arr IArr
+  where
+    unsafeArrEq (Arr _ _ arr) (IArr _ _ brr) =
+        and (zipListStruct sameId arr brr)
+      where
+        sameId :: Imp.VArray Index a -> Imp.IArray Index a -> Bool
+        sameId (Imp.VArrayC a) (Imp.IArrayC b) = a P.== b
+        sameId _ _ = False
 
 --------------------------------------------------------------------------------
 
