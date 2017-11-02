@@ -277,6 +277,15 @@ instance IArrays Software
 
 --------------------------------------------------------------------------------
 
+-- | Short-hand for software pull vectors.
+type SPull a = Pull SExp a
+
+-- | Short-hand for software push vectors.
+type SPush a = Push Software a
+
+-- | Short-hand for software manifest vectors.
+type SManifest a = Manifest Software a
+
 instance Syntax SExp (SExp a) => Pushy Software (IArr (SExp a)) (SExp a)
   where
     toPush iarr = toPush (M iarr :: Manifest Software (SExp a))

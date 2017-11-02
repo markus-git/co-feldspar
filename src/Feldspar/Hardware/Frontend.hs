@@ -274,6 +274,15 @@ instance IArrays Hardware
 
 --------------------------------------------------------------------------------
 
+-- | Short-hand for hardware pull vectors.
+type HPull a = Pull HExp a
+
+-- | Short-hand for hardware push vectors.
+type HPush a = Push Hardware a
+
+-- | Short-hand for hardware manifest vectors.
+type HManifest a = Manifest Hardware a
+
 instance Syntax HExp (HExp a) => Pushy Hardware (IArr (HExp a)) (HExp a)
   where
     toPush iarr = toPush (M iarr :: Manifest Hardware (HExp a))
