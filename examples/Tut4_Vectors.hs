@@ -9,6 +9,8 @@ import Feldspar.Array.Vector
 import Feldspar.Software as Soft
 import Feldspar.Hardware as Hard
 
+import Control.Monad (void)
+
 import Prelude hiding (map, zipWith, sum, take, reverse, (++))
 
 --------------------------------------------------------------------------------
@@ -53,22 +55,19 @@ import Prelude hiding (map, zipWith, sum, take, reverse, (++))
 --
 --------------------------------------------------------------------------------
 
--- To simplify our examples' types, we define software specialized vectors.
-type SPull a = Pull Software (SExp a)
-type SPush a = Push Software (SExp a)
--- ... and for arrays ...
-type SArray  a = Array  Software (SExp a) -- Regular arrays.
-type SIArray a = IArray Software (SExp a) -- Immutable arrays.
+-- To simplify our examples' types, we define software specialized arrays.
+type SArray  a = Array  Software a -- Regular, software arrays.
+type SIArray a = IArray Software a -- Immutable, software arrays.
 
 -- Pull vectors support many list-like operations. Here is a function that sums
 -- the last 5 elements in a vector:
-sumLast5 :: SPull Word32 -> SExp Word32
+sumLast5 :: SPull (SExp Word32) -> SExp Word32
 sumLast5 = sum . take 5 . reverse
 
 sumLast5Prog :: Software ()
 sumLast5Prog =
-  do arr :: SArray Word32 <- initArr [1, 2, 3, 4] -- Create example array.
-     brr <- unsafeFreezeArr arr                   -- Make it immutable.
+  do arr :: SArray (SExp Word32) <- initArr [1, 2, 3, 4] -- Create example array.
+     brr <- unsafeFreezeArr arr                          -- Make it immutable.
      printf "sum: %d\n" (sumLast5 $ toPull brr)
 
 test1 = Soft.icompile sumLast5Prog
@@ -82,7 +81,7 @@ test2 = Soft.runCompiled sumLast5Prog
 
 -- Compute the sum of the square of the numbers from 1 to n:
 sumSq :: SExp Word32 -> SExp Word32
-sumSq n = sum $ map (\x -> x*x) (1...n :: SPull Word32)
+sumSq n = sum $ map (\x -> x*x) (1...n :: SPull (SExp Word32))
 -- The type `Word32` is used quite often our examples, and the vector library as
 -- well. As the type is often used, at least on the software side, to represent
 -- an index or length, it goes under the aliases: `Index` and `Length`.
@@ -94,30 +93,25 @@ test3 = Soft.icompile sumSqProg
 -- Note that, as with our previous example, there are no arrays declared in the
 -- generated code, only scalars.
 
+
 --------------------------------------------------------------------------------
 
 -- Dot product of two vectors:
-dotProd :: ( Num a      -- Lets use any number type instead of `Word32` ...
-           , SyntaxM m a -- ... as long as its well-typed in `m`.
-           -- Expressions over `Length` must be well typed.
-           , SyntaxM' m (Expr m Length)
-           , Primitive (Expr m) Length
-           -- Expressions must support: 
-           , Loop    (Expr m) -- as `sum` uses a loop.
-           , Cond    (Expr m) -- as `zip` needs to check with input is smallest.
-           , Ordered (Expr m) -- as `zip` needs to compare input lengths.
-           )
-  => Pull m a -> Pull m a -> a
+dotProd
+  :: ( Num a        -- Lets use any number type instead of `SExp Word32`,
+     , Syntax exp a -- as long as its well-typed in `exp` and
+     , Vector exp   -- `exp` supports the necessary vector expressions.
+     )
+  => Pull exp a -> Pull exp a -> a
 dotProd a b = sum $ zipWith (*) a b
--- todo: I should put these common constraints in a class like MonadComp.
 
 dotProdProg :: Software ()
 dotProdProg =
-  do arr :: SArray Word16 <- initArr [1, 2, 3, 4]
-     brr :: SPull  Word16 <- toPull <$> unsafeFreezeArr arr
+  do arr :: SArray (SExp Word16) <- initArr [1, 2, 3, 4]
+     brr :: SPull  (SExp Word16) <- toPull <$> unsafeFreezeArr arr
 
-     crr :: SArray Word16 <- initArr [4, 3, 2, 1]
-     drr :: SPull  Word16 <- toPull <$> unsafeFreezeArr crr
+     crr :: SArray (SExp Word16) <- initArr [4, 3, 2, 1]
+     drr :: SPull  (SExp Word16) <- toPull <$> unsafeFreezeArr crr
 
      printf "dotProd: %d\n" (dotProd brr drr)
 -- todo: clean up/automate conversion from/to pull and regular arrays.
@@ -136,28 +130,33 @@ test4 = Soft.icompile dotProdProg
 --
 -- The following function appends two modified compies of a vector to each
 -- other:
-apa :: ( Num a
-       , MonadComp m
-       , SyntaxM m a
-       -- todo: yep, should hide these.
-       , Num (Expr m Length)
-       , SyntaxM' m (Expr m Length)
-       , Primitive (Expr m) Length
-       -- hmm...
-       , Integral (Internal (Expr m Length))
-       )
-  => Pull m a -> Push m a
-apa vec = reverse vec ++ map (*2) vec
+pushy :: (Num a, SyntaxM m a, VectorM m, MonadComp m)
+  => Pull (Expr m) a -> Push m a
+pushy vec = reverse vec ++ map (*2) vec
+-- Note that any writing done by a `Push` vector is an stateful operations,
+-- it's therefore parameterized by the computational monad `m` in which these
+-- writes will be performed (`Pull` vectors do not perform any monadic writes
+-- and are therefore only parameterized on their expression's type). As a
+-- result, we used the monadic versions of `Syntax` and `Vector`, which are
+-- suffixed by an `M` and takes a monadic type instead of an expression type.
 
-apaProg :: Software ()
-apaProg =
-  do arr :: SArray  Word16 <- initArr [1, 2, 3, 4]
-     brr :: SPull   Word16 <- toPull <$> unsafeFreezeArr arr
-     -- todo: hmm... hide or explain mainfest arrays.
-     crr :: SIArray Word16 <- manifest <$> manifestFresh (apa brr)
-     return ()
+pushyProg :: Software ()
+pushyProg =
+  do arr :: SArray (SExp Word16) <- initArr [1, 2, 3, 4]
+     brr :: SPull  (SExp Word16) <- toPull <$> unsafeFreezeArr arr
 
-test5 = Soft.icompile apaProg
+     -- Apply our pushy vector program to `brr`:
+     let crr :: SPush (SExp Word16)
+         crr = pushy brr
+     
+     -- Remember that `Push` arrays only describes how a vector should be
+     -- written to some memory. To make the pushy vector manifest, we use
+     -- `manifestFresh` operation which writes the vector to a fresh array.
+     void $ manifestFresh crr
+-- The idea of `manifest` vectors is explained below.
+
+test5 = Soft.icompile pushyProg
+
 
 --------------------------------------------------------------------------------
 
@@ -169,39 +168,32 @@ test5 = Soft.icompile apaProg
 -- > By writing another vector to memory using `manifestArr` or `manifestFresh`.
 --
 -- Writing a vector to memory is often forced by the types. For example, if we
--- want to compose `sumLast5` with `quirk` we find that the types don't match:
-manifestApa :: forall m a .
+-- want to compose `sumLast5` with `pushy` we find that the types don't match:
+manifestPushy :: forall m a .
   ( Num a
   , MonadComp m
   , SyntaxM m a
-    -- ...
-  , Arrays m
-  , IArrays m
-  , Indexed  (Expr m) (IArray m a)
-  , Finite   (Expr m) (Array  m a)
-  , Finite   (Expr m) (IArray m a)
+  , VectorM m
+  -- Make sure we can manifest our arrays (todo: maybe put these in `Vector`?).
+  , Finite   (Expr m) (Array m a)
   , Slicable (Expr m) (IArray m a)
-  , Elem (IArray m a) ~ a
-    -- ...
-  , Loop    (Expr m)
-  , Cond    (Expr m)
-  , Ordered (Expr m)
-    -- ...
-  , Num (Expr m Length)
-  , SyntaxM' m (Expr m Length)
-  , Primitive (Expr m) Length
-    -- hmm...
-  , Integral (Internal (Expr m Length))
+  -- Make sure the manifest arrays can be used as `pully` vectors.
+  , Pully (Expr m) (IArray m a) a
   )
-  => Pull m a -> m a
-manifestApa vec =
-  do vec2 <- manifestFresh (apa vec)
-     -- todo: yep, need to automate this stuff.
-     return $ sumLast5' (toPull $ manifest $ vec2)
+  => Pull (Expr m) a -> m a
+manifestPushy vec =
+  do -- First we apply `pushy` to vec:
+     let arr :: Push m a
+         arr = pushy vec
+     -- Then, as we need to get a pully vector from our pushy one, we will
+     -- need to first manifest it as an array:
+     brr <- manifestFresh arr
+     -- The manifest array can then be given to our, now generic, `sumLast5`:
+     return $ genericSumLast5 brr
   where
-    sumLast5' :: Pull m a -> a
-    sumLast5' = sum . take 5 . reverse
--- Here, `vec2` is a manifest vector. One problem with this example is the use
+    genericSumLast5 :: Pully (Expr m) vec a => vec -> a
+    genericSumLast5 = sum . take 5 . reverse
+-- Here, `brr` is a manifest vector. One problem with this example is the use
 -- of `manifestFresh` which silently allocates a fresh array to hold the
 -- manifest vector. This array will be allocated on the stack and not freed
 -- until the end of the current block in the generated code.
@@ -212,13 +204,16 @@ manifestApa vec =
 -- since each call to `manifestArr` with a given location will invalidate
 -- earlier manifest vectors using that location.
 
-manifestApaProg :: Software ()
-manifestApaProg =
-  do arr :: SArray  Word16 <- initArr [1, 2, 3, 4]
-     brr :: SPull   Word16 <- toPull <$> unsafeFreezeArr arr
-     out <- manifestApa brr
+manifestPushyProg :: Software ()
+manifestPushyProg =
+  do arr :: SArray (SExp Word16) <- initArr [1, 2, 3, 4]
+     brr :: SPull  (SExp Word16) <- toPull <$> unsafeFreezeArr arr
+     
+     out <- manifestPushy brr
+     
      printf "manifest apa: %d\n" out
 
-test6 = Soft.icompile manifestApaProg
+test6 = Soft.icompile manifestPushyProg
+
 
 --------------------------------------------------------------------------------
