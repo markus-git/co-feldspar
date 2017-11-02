@@ -22,6 +22,7 @@ library
     Feldspar.Representation,
     Feldspar.Storable,
     Feldspar.Frontend,
+    Feldspar.Array.Buffered,
     Feldspar.Array.Vector,
     Feldspar.Hardware,
     Feldspar.Hardware.Primitive,
