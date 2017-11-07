@@ -12,6 +12,7 @@ import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
 import Feldspar.Array.Vector hiding (reverse)
+import Feldspar.Array.Buffered (ArraysSwap(..))
 import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
 import Feldspar.Software.Representation

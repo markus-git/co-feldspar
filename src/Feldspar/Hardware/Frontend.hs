@@ -11,7 +11,8 @@ module Feldspar.Hardware.Frontend where
 import Feldspar.Representation
 import Feldspar.Frontend
 import Feldspar.Sugar
-import Feldspar.Array.Vector
+import Feldspar.Array.Vector hiding (reverse)
+import Feldspar.Array.Buffered (ArraysSwap(..))
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Representation
