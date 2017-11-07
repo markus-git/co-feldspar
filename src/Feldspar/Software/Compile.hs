@@ -6,10 +6,11 @@
 module Feldspar.Software.Compile where
 
 import Feldspar.Representation
-import Feldspar.Software.Primitive hiding (bug)
+import Feldspar.Software.Primitive
 import Feldspar.Software.Primitive.Backend
-import Feldspar.Software.Expression hiding (bug)
+import Feldspar.Software.Expression
 import Feldspar.Software.Representation
+import Feldspar.Software.Optimize
 import Data.Struct
 
 import Control.Monad.Identity
@@ -98,11 +99,8 @@ lookAlias t v = do
 
 --------------------------------------------------------------------------------
 
-bug :: Monad m => String -> m ()
-bug s = trace s (return ())
-
 translateExp :: forall m a . Monad m => SExp a -> TargetT m (VExp a)
-translateExp = goAST . unSExp
+translateExp = goAST . optimize . unSExp
   where
     goAST :: ASTF SoftwareDomain b -> TargetT m (VExp b)
     goAST = Syn.simpleMatch (\(s :&: ValT t) -> go t s)
@@ -125,13 +123,11 @@ translateExp = goAST . unSExp
       = return $ Node $ sugarSymPrim $ FreeVar v
     go t var Syn.Nil
       | Just (VarT v) <- prj var
-      = do bug ("lookup for: " ++ show v) -- ***
-           lookAlias t v
+      = do lookAlias t v
     go t lt (a :* (lam :$ body) :* Syn.Nil)
       | Just (Let tag) <- prj lt
       , Just (LamT v)  <- prj lam
-      = do bug ("lambda for: " ++ show v)
-           let base = if null tag then "let" else tag
+      = do let base = if null tag then "let" else tag
            r  <- initRefV base =<< goAST a
            a' <- unsafeFreezeRefV r
            localAlias v a' $ goAST body

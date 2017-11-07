@@ -14,7 +14,7 @@ module Feldspar.Software.Expression where
 
 import Feldspar.Sugar
 import Feldspar.Representation
-import Feldspar.Software.Primitive hiding (bug)
+import Feldspar.Software.Primitive
 import Data.Struct
 
 import Data.Int
@@ -50,7 +50,10 @@ type instance RepresentationOf SoftwarePrimType = SoftwarePrimTypeRep
 -- ** Software types.
 
 -- | Representation of supported software types.
-type STypeRep = TypeRep SoftwarePrimType SoftwarePrimTypeRep
+type STypeRep  = TypeRep SoftwarePrimType SoftwarePrimTypeRep
+
+-- | ...
+type STypeRepF = TypeRepF SoftwarePrimType SoftwarePrimTypeRep
 
 instance Type SoftwarePrimType Bool   where typeRep = Node BoolST
 instance Type SoftwarePrimType Int8   where typeRep = Node Int8ST
@@ -209,6 +212,8 @@ instance Render ForLoop
 instance EvalEnv ForLoop env
 
 instance StringTree ForLoop
+
+instance Equality ForLoop
 
 --------------------------------------------------------------------------------
 -- *** Temporary fix until GHC fixes their class resolution for DTC ***

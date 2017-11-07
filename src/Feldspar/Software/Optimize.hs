@@ -1,8 +1,9 @@
-{-# language GADTs            #-}
-{-# language TypeOperators    #-}
-{-# language PatternSynonyms  #-}
-{-# language ViewPatterns     #-}
-{-# language FlexibleContexts #-}
+{-# language GADTs               #-}
+{-# language TypeOperators       #-}
+{-# language PatternSynonyms     #-}
+{-# language ViewPatterns        #-}
+{-# language FlexibleContexts    #-}
+{-# language ScopedTypeVariables #-}
 
 module Feldspar.Software.Optimize where
 
@@ -13,12 +14,10 @@ import Feldspar.Software.Expression
 import Data.Struct
 import Data.Selection
 
-import Control.Monad.Reader
 import Control.Monad.Writer hiding (Any (..))
 import Data.Maybe
 import Data.Constraint (Dict (..))
 import Data.Set (Set)
-
 import qualified Data.Monoid as Monoid
 import qualified Data.Set as Set
 
@@ -28,6 +27,8 @@ import Language.Syntactic.Functional
 import Language.Syntactic.Functional.Tuple
 import Language.Syntactic.Functional.Sharing
 
+-- debug.
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- * Optimize software expressions.
@@ -198,7 +199,117 @@ simplifyUp (SymP _ Or :$ _ :$ LitP t True)  = LitP t True
 -- Simplify conditional expressions.
 simplifyUp (SymP _ Cond :$ LitP _ True  :$ t :$ _)  = t
 simplifyUp (SymP _ Cond :$ LitP _ False :$ _ :$ f)  = f
---simplifyUp (SymP _ Cond :$ c :$ t :$ f) | equal t f = t
+simplifyUp (SymP _ Cond :$ c :$ t :$ f) | equal t f = t
+-- Simplify pairs.
+simplifyUp (SymP t Pair :$ (SymP _ Fst :$ a) :$ (SymP _ Snd :$ b))
+    | alphaEq a b
+    , ValT t' <- getDecor a
+    , Just Dict <- softwareTypeEq t t' = a
+simplifyUp (SymP t Fst :$ (SymP _ Pair :$ a :$ _)) = a
+simplifyUp (SymP t Snd :$ (SymP _ Pair :$ _ :$ a)) = a
+-- 
+simplifyUp a | bug ("fold: " ++ show a) = constFold a
+  -- `constFold` here ensures that `simplifyUp` does not produce any expressions
+  -- that can be statically constant folded. This property is needed, e.g. to
+  -- fully simplify the expression `negate (2*x)`. The simplification should go
+  -- as follows:
+  --
+  --     negate (2*x)  ->  negate (x*2)  ->  x * negate 2  ->  x*(-2)
+  --
+  -- There is no explicit rule for the last step; it is done by `constFold`.
+  -- Furthermore, this constant folding would not be performed by `simplifyM`
+  -- since it never sees the sub-expression `negate 2`. (Note that the constant
+  -- folding in `simplifyM` is still needed, because constructs such as
+  -- `ForLoop` cannot be folded by simple literal propagation.)
+  --
+  -- In order to see that `simplifyUp` doesn't produce any "junk"
+  -- (sub-expressions that can be folded by `constFold`), we reason as follows:
+  --
+  --   * Assume that the arguments of the top-level node are junk-free
+  --   * `simplifyUp` will either apply an explicit rewrite or apply `constFold`
+  --   * In the latter case, the result will be junk-free
+  --   * In case of an explicit rewrite, the resulting expression is constructed
+  --     by applying `simplifyUp` to each newly introduced node; thus the
+  --     resulting expression must be junk-free
+
+
+--------------------------------------------------------------------------------
+
+-- | Reduce an expression to a literal if the following conditions are met:
+--
+-- * The top-most symbol can be evaluated statically (i.g. not a variable or a
+--   lifted side-effecting program)
+-- * All immediate sub-terms are literals
+-- * The type of the expression is an allowed type for literals (e.g. not a
+--   function)
+--
+-- Note that this function only folds the top-level node of an expressions (if
+-- possible). It does not reduce an expression like @1+(2+3)@ where the
+-- sub-expression @2+3@ is not a literal.
+constFold :: ASTF SoftwareDomain a -> ASTF SoftwareDomain a
+constFold e
+    | constArgs e, canFold e, ValT t@(Node _) <- getDecor e
+    = LitP t (evalClosed e)
+  where
+    canFold :: ASTF SoftwareDomain a -> Bool
+    canFold = simpleMatch (\(s :&: ValT _) _ -> go s)
+      where
+        go :: SoftwareConstructs sig
+           -> Bool
+        go var | Just (FreeVar _)         <- prj var = False
+        go ix  | Just (ArrIx _)           <- prj ix  = False
+        go bid | Just (_ :: BindingT sig) <- prj bid = False
+        go _   = True
+constFold e = e
+
+-- | Check whether all arguments of a symbol are literals
+constArgs :: AST SoftwareDomain sig -> Bool
+constArgs (Sym _)         = True
+constArgs (s :$ LitP _ _) = constArgs s
+constArgs _               = False
+
+
+--------------------------------------------------------------------------------
+
+type Opt = Writer (Set Name, Monoid.Any)
+
+freeVar :: Name -> Opt ()
+freeVar v = tell (Set.singleton v, mempty)
+
+bindVar :: Name -> Opt a -> Opt a
+bindVar v = censor (\(vars, unsafe) -> (Set.delete v vars, unsafe))
+
+tellUnsafe :: Opt ()
+tellUnsafe = tell (mempty, Monoid.Any True)
+
+simplifyM :: ASTF SoftwareDomain a -> Opt (ASTF SoftwareDomain a)
+simplifyM exp = case exp of
+    (VarP _ v)      -> freeVar v >> return exp
+    (LamP t v body) -> bindVar v $ fmap (LamP t v) $ simplifyM body
+    _               -> simpleMatch (\s@(v :&: t) args ->
+      do (exp', (vars, Monoid.Any unsafe)) <- listen
+           (simplifyUp . appArgs (Sym s) <$> mapArgsM simplifyM args)
+         case () of
+           _ | Just (FreeVar _) <- prj v -> tellUnsafe >> return exp'
+           _ | Just (ArrIx _)   <- prj v -> tellUnsafe >> return exp'
+           _ | null vars && not unsafe, ValT t'@(Node _) <- t
+             -> return $ LitP t' $ evalClosed exp'
+           _ -> return exp'
+      )
+      exp
+  -- Array indexing is actually not unsafe. It's more like
+  -- an expression with a free variable. But setting the
+  -- unsafe flag does the trick.
+  -- Constant fold if expression is closed and does not
+  -- contain unsafe operations.
+
+bug :: String -> Bool
+bug = flip trace True
+
+--------------------------------------------------------------------------------
+
+optimize :: ASTF SoftwareDomain a -> ASTF SoftwareDomain a
+optimize = fst . runWriter . simplifyM
 
 
 --------------------------------------------------------------------------------
