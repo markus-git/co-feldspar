@@ -41,7 +41,9 @@ library
     Feldspar.Software.Representation,
     Feldspar.Software.Frontend,
     Feldspar.Software.Compile,
-    Data.Struct
+    Feldspar.Software.Optimize,
+    Data.Struct,
+    Data.Selection
     
   -- other-modules:       
   -- other-extensions:    
@@ -53,9 +55,9 @@ library
     array >=0.5,
     syntactic >=3.6.1,
     operational-alacarte >=0.3,
-    imperative-edsl >=0.7,
+    imperative-edsl >=0.7.1,
     hardware-edsl >=0.1.2,
-    language-c-quote >=0.11,
+    language-c-quote,
     language-vhdl >=0.1.3,
     template-haskell
 
