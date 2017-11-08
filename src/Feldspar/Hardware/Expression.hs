@@ -210,4 +210,6 @@ instance EvalEnv ForLoop env
 
 instance StringTree ForLoop
 
+instance Equality ForLoop
+
 --------------------------------------------------------------------------------

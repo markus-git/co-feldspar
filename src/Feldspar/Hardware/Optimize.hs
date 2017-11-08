@@ -5,11 +5,11 @@
 {-# language FlexibleContexts    #-}
 {-# language ScopedTypeVariables #-}
 
-module Feldspar.Software.Optimize where
+module Feldspar.Hardware.Optimize where
 
 import Feldspar.Representation
-import Feldspar.Software.Primitive
-import Feldspar.Software.Expression
+import Feldspar.Hardware.Primitive
+import Feldspar.Hardware.Expression
 import Data.Struct
 
 import Control.Monad.Writer hiding (Any (..))
@@ -26,26 +26,27 @@ import Language.Syntactic.Functional.Tuple
 import Language.Syntactic.Functional.Sharing
 
 --------------------------------------------------------------------------------
--- * Optimize software expressions.
+-- * Optimize hardware expressions.
 --------------------------------------------------------------------------------
 
-viewLit :: ASTF SoftwareDomain a -> Maybe a
+
+viewLit :: ASTF HardwareDomain a -> Maybe a
 viewLit lit | Just (Lit a) <- prj lit = Just a
 viewLit _ = Nothing
 
-witInteger :: ASTF SoftwareDomain a -> Maybe (Dict (Integral a, Ord a))
+witInteger :: ASTF HardwareDomain a -> Maybe (Dict (Integral a, Ord a))
 witInteger a = case getDecor a of
-  ValT (Node Int8ST)   -> Just Dict
-  ValT (Node Int16ST)  -> Just Dict
-  ValT (Node Int32ST)  -> Just Dict
-  ValT (Node Int64ST)  -> Just Dict
-  ValT (Node Word8ST)  -> Just Dict
-  ValT (Node Word16ST) -> Just Dict
-  ValT (Node Word32ST) -> Just Dict
-  ValT (Node Word64ST) -> Just Dict
+  ValT (Node Int8HT)   -> Just Dict
+  ValT (Node Int16HT)  -> Just Dict
+  ValT (Node Int32HT)  -> Just Dict
+  ValT (Node Int64HT)  -> Just Dict
+  ValT (Node Word8HT)  -> Just Dict
+  ValT (Node Word16HT) -> Just Dict
+  ValT (Node Word32HT) -> Just Dict
+  ValT (Node Word64HT) -> Just Dict
   _ -> Nothing
 
-isExact :: ASTF SoftwareDomain a -> Bool
+isExact :: ASTF HardwareDomain a -> Bool
 isExact = isJust . witInteger
 
 -- | projection with a stronger constraint to allow using it in
@@ -72,30 +73,31 @@ pattern LamP t v body <- Sym ((prjBi -> Just (LamT v)) :&: t) :$ body
 --------------------------------------------------------------------------------
 
 pattern LitP :: () => (Eq a, Show a)
-  => STypeRep a -> a -> ASTF SoftwareDomain a
+  => HTypeRep a -> a -> ASTF HardwareDomain a
   
-pattern AddP :: () => (Num a, SoftwarePrimType a)
-  => STypeRep a -> ASTF SoftwareDomain a -> ASTF SoftwareDomain a
-  -> ASTF SoftwareDomain a
+pattern AddP :: () => (Num a, HardwarePrimType a)
+  => HTypeRep a -> ASTF HardwareDomain a -> ASTF HardwareDomain a
+  -> ASTF HardwareDomain a
 
-pattern SubP :: () => (Num a, SoftwarePrimType a)
-  => STypeRep a -> ASTF SoftwareDomain a -> ASTF SoftwareDomain a
-  -> ASTF SoftwareDomain a
+pattern SubP :: () => (Num a, HardwarePrimType a)
+  => HTypeRep a -> ASTF HardwareDomain a -> ASTF HardwareDomain a
+  -> ASTF HardwareDomain a
 
-pattern MulP :: () => (Num a, SoftwarePrimType a)
-  => STypeRep a -> ASTF SoftwareDomain a -> ASTF SoftwareDomain a
-  -> ASTF SoftwareDomain a
+pattern MulP :: () => (Num a, HardwarePrimType a)
+  => HTypeRep a -> ASTF HardwareDomain a -> ASTF HardwareDomain a
+  -> ASTF HardwareDomain a
 
-pattern NegP :: () => (Num a, SoftwarePrimType a)
-  => STypeRep a -> ASTF SoftwareDomain a -> ASTF SoftwareDomain a
+pattern NegP :: () => (Num a, HardwarePrimType a)
+  => HTypeRep a -> ASTF HardwareDomain a -> ASTF HardwareDomain a
 
-pattern DivP :: () => (Integral a, SoftwarePrimType a)
-  => STypeRep a -> ASTF SoftwareDomain a -> ASTF SoftwareDomain a
-  -> ASTF SoftwareDomain a
+pattern DivP :: () => (Integral a, HardwarePrimType a)
+  => HTypeRep a -> ASTF HardwareDomain a -> ASTF HardwareDomain a
+  -> ASTF HardwareDomain a
 
-pattern ModP :: () => (Integral a, SoftwarePrimType a)
-  => STypeRep a -> ASTF SoftwareDomain a -> ASTF SoftwareDomain a
-  -> ASTF SoftwareDomain a
+pattern ModP :: () => (Integral a, HardwarePrimType a)
+  => HTypeRep a -> ASTF HardwareDomain a -> ASTF HardwareDomain a
+  -> ASTF HardwareDomain a
+
 
 --------------------------------------------------------------------------------
 
@@ -129,9 +131,10 @@ pattern ModP t a b <- SymP t Mod :$ a :$ b
   where
     ModP t a b = simplifyUp $ SymP t Mod :$ a :$ b
 
+
 --------------------------------------------------------------------------------
 
-simplifyUp :: ASTF SoftwareDomain a -> ASTF SoftwareDomain a
+simplifyUp :: ASTF HardwareDomain a -> ASTF HardwareDomain a
 -- Addition with zero.
 simplifyUp (AddP t (LitP _ 0) b) | isExact b = b
 simplifyUp (AddP t a (LitP _ 0)) | isExact a = a
@@ -199,7 +202,7 @@ simplifyUp (SymP _ Cond :$ c :$ t :$ f) | equal t f = t
 simplifyUp (SymP t Pair :$ (SymP _ Fst :$ a) :$ (SymP _ Snd :$ b))
     | alphaEq a b
     , ValT t' <- getDecor a
-    , Just Dict <- softwareTypeEq t t' = a
+    , Just Dict <- hardwareTypeEq t t' = a
 simplifyUp (SymP t Fst :$ (SymP _ Pair :$ a :$ _)) = a
 simplifyUp (SymP t Snd :$ (SymP _ Pair :$ _ :$ a)) = a
 -- 
@@ -241,15 +244,15 @@ simplifyUp a = constFold a
 -- Note that this function only folds the top-level node of an expressions (if
 -- possible). It does not reduce an expression like @1+(2+3)@ where the
 -- sub-expression @2+3@ is not a literal.
-constFold :: ASTF SoftwareDomain a -> ASTF SoftwareDomain a
+constFold :: ASTF HardwareDomain a -> ASTF HardwareDomain a
 constFold e
     | constArgs e, canFold e, ValT t@(Node _) <- getDecor e
     = LitP t (evalClosed e)
   where
-    canFold :: ASTF SoftwareDomain a -> Bool
+    canFold :: ASTF HardwareDomain a -> Bool
     canFold = simpleMatch (\(s :&: ValT _) _ -> go s)
       where
-        go :: SoftwareConstructs sig
+        go :: HardwareConstructs sig
            -> Bool
         go var | Just (FreeVar _)         <- prj var = False
         go ix  | Just (ArrIx _)           <- prj ix  = False
@@ -258,7 +261,7 @@ constFold e
 constFold e = e
 
 -- | Check whether all arguments of a symbol are literals
-constArgs :: AST SoftwareDomain sig -> Bool
+constArgs :: AST HardwareDomain sig -> Bool
 constArgs (Sym _)         = True
 constArgs (s :$ LitP _ _) = constArgs s
 constArgs _               = False
@@ -277,7 +280,7 @@ bindVar v = censor (\(vars, unsafe) -> (Set.delete v vars, unsafe))
 tellUnsafe :: Opt ()
 tellUnsafe = tell (mempty, Monoid.Any True)
 
-simplifyM :: ASTF SoftwareDomain a -> Opt (ASTF SoftwareDomain a)
+simplifyM :: ASTF HardwareDomain a -> Opt (ASTF HardwareDomain a)
 simplifyM exp = case exp of
     (VarP _ v)      -> freeVar v >> return exp
     (LamP t v body) -> bindVar v $ fmap (LamP t v) $ simplifyM body
@@ -301,7 +304,7 @@ simplifyM exp = case exp of
 
 --------------------------------------------------------------------------------
 
-optimize :: ASTF SoftwareDomain a -> ASTF SoftwareDomain a
+optimize :: ASTF HardwareDomain a -> ASTF HardwareDomain a
 optimize = fst . runWriter . simplifyM
 
 

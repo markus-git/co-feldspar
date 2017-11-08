@@ -12,6 +12,7 @@ import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Primitive.Backend
 import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Representation
+import Feldspar.Hardware.Optimize
 import Data.Struct
 
 -- hmm..
@@ -103,7 +104,7 @@ lookAlias t v = do
 --------------------------------------------------------------------------------
 
 translateExp :: forall m a . Monad m => HExp a -> TargetT m (VExp a)
-translateExp = goAST . unHExp
+translateExp = goAST . optimize . unHExp
   where
     goAST :: ASTF HardwareDomain b -> TargetT m (VExp b)
     goAST = simpleMatch (\(s :&: ValT t) -> go t s)
@@ -111,10 +112,10 @@ translateExp = goAST . unHExp
     goSmallAST :: HardwarePrimType b => ASTF HardwareDomain b -> TargetT m (Prim b)
     goSmallAST = fmap extractNode . goAST
 
-    go    :: HTypeRep (DenResult sig)
-          -> HardwareConstructs sig
-          -> Syn.Args (AST HardwareDomain) sig
-          -> TargetT m (VExp (DenResult sig))
+    go :: HTypeRep (DenResult sig)
+       -> HardwareConstructs sig
+       -> Syn.Args (AST HardwareDomain) sig
+       -> TargetT m (VExp (DenResult sig))
     go t lit Syn.Nil
       | Just (Lit a) <- prj lit
       = return $ mapStruct (litE . runIdentity) $ toStruct t a
