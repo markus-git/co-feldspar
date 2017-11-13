@@ -23,6 +23,7 @@ import Data.Constraint hiding (Sub)
 import Data.Int
 import Data.List (genericLength)
 import Data.Proxy
+import Data.Typeable (Typeable)
 
 -- syntactic.
 import Language.Syntactic (Syntactic(..))
@@ -36,6 +37,7 @@ import qualified Control.Monad.Operational.Higher as Oper
 import Language.Embedded.Hardware.Command (Signal, Ident, Mode, ToIdent)
 import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
+import qualified Language.Embedded.Hardware.Expression.Represent as Imp
 
 import Prelude hiding (length)
 
@@ -133,29 +135,6 @@ resugar
      )
   => a -> b
 resugar = Syntactic.resugar
-
---------------------------------------------------------------------------------
-
--- Swap an `Imp.FreePred` constraint with a `HardwarePrimType` one.
-withHType :: forall a b . Proxy a
-  -> (Imp.PredicateExp HExp a => b)
-  -> (HardwarePrimType      a => b)
-withHType _ f = case hardwareDict (hardwareRep :: HardwarePrimTypeRep a) of
-  Dict -> f
-
--- Proves that a `HardwarePrimTypeRep a` type satisfies `Imp.FreePred`.
-hardwareDict :: HardwarePrimTypeRep a -> Dict (Imp.PredicateExp HExp a)
-hardwareDict rep = case rep of
-  BoolHT    -> Dict
-  IntegerHT -> Dict
-  Int8HT    -> Dict
-  Int16HT   -> Dict
-  Int32HT   -> Dict
-  Int64HT   -> Dict
-  Word8HT   -> Dict
-  Word16HT  -> Dict
-  Word32HT  -> Dict
-  Word64HT  -> Dict
 
 --------------------------------------------------------------------------------
 
@@ -383,6 +362,11 @@ architecture entity name = Hardware . (Imp.architecture entity name) . unHardwar
 process :: [Ident] -> Hardware () -> Hardware ()
 process is = Hardware . (Imp.process is) . unHardware
 
+(.:) :: ToIdent a => a -> [Ident] -> [Ident]
+(.:) x xs = Imp.toIdent x : xs
+
+infixr .:
+
 --------------------------------------------------------------------------------
 
 -- | Declare a port signal and assig its initial value.
@@ -395,57 +379,123 @@ newPort m  = Hardware $ Imp.newPort m
 
 --------------------------------------------------------------------------------
 
-(.:) :: ToIdent a => a -> [Ident] -> [Ident]
-(.:) x xs = Imp.toIdent x : xs
+-- | ...
+type HSig  = Imp.Sig  HardwareCMD HExp HardwarePrimType Identity
 
-infixr .:
+-- | ...
+type HComp = Imp.Comp HardwareCMD HExp HardwarePrimType Identity
 
---------------------------------------------------------------------------------
--- *** Components.
-{-
--- short-hand for hardware signatures.
-type HSignature = Imp.Sig HardwareCMD HExp HardwarePrimType Identity
+-- | ...
+type HArg  = Imp.Argument HardwarePrimType
 
--- short-hand for hardware components.
-type HComponent = Imp.Comp HardwareCMD HExp HardwarePrimType Identity
+namedComponent :: String -> HSig a -> Hardware (HComp a)
+namedComponent name sig = Hardware $ Imp.namedComponent name sig
 
--- short-hand for arguments to hardware signatures.
-type HArgument  = Imp.Argument HardwarePrimType
-
-namedComponent :: String -> Sig a -> Hardware (HComponent a)
-namedComponent n sig = Hardware $ Imp.namedComponent n $ toHardware sig
-  where
-    toHardware :: Sig a -> HSignature a
-    toHardware (SigRet p)           = Imp.Ret (unHardware p)
-    toHardware (SigSignal n m   sf) = Imp.SSig n m (toHardware . sf)
-    toHardware (SigArray  n m l af) = Imp.SArr n m (toInteger l) (toHardware . af)
-
-component :: Sig a -> Hardware (HComponent a)
+component :: HSig a -> Hardware (HComp a)
 component = namedComponent "comp"
 
-portmap :: HComponent a -> HArgument a -> Hardware ()
-portmap c = Hardware . Imp.portmap c
+portmap :: HComp a -> HArg a -> Hardware ()
+portmap comp = Hardware . Imp.portmap comp
 
-ret :: Hardware () -> Sig ()
-ret = SigRet
+--------------------------------------------------------------------------------
 
-output :: FType' a => (Signal a -> Hardware ()) -> Sig (Signal a -> ())
-output f = SigSignal (Imp.Base "out") Imp.Out $ \sig -> ret (f sig)
+ret :: Hardware () -> HSig ()
+ret = Imp.ret . unHardware
 
-input :: FType' a => (Signal a -> Sig b) -> Sig (Signal a -> b)
-input = SigSignal (Imp.Base "in") Imp.In
+input :: forall a b . (HType' a, Integral a)
+  => (Signal a -> HSig b) -> HSig (Signal a -> b)
+input = withHType' (Proxy::Proxy a) Imp.input
 
-outputArr :: FType' a
-  => Integer
-  -> (SArr (HExp a) -> Hardware ())
-  -> Sig (Imp.Array a -> ())
-outputArr len f = SigArray (Imp.Base "out") Imp.Out (fromIntegral len) $ \arr ->
-  ret $ f $ SArr 0 (value len) $ Node arr
+output :: forall a b . (HType' a, Integral a)
+  => (Signal a -> HSig b) -> HSig (Signal a -> b)
+output = withHType' (Proxy::Proxy a) Imp.output
 
-inputArr :: FType' a
-  => Integer
-  -> (SArr (HExp a) -> Sig b) -> Sig (Imp.Array a -> b)
-inputArr len f = SigArray (Imp.Base "in") Imp.In (fromIntegral len) $ \arr ->
-  f $ SArr 0 (value len) $ Node arr
--}
+--------------------------------------------------------------------------------
+
+-- Swap an `Imp.FreePred` constraint with a `HardwarePrimType` one.
+withHType :: forall a b . Proxy a
+  -> (Imp.PredicateExp HExp a => b)
+  -> (HardwarePrimType      a => b)
+withHType _ f = let rep = hardwareRep :: HardwarePrimTypeRep a in
+  case predicateDict rep of
+    Dict -> f
+
+withHType' :: forall a b . Proxy a
+  -> (Imp.Inhabited a => Imp.Sized a => Imp.Rep a => b)
+  -> (HardwarePrimType a => b)
+withHType' _ f = let rep = hardwareRep :: HardwarePrimTypeRep a in
+  case (inhabitedDict rep, sizedDict rep, repDict rep) of
+    (Dict, Dict, Dict) -> f
+
+-- Proves that a `HardwarePrimTypeRep a` type satisfies `Imp.FreePred`.
+predicateDict :: HardwarePrimTypeRep a -> Dict (Imp.PredicateExp HExp a)
+predicateDict rep = case rep of
+  BoolHT    -> Dict
+  IntegerHT -> Dict
+  Int8HT    -> Dict
+  Int16HT   -> Dict
+  Int32HT   -> Dict
+  Int64HT   -> Dict
+  Word8HT   -> Dict
+  Word16HT  -> Dict
+  Word32HT  -> Dict
+  Word64HT  -> Dict
+--t         -> error ("predicateDict failed for " Prelude.++ show t)
+
+inhabitedDict :: HardwarePrimTypeRep a -> Dict (Imp.Inhabited a)
+inhabitedDict rep = case rep of
+  BoolHT    -> Dict
+  IntegerHT -> Dict
+  Int8HT    -> Dict
+  Int16HT   -> Dict
+  Int32HT   -> Dict
+  Int64HT   -> Dict
+  Word8HT   -> Dict
+  Word16HT  -> Dict
+  Word32HT  -> Dict
+  Word64HT  -> Dict
+--t         -> error ("predicateDict failed for " Prelude.++ show t)  
+
+sizedDict :: HardwarePrimTypeRep a -> Dict (Imp.Sized a)
+sizedDict rep = case rep of
+  BoolHT    -> Dict
+  Int8HT    -> Dict
+  Int16HT   -> Dict
+  Int32HT   -> Dict
+  Int64HT   -> Dict
+  Word8HT   -> Dict
+  Word16HT  -> Dict
+  Word32HT  -> Dict
+  Word64HT  -> Dict
+  t         -> error ("predicateDict failed for " Prelude.++ show t)
+
+repDict :: HardwarePrimTypeRep a -> Dict (Imp.Rep a)
+repDict rep = case rep of
+  BoolHT    -> Dict
+  IntegerHT -> Dict
+  Int8HT    -> Dict
+  Int16HT   -> Dict
+  Int32HT   -> Dict
+  Int64HT   -> Dict
+  Word8HT   -> Dict
+  Word16HT  -> Dict
+  Word32HT  -> Dict
+  Word64HT  -> Dict
+--t         -> error ("predicateDict failed for " Prelude.++ show t)
+
+typeableDict :: HardwarePrimTypeRep a -> Dict (Typeable a)
+typeableDict rep = case rep of
+  BoolHT    -> Dict
+  IntegerHT -> Dict
+  Int8HT    -> Dict
+  Int16HT   -> Dict
+  Int32HT   -> Dict
+  Int64HT   -> Dict
+  Word8HT   -> Dict
+  Word16HT  -> Dict
+  Word32HT  -> Dict
+  Word64HT  -> Dict
+--t         -> error ("predicateDict failed for " Prelude.++ show t)
+
+
 --------------------------------------------------------------------------------
