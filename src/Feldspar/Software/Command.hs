@@ -1,16 +1,34 @@
+{-# language GADTs                #-}
+{-# language TypeFamilies         #-}
+{-# language FlexibleInstances    #-}
+{-# language UndecidableInstances #-}
+
 module Feldspar.Software.Command where
 
 import Feldspar.Software.Expression
+
+import Control.Monad.Identity
 
 -- operational-higher.
 import Control.Monad.Operational.Higher
 
 -- imperative-edsl.
+import Language.Embedded.Hardware.Command (Signal, Mode)
+import qualified Language.Embedded.Hardware.Command as Imp
 -- ...
+
+-- hmm.
+import Feldspar.Software.Primitive (SoftwarePrimType)
+import Feldspar.Hardware.Primitive (HardwarePrimType)
+-- hmm!
+import Feldspar.Hardware.Frontend (HSig)
 
 --------------------------------------------------------------------------------
 -- * Software commands.
 --------------------------------------------------------------------------------
+
+class    (SoftwarePrimType a, HardwarePrimType a) => AXILiteType a
+instance (SoftwarePrimType a, HardwarePrimType a) => AXILiteType a
 
 --------------------------------------------------------------------------------
 -- ** Memory mapping.

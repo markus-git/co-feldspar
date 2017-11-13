@@ -205,15 +205,28 @@ translateExp = goAST . optimize . unSExp
           return $ Node $ sugarSymPrim (ArrIx arr) i'
     go _ s _ = error $ "software translation handling for symbol " ++ Syn.renderSym s ++ " is missing."
 
-
 unsafeTranslateSmallExp :: Monad m => SExp a -> TargetT m (Prim a)
 unsafeTranslateSmallExp a = do
   Node b <- translateExp a
   return b
 
+--------------------------------------------------------------------------------
+--
+--------------------------------------------------------------------------------
+
+translateCMD ::
+     ProgramT SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) m a
+  -> ProgramT TargetCMD   (Oper.Param2 SExp SoftwarePrimType) m a
+translateCMD = undefined
+
+--------------------------------------------------------------------------------
+
 translate :: Software a -> ProgC a
 translate = flip runReaderT Map.empty
           . Oper.reexpressEnv unsafeTranslateSmallExp
+            -- todo: 
+          . translateCMD
+            --
           . unSoftware
 
 --------------------------------------------------------------------------------

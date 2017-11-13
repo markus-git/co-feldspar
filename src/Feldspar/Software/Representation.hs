@@ -1,10 +1,12 @@
 {-# language GADTs                      #-}
+{-# language ConstraintKinds            #-}
 {-# language TypeOperators              #-}
 {-# language TypeFamilies               #-}
 {-# language MultiParamTypeClasses      #-}
 {-# language FlexibleContexts           #-}
 {-# language FlexibleInstances          #-}
 {-# language GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PolyKinds             #-}
 
 module Feldspar.Software.Representation where
 
@@ -23,6 +25,7 @@ import Data.Word
 import Data.List (genericTake)
 import Data.Typeable (Typeable)
 import Data.Constraint
+import Control.Monad.Reader (ReaderT(..), runReaderT, lift)
 
 -- syntactic.
 import Language.Syntactic hiding (Signature, Args)
@@ -31,18 +34,74 @@ import Language.Syntactic.Functional.Tuple
 import qualified Language.Syntactic as Syn
 
 -- operational-higher.
-import Control.Monad.Operational.Higher as Oper hiding ((:<:))
+import Control.Monad.Operational.Higher as Oper
 
 -- imperative-edsl.
 import qualified Language.Embedded.Expression as Imp
 import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
 
+-- hardware-edsl.
+import Language.Embedded.Hardware.Command (Signal, Mode)
+import qualified Language.Embedded.Hardware.Command as Imp
+import qualified Language.Embedded.Hardware.Expression.Represent as Imp
+
 import Prelude hiding ((==))
 import qualified Prelude as P
 
+-- hmm!
+import Feldspar.Hardware.Frontend (HSig)
+
 --------------------------------------------------------------------------------
 -- * Programs.
+--------------------------------------------------------------------------------
+
+type family   Soften a
+type instance Soften () = ()
+type instance Soften (Imp.Signal a -> b) = Ref a -> Soften b
+
+data Argument pred a
+  where
+    Nil  :: Argument pred ()
+    ARef :: ( pred a
+            , Imp.Inhabited a
+            , Imp.Sized a
+            , Integral a
+            , Typeable a
+            , Imp.Rep a
+            )
+      => Ref a
+      -> Argument pred b
+      -> Argument pred (Ref a -> b)
+
+data MMapCMD fs a
+  where
+    MMap :: String
+         -> HSig a
+         -> MMapCMD (Param3 prog exp pred) String
+--              Imp.Signature (Param3 prog exp pred) (Soften a)
+           
+    Call :: Imp.Signature (Param3 prog exp pred) a
+         -> Argument pred a
+         -> MMapCMD (Param3 prog exp pred) ()
+
+instance Oper.HFunctor MMapCMD
+  where
+    hfmap f (MMap s sig)   = MMap s sig
+    hfmap f (Call sig arg) = Call (hfmap f sig) arg
+
+instance Oper.HBifunctor MMapCMD
+  where
+    hbimap g f (MMap s sig)   = MMap s sig
+    hbimap g f (Call sig arg) = Call (hbimap g f sig) arg
+
+instance (MMapCMD Oper.:<: instr) => Oper.Reexpressible MMapCMD instr env
+  where
+    reexpressInstrEnv reexp (MMap s sig) = ReaderT $ \env ->
+      singleInj $ MMap s sig
+    reexpressInstrEnv reexp (Call sig arg) = ReaderT $ \env ->
+      singleInj $ Call (Imp.reexpressSignature env sig) arg
+
 --------------------------------------------------------------------------------
 
 -- | Software instructions.
@@ -53,6 +112,8 @@ type SoftwareCMD
   Oper.:+: Imp.ArrCMD
     -- ^ Software specific instructions.
   Oper.:+: Imp.FileCMD
+    -- ^ ...
+  Oper.:+: MMapCMD
 
 -- | Monad for building software programs in Feldspar.
 newtype Software a = Software { unSoftware :: Program SoftwareCMD (Param2 SExp SoftwarePrimType) a }

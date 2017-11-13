@@ -415,7 +415,7 @@ output = withHType' (Proxy::Proxy a) Imp.output
 -- Swap an `Imp.FreePred` constraint with a `HardwarePrimType` one.
 withHType :: forall a b . Proxy a
   -> (Imp.PredicateExp HExp a => b)
-  -> (HardwarePrimType      a => b)
+  -> (HardwarePrimType a => b)
 withHType _ f = let rep = hardwareRep :: HardwarePrimTypeRep a in
   case predicateDict rep of
     Dict -> f
