@@ -66,7 +66,7 @@ sumLast5 = sum . take 5 . reverse
 
 sumLast5Prog :: Software ()
 sumLast5Prog =
-  do arr :: SArray (SExp Word32) <- initArr [1, 2, 3, 4] -- Create example array.
+  do arr :: SArray (SExp Word32) <- initArr [1, 2, 3, 4] -- Create array.
      brr <- unsafeFreezeArr arr                          -- Make it immutable.
      printf "sum: %d\n" (sumLast5 $ toPull brr)
 
