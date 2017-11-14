@@ -211,22 +211,39 @@ unsafeTranslateSmallExp a = do
   return b
 
 --------------------------------------------------------------------------------
---
+-- * Interpretation of software commands.
 --------------------------------------------------------------------------------
 
-translateCMD ::
-     ProgramT SoftwareCMD (Oper.Param2 SExp SoftwarePrimType) m a
-  -> ProgramT TargetCMD   (Oper.Param2 SExp SoftwarePrimType) m a
-translateCMD = undefined
+type InterT = Program TargetCMD (Oper.Param2 SExp SoftwarePrimType)
+
+class TranslateExtended instr
+  where
+    translateCMD :: instr (Oper.Param3 InterT SExp SoftwarePrimType) a
+                  -> InterT a
+
+instance (TranslateExtended i, TranslateExtended j) =>
+    TranslateExtended (i Oper.:+: j)
+  where
+    translateCMD (Oper.Inl a) = translateCMD a
+    translateCMD (Oper.Inr b) = translateCMD b
+
+instance TranslateExtended RefCMD     where translateCMD = Oper.singleInj
+instance TranslateExtended ArrCMD     where translateCMD = Oper.singleInj
+instance TranslateExtended ControlCMD where translateCMD = Oper.singleInj
+instance TranslateExtended PtrCMD     where translateCMD = Oper.singleInj
+instance TranslateExtended FileCMD    where translateCMD = Oper.singleInj
+instance TranslateExtended C_CMD      where translateCMD = Oper.singleInj
+
+instance TranslateExtended MMapCMD
+  where
+    translateCMD (MMap n sig) = undefined
 
 --------------------------------------------------------------------------------
 
 translate :: Software a -> ProgC a
 translate = flip runReaderT Map.empty
           . Oper.reexpressEnv unsafeTranslateSmallExp
-            -- todo: 
-          . translateCMD
-            --
+          . Oper.interpretWithMonad translateCMD
           . unSoftware
 
 --------------------------------------------------------------------------------

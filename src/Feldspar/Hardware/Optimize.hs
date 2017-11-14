@@ -29,7 +29,6 @@ import Language.Syntactic.Functional.Sharing
 -- * Optimize hardware expressions.
 --------------------------------------------------------------------------------
 
-
 viewLit :: ASTF HardwareDomain a -> Maybe a
 viewLit lit | Just (Lit a) <- prj lit = Just a
 viewLit _ = Nothing

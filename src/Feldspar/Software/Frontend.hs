@@ -137,29 +137,6 @@ resugar = Syntactic.resugar
 
 --------------------------------------------------------------------------------
 
--- Swap an `Imp.FreePred` constraint with a `SoftwarePrimType` one.
-withSType :: forall a b . Proxy a
-  -> (Imp.FreePred SExp a => b)
-  -> (SoftwarePrimType  a => b)
-withSType _ f = case softwareDict (softwareRep :: SoftwarePrimTypeRep a) of
-  Dict -> f
-
--- Proves that a type from `SoftwarePrimTypeRep` satisfies `Imp.FreePred`.
-softwareDict :: SoftwarePrimTypeRep a -> Dict (Imp.FreePred SExp a)
-softwareDict rep = case rep of
-  BoolST   -> Dict
-  Int8ST   -> Dict
-  Int16ST  -> Dict
-  Int32ST  -> Dict
-  Int64ST  -> Dict
-  Word8ST  -> Dict
-  Word16ST -> Dict
-  Word32ST -> Dict
-  Word64ST -> Dict
-  FloatST  -> Dict
-
---------------------------------------------------------------------------------
-
 instance References Software
   where
     type Reference Software = Ref    
@@ -400,5 +377,28 @@ nil = SoftNil
 
 infixr 1 >:, >>:
 -}
+
+--------------------------------------------------------------------------------
+
+-- Swap an `Imp.FreePred` constraint with a `SoftwarePrimType` one.
+withSType :: forall a b . Proxy a
+  -> (Imp.FreePred SExp a => b)
+  -> (SoftwarePrimType  a => b)
+withSType _ f = case predicateDict (softwareRep :: SoftwarePrimTypeRep a) of
+  Dict -> f
+
+-- Proves that a type from `SoftwarePrimTypeRep` satisfies `Imp.FreePred`.
+predicateDict :: SoftwarePrimTypeRep a -> Dict (Imp.FreePred SExp a)
+predicateDict rep = case rep of
+  BoolST   -> Dict
+  Int8ST   -> Dict
+  Int16ST  -> Dict
+  Int32ST  -> Dict
+  Int64ST  -> Dict
+  Word8ST  -> Dict
+  Word16ST -> Dict
+  Word32ST -> Dict
+  Word64ST -> Dict
+  FloatST  -> Dict
 
 --------------------------------------------------------------------------------

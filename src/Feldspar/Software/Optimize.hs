@@ -97,6 +97,7 @@ pattern ModP :: () => (Integral a, SoftwarePrimType a)
   => STypeRep a -> ASTF SoftwareDomain a -> ASTF SoftwareDomain a
   -> ASTF SoftwareDomain a
 
+
 --------------------------------------------------------------------------------
 
 pattern NonLitP <- (viewLit -> Nothing)
@@ -128,6 +129,7 @@ pattern DivP t a b <- SymP t Div :$ a :$ b
 pattern ModP t a b <- SymP t Mod :$ a :$ b
   where
     ModP t a b = simplifyUp $ SymP t Mod :$ a :$ b
+
 
 --------------------------------------------------------------------------------
 

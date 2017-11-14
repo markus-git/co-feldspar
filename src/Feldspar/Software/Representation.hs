@@ -55,11 +55,11 @@ import Feldspar.Hardware.Frontend (HSig)
 --------------------------------------------------------------------------------
 -- * Programs.
 --------------------------------------------------------------------------------
-
+{-
 type family   Soften a
 type instance Soften () = ()
 type instance Soften (Imp.Signal a -> b) = Ref a -> Soften b
-
+-}
 data Argument pred a
   where
     Nil  :: Argument pred ()
@@ -79,7 +79,7 @@ data MMapCMD fs a
     MMap :: String
          -> HSig a
          -> MMapCMD (Param3 prog exp pred) String
---              Imp.Signature (Param3 prog exp pred) (Soften a)
+--            Imp.Signature (Param3 prog exp pred) (Soften a)
            
     Call :: Imp.Signature (Param3 prog exp pred) a
          -> Argument pred a
