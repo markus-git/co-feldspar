@@ -3,6 +3,11 @@
 {-# language FlexibleContexts    #-}
 {-# language ScopedTypeVariables #-}
 
+{-# language TypeSynonymInstances #-}
+{-# language FlexibleInstances #-}
+{-# language MultiParamTypeClasses #-}
+{-# language QuasiQuotes #-}
+
 module Feldspar.Software.Compile where
 
 import Feldspar.Representation
@@ -34,7 +39,17 @@ import qualified Control.Monad.Operational.Higher as Oper
 import Language.Embedded.Expression
 import Language.Embedded.Imperative hiding (Ref, (:+:)(..), (:<:)(..))
 import qualified Language.Embedded.Imperative as Imp
+import qualified Language.Embedded.Imperative.CMD as Imp
 import qualified Language.Embedded.Backend.C  as Imp
+import qualified Language.C.Monad as C
+  (CGen, addGlobal, addLocal, addInclude, addStm, gensym)
+
+-- hardware-edsl
+import Language.Embedded.Hardware.Command (Mode(..))
+
+-- language-c-quote
+import Language.C.Quote.GCC
+import qualified Language.C.Syntax as C
 
 -- debug.
 import Debug.Trace
@@ -51,6 +66,8 @@ type TargetCMD
     Oper.:+: PtrCMD
     Oper.:+: FileCMD
     Oper.:+: C_CMD
+    --
+    Oper.:+: MMapCMD
 
 -- | Target monad during translation.
 type TargetT m = ReaderT Env (ProgramT TargetCMD (Oper.Param2 Prim SoftwarePrimType) m)
@@ -214,36 +231,78 @@ unsafeTranslateSmallExp a = do
 -- * Interpretation of software commands.
 --------------------------------------------------------------------------------
 
-type InterT = Program TargetCMD (Oper.Param2 SExp SoftwarePrimType)
-
-class TranslateExtended instr
+instance (Imp.CompExp exp, Imp.CompTypeClass ct) => Oper.Interp MMapCMD C.CGen (Oper.Param2 exp ct)
   where
-    translateCMD :: instr (Oper.Param3 InterT SExp SoftwarePrimType) a
-                  -> InterT a
+    interp = compMMapCMD
 
-instance (TranslateExtended i, TranslateExtended j) =>
-    TranslateExtended (i Oper.:+: j)
+compMMapCMD :: forall exp ct a . (Imp.CompExp exp, Imp.CompTypeClass ct)
+  => MMapCMD (Oper.Param3 C.CGen exp ct) a
+  -> C.CGen a
+compMMapCMD (MMap n sig) =
+  do C.addInclude "<stdio.h>"
+     C.addInclude "<stdlib.h>"
+     C.addInclude "<stddef.h>"
+     C.addInclude "<unistd.h>"
+     C.addInclude "<sys/mman.h>"
+     C.addInclude "<fcntl.h>"
+     C.addGlobal [cedecl| unsigned page_size = 0; |]
+     C.addGlobal [cedecl| int mem_fd = -1; |]
+     C.addGlobal mmap_def
+     mem <- C.gensym "mem"
+     C.addLocal [cdecl| int * $id:mem = f_map($string:n); |]
+     return mem
+compMMapCMD (Call addr arg) =
+  do undefined
   where
-    translateCMD (Oper.Inl a) = translateCMD a
-    translateCMD (Oper.Inr b) = translateCMD b
+    write :: Address ct b -> Argument ct b -> C.CGen ()
+    write (Ret)           (Nil)        = return ()
+    write (SRef n Out rf) (ARef r arg) = write (rf r) arg
+    write (SRef n In  rf) (ARef r arg) =
+      do let (Ref (Node (Imp.RefComp ref))) = r
+         C.addStm [cstm| $id:n = $id:ref; |] -- todo: type cast.
+         write (rf r) arg
 
-instance TranslateExtended RefCMD     where translateCMD = Oper.singleInj
-instance TranslateExtended ArrCMD     where translateCMD = Oper.singleInj
-instance TranslateExtended ControlCMD where translateCMD = Oper.singleInj
-instance TranslateExtended PtrCMD     where translateCMD = Oper.singleInj
-instance TranslateExtended FileCMD    where translateCMD = Oper.singleInj
-instance TranslateExtended C_CMD      where translateCMD = Oper.singleInj
+    read :: Address ct b -> Argument ct b -> C.CGen ()
+    read (Ret)           (Nil)        = return ()
+    read (SRef n In  rf) (ARef r arg) = read (rf r) arg
+    read (SRef n Out rf) (ARef r arg) =
+      do let (Ref (Node (Imp.RefComp ref))) = r
+         C.addStm [cstm| $id:ref = $id:n; |] -- todo: type cast.
+         read (rf r) arg
+  
+--------------------------------------------------------------------------------
 
-instance TranslateExtended MMapCMD
-  where
-    translateCMD (MMap n sig) = undefined
+mmap_def :: C.Definition
+mmap_def = [cedecl|
+int * f_map(unsigned addr) {
+  unsigned page_addr;
+  unsigned offset;
+  void * ptr;
+  if (!page_size) {
+    page_size = sysconf(_SC_PAGESIZE);
+  }
+  if (mem_fd < 1) {
+    mem_fd = open("/dev/mem", O_RDWR);
+    if (mem_fd < 1) {
+      perror("f_map");
+    }
+  }
+  page_addr = (addr & (~(page_size - 1)));
+  offset = addr - page_addr;
+  ptr = mmap(NULL, page_size, PROT_READ|PROT_WRITE, MAP_SHARED, mem_fd, page_addr);
+  if (ptr == MAP_FAILED || !ptr) {
+    perror("f_map");
+  }
+  return (int*) (ptr + offset);
+}
+|]
 
 --------------------------------------------------------------------------------
 
 translate :: Software a -> ProgC a
 translate = flip runReaderT Map.empty
           . Oper.reexpressEnv unsafeTranslateSmallExp
-          . Oper.interpretWithMonad translateCMD
+--          . Oper.interpretWithMonad translateCMD
           . unSoftware
 
 --------------------------------------------------------------------------------

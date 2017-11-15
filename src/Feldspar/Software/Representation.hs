@@ -60,16 +60,19 @@ type family   Soften a
 type instance Soften () = ()
 type instance Soften (Imp.Signal a -> b) = Ref a -> Soften b
 -}
+
+data Address pred a
+  where
+    Ret  :: Address pred ()
+    SRef :: (pred a, Inhabited a, Integral a, Typeable a, Imp.Sized a, Imp.Rep a)
+         => Imp.VarId -> Mode
+         -> (Ref a -> Address pred b)
+         -> Address pred (Ref a -> b)
+
 data Argument pred a
   where
     Nil  :: Argument pred ()
-    ARef :: ( pred a
-            , Imp.Inhabited a
-            , Imp.Sized a
-            , Integral a
-            , Typeable a
-            , Imp.Rep a
-            )
+    ARef :: ( pred a, Inhabited a, Integral a, Typeable a, Imp.Sized a, Imp.Rep a)
       => Ref a
       -> Argument pred b
       -> Argument pred (Ref a -> b)
@@ -81,26 +84,28 @@ data MMapCMD fs a
          -> MMapCMD (Param3 prog exp pred) String
 --            Imp.Signature (Param3 prog exp pred) (Soften a)
            
-    Call :: Imp.Signature (Param3 prog exp pred) a
+    Call :: Address  pred a
          -> Argument pred a
          -> MMapCMD (Param3 prog exp pred) ()
 
 instance Oper.HFunctor MMapCMD
   where
-    hfmap f (MMap s sig)   = MMap s sig
-    hfmap f (Call sig arg) = Call (hfmap f sig) arg
+    hfmap f (MMap s sig)    = MMap s sig
+    hfmap f (Call addr arg) = Call addr arg
 
 instance Oper.HBifunctor MMapCMD
   where
-    hbimap g f (MMap s sig)   = MMap s sig
-    hbimap g f (Call sig arg) = Call (hbimap g f sig) arg
+    hbimap g f (MMap s sig)    = MMap s sig
+    hbimap g f (Call addr arg) = Call addr arg
 
 instance (MMapCMD Oper.:<: instr) => Oper.Reexpressible MMapCMD instr env
   where
-    reexpressInstrEnv reexp (MMap s sig) = ReaderT $ \env ->
-      singleInj $ MMap s sig
-    reexpressInstrEnv reexp (Call sig arg) = ReaderT $ \env ->
-      singleInj $ Call (Imp.reexpressSignature env sig) arg
+    reexpressInstrEnv reexp (MMap s sig)    = lift $ singleInj $ MMap s sig
+    reexpressInstrEnv reexp (Call addr arg) = lift $ singleInj $ Call addr arg
+
+instance Oper.InterpBi MMapCMD IO (Oper.Param1 SoftwarePrimType)
+  where
+    interpBi = error "todo: interpBi of mmap."
 
 --------------------------------------------------------------------------------
 
