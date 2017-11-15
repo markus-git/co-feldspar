@@ -259,7 +259,7 @@ compMMapCMD (Call addr arg) =
     write (SRef n Out rf) (ARef r arg) = write (rf r) arg
     write (SRef n In  rf) (ARef r arg) =
       do let (Ref (Node (Imp.RefComp ref))) = r
-         C.addStm [cstm| $id:n = $id:ref; |] -- todo: type cast.
+         C.addStm [cstm| $id:n = (int) $id:ref; |]
          write (rf r) arg
 
     read :: Address ct b -> Argument ct b -> C.CGen ()
@@ -267,8 +267,12 @@ compMMapCMD (Call addr arg) =
     read (SRef n In  rf) (ARef r arg) = read (rf r) arg
     read (SRef n Out rf) (ARef r arg) =
       do let (Ref (Node (Imp.RefComp ref))) = r
-         C.addStm [cstm| $id:ref = $id:n; |] -- todo: type cast.
+         typ <- Imp.compType (Proxy::Proxy ct) (proxy r)
+         C.addStm [cstm| $id:ref = ($ty:typ) $id:n; |]
          read (rf r) arg
+      where
+        proxy :: Ref c -> Proxy c
+        proxy _ = Proxy
   
 --------------------------------------------------------------------------------
 
@@ -302,7 +306,6 @@ int * f_map(unsigned addr) {
 translate :: Software a -> ProgC a
 translate = flip runReaderT Map.empty
           . Oper.reexpressEnv unsafeTranslateSmallExp
---          . Oper.interpretWithMonad translateCMD
           . unSoftware
 
 --------------------------------------------------------------------------------
