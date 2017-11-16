@@ -34,6 +34,8 @@ plus_sig = input $ \a -> input $ \b -> output $ \c -> ret $ plus a b c
 plus_hard :: Hardware ()
 plus_hard = void $ component plus_sig
 
+test1 = H.icompile plus_hard
+
 --------------------------------------------------------------------------------
 
 type SRef a = Reference Software (SExp a)
@@ -47,5 +49,7 @@ plus_soft =
      call plus (a .+. b .+. c .+. empty)
      vc <- getRef c
      printf "plus: %d\n" vc
+
+test2 = S.icompile plus_soft
 
 --------------------------------------------------------------------------------
