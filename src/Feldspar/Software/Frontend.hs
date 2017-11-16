@@ -11,7 +11,7 @@ module Feldspar.Software.Frontend where
 import Feldspar.Sugar
 import Feldspar.Representation
 import Feldspar.Frontend
-import Feldspar.Array.Vector hiding (reverse)
+import Feldspar.Array.Vector hiding (reverse, (++))
 import Feldspar.Array.Buffered (ArraysSwap(..))
 import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
@@ -377,26 +377,38 @@ type SArg  = Argument SoftwarePrimType
 mmap :: String -> HSig a -> Software (SComp (Soften a))
 mmap addr sig =
   do ref <- Software $ Oper.singleInj $ MMap addr sig
-     return $ soften ref sig
+     return $ soften ref 0 sig
   where
-    soften :: String -> HSig b -> SComp (Soften b)
-    soften _ (Hard.Ret _) = Ret
-    soften r (Hard.SSig _ m (sf :: Hard.Signal c -> HSig d)) =
-      case witSP (Proxy::Proxy c) of
-        Dict -> SRef r m $ \ref -> soften r $ sf $ error "evaluated soften."
+    soften :: String -> Int -> HSig b -> SComp (Soften b)
+    soften _ ix (Hard.Ret _) = Ret
+    soften r ix (Hard.SSig _ m (sf :: Hard.Signal c -> HSig d)) =
+      case witSP (Proxy::Proxy c) of 
+        Dict -> SRef (reference r ix) m $ \ref -> soften r (ix+1) $ sf dummy
       where
-        witSP :: forall a . HardwarePrimType a
-          => Proxy a -> Dict (SoftwarePrimType a)
-        witSP _ = case hardwareRep :: HardwarePrimTypeRep a of
-          BoolHT    -> Dict
-          Int8HT    -> Dict
-          Int16HT   -> Dict
-          Int32HT   -> Dict
-          Int64HT   -> Dict
-          Word8HT   -> Dict
-          Word16HT  -> Dict
-          Word32HT  -> Dict
-          Word64HT  -> Dict
+        dummy :: Hard.Signal c
+        dummy = error "evaluated soften."
+
+        reference :: String -> Int -> String
+        reference mem 0  = "*" ++ mem
+        reference mem ix = "*(" ++ mem ++ " + " ++ show ix ++ ")"
+
+    -- This list over types in not exhaustive, as there's some hardware types
+    -- that doesn't have a corresponding software type representation. It's up
+    -- to the component/argument constructors to ensure that we can only make
+    -- signatures over types that both software and hardware supports. I could
+    -- also have made a new type class to check 'a' and remove this function.
+    witSP :: forall b . HardwarePrimType b => Proxy b -> Dict (SoftwarePrimType b)
+    witSP _ = case hardwareRep :: HardwarePrimTypeRep b of
+      BoolHT    -> Dict
+      Int8HT    -> Dict
+      Int16HT   -> Dict
+      Int32HT   -> Dict
+      Int64HT   -> Dict
+      Word8HT   -> Dict
+      Word16HT  -> Dict
+      Word32HT  -> Dict
+      Word64HT  -> Dict
+      _         -> error "Trying to send invalid type with mmap."
 
 call :: SComp a -> SArg a -> Software ()
 call addr arg = Software $ Oper.singleInj $ Call addr arg
