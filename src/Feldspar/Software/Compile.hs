@@ -252,7 +252,8 @@ compMMapCMD (MMap n sig) =
      C.addLocal [cdecl| int * $id:mem = f_map($string:n); |]
      return mem
 compMMapCMD (Call addr arg) =
-  do undefined
+  do write addr arg
+     read  addr arg
   where
     write :: Address ct b -> Argument ct b -> C.CGen ()
     write (Ret)           (Nil)        = return ()
@@ -266,12 +267,12 @@ compMMapCMD (Call addr arg) =
     read (Ret)           (Nil)        = return ()
     read (SRef n In  rf) (ARef r arg) = read (rf r) arg
     read (SRef n Out rf) (ARef r arg) =
-      do let (Ref (Node (Imp.RefComp ref))) = r
-         typ <- Imp.compType (Proxy::Proxy ct) (proxy r)
+      do let (Ref (Node ref)) = r
+         typ <- Imp.compType (Proxy::Proxy ct) (proxy ref)
          C.addStm [cstm| $id:ref = ($ty:typ) $id:n; |]
          read (rf r) arg
       where
-        proxy :: Ref c -> Proxy c
+        proxy :: Imp.Ref c -> Proxy c
         proxy _ = Proxy
   
 --------------------------------------------------------------------------------

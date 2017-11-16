@@ -37,6 +37,14 @@ import Language.Embedded.Imperative.Frontend.General hiding (Ref, Arr, IArr)
 import qualified Language.Embedded.Imperative     as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
 
+-- hardware-edsl.
+import qualified Language.Embedded.Hardware.Command.CMD as Hard
+
+-- hmm!
+import Feldspar.Hardware.Primitive  (HardwarePrimType(..), HardwarePrimTypeRep(..))
+import Feldspar.Hardware.Expression (HType')
+import Feldspar.Hardware.Frontend   (HSig, withHType')
+
 import Prelude hiding (length, Word, (<=))
 import qualified Prelude
 
@@ -359,24 +367,48 @@ printf = fprintf Imp.stdout
 
 --------------------------------------------------------------------------------
 -- *** Memory.
-{-
-mmap :: String -> Sig a -> Software (Address (Soften a))
-mmap name sig = Software $ Oper.singleInj $ MMap name sig
 
-call :: Address a -> SArg (Argument a) -> Software (Result a)
-call addr args = Software $ Oper.singleInj $ Call addr args
+-- | ...
+type SComp  = Address SoftwarePrimType
 
-nil :: SArg ()
-nil = SoftNil
+-- | ...
+type SArg  = Argument SoftwarePrimType
 
-(>:) :: SType' a => Ref (SExp a) -> SArg b -> SArg (Imp.Ref a -> b)
-(>:) r = let (Ref (Node r')) = r in SoftRef r'
+mmap :: String -> HSig a -> Software (SComp (Soften a))
+mmap addr sig =
+  do ref <- Software $ Oper.singleInj $ MMap addr sig
+     return $ soften ref sig
+  where
+    soften :: String -> HSig b -> SComp (Soften b)
+    soften _ (Hard.Ret _) = Ret
+    soften r (Hard.SSig _ m (sf :: Hard.Signal c -> HSig d)) =
+      case witSP (Proxy::Proxy c) of
+        Dict -> SRef r m $ \ref -> soften r $ sf $ error "evaluated soften."
+      where
+        witSP :: forall a . HardwarePrimType a
+          => Proxy a -> Dict (SoftwarePrimType a)
+        witSP _ = case hardwareRep :: HardwarePrimTypeRep a of
+          BoolHT    -> Dict
+          Int8HT    -> Dict
+          Int16HT   -> Dict
+          Int32HT   -> Dict
+          Int64HT   -> Dict
+          Word8HT   -> Dict
+          Word16HT  -> Dict
+          Word32HT  -> Dict
+          Word64HT  -> Dict
 
-(>>:) :: SType' a => Arr (SExp a) -> SArg b -> SArg (Imp.Arr Index a -> b)
-(>>:) a = let (Arr _ _ (Node a')) = a in SoftArr a'
+call :: SComp a -> SArg a -> Software ()
+call addr arg = Software $ Oper.singleInj $ Call addr arg
 
-infixr 1 >:, >>:
--}
+empty :: SArg ()
+empty = Nil
+
+(.+.) :: forall a b . (SType' a, HType' a, Integral a)
+  => Ref (SExp a) -> SArg b -> SArg (Ref (SExp a) -> b)
+(.+.) = withHType' (Proxy::Proxy a) ARef
+
+infixr 1 .+.
 
 --------------------------------------------------------------------------------
 

@@ -6,7 +6,7 @@
 {-# language FlexibleContexts           #-}
 {-# language FlexibleInstances          #-}
 {-# language GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE PolyKinds             #-}
+{-# LANGUAGE PolyKinds                  #-}
 
 module Feldspar.Software.Representation where
 
@@ -55,38 +55,53 @@ import Feldspar.Hardware.Frontend (HSig)
 --------------------------------------------------------------------------------
 -- * Programs.
 --------------------------------------------------------------------------------
-{-
-type family   Soften a
-type instance Soften () = ()
-type instance Soften (Imp.Signal a -> b) = Ref a -> Soften b
--}
 
-data Address pred a
-  where
-    Ret  :: Address pred ()
-    SRef :: (pred a, Inhabited a, Integral a, Typeable a, Imp.Sized a, Imp.Rep a)
-         => Imp.VarId -> Mode
-         -> (Ref a -> Address pred b)
-         -> Address pred (Ref a -> b)
+-- | ...
+type family Soften a where
+  Soften ()                  = ()
+  Soften (Imp.Signal a -> b) = Ref (SExp a) -> Soften b 
 
+-- | ...
 data Argument pred a
   where
-    Nil  :: Argument pred ()
-    ARef :: ( pred a, Inhabited a, Integral a, Typeable a, Imp.Sized a, Imp.Rep a)
+    Nil  :: Argument fs ()
+    ARef :: ( pred      (Internal a)
+            , Inhabited (Internal a)
+            , Integral  (Internal a)
+            , Typeable  (Internal a)
+            , Imp.Sized (Internal a)
+            , Imp.Rep   (Internal a)
+            )
       => Ref a
       -> Argument pred b
       -> Argument pred (Ref a -> b)
 
+-- | ...
+data Address pred a
+  where
+    Ret  :: Address fs ()
+    SRef :: ( pred      (Internal a)
+            , Inhabited (Internal a)
+            , Integral  (Internal a)
+            , Typeable  (Internal a)
+            , Imp.Sized (Internal a)
+            , Imp.Rep   (Internal a)
+            )
+         => Imp.VarId
+         -> Mode
+         -> (Ref a -> Address pred b)
+         -> Address pred (Ref a -> b)
+
+-- | ...
 data MMapCMD fs a
   where
     MMap :: String
          -> HSig a
          -> MMapCMD (Param3 prog exp pred) String
---            Imp.Signature (Param3 prog exp pred) (Soften a)
-           
+         
     Call :: Address  pred a
          -> Argument pred a
-         -> MMapCMD (Param3 prog exp pred) ()
+         -> MMapCMD  (Param3 prog exp pred) ()
 
 instance Oper.HFunctor MMapCMD
   where
@@ -103,7 +118,7 @@ instance (MMapCMD Oper.:<: instr) => Oper.Reexpressible MMapCMD instr env
     reexpressInstrEnv reexp (MMap s sig)    = lift $ singleInj $ MMap s sig
     reexpressInstrEnv reexp (Call addr arg) = lift $ singleInj $ Call addr arg
 
-instance Oper.InterpBi MMapCMD IO (Oper.Param1 SoftwarePrimType)
+instance Oper.InterpBi MMapCMD IO (Param1 SoftwarePrimType)
   where
     interpBi = error "todo: interpBi of mmap."
 
