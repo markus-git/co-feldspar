@@ -20,18 +20,32 @@ import qualified Feldspar.Hardware as H (icompile, icompileWrap)
 -- * Example of components in co-feldspar.
 --------------------------------------------------------------------------------
 
-plus :: Signal Int32 -> Signal Int32 -> Signal Int32 -> Hardware ()
+plus :: Signal Int8 -> Signal Int8 -> Signal Int8 -> Hardware ()
 plus a b c = do
   va <- getSignal a
   vb <- getSignal b
   setSignal c (va + vb)
 
-plus_sig :: HSig (Signal Int32 -> Signal Int32 -> Signal Int32 -> ())
+plus_sig :: HSig (Signal Int8 -> Signal Int8 -> Signal Int8 -> ())
 plus_sig = input $ \a -> input $ \b -> output $ \c -> ret $ plus a b c
 
 --------------------------------------------------------------------------------
 
 plus_hard :: Hardware ()
 plus_hard = void $ component plus_sig
+
+--------------------------------------------------------------------------------
+
+type SRef a = Reference Software (SExp a)
+
+plus_soft :: Software ()
+plus_soft =
+  do plus <- mmap "0x83C00000" plus_sig
+     a :: SRef Int8 <- initRef 0
+     b :: SRef Int8 <- initRef 1
+     c :: SRef Int8 <- newRef
+     call plus (a .+. b .+. c .+. empty)
+     vc <- getRef c
+     printf "plus: %d\n" vc
 
 --------------------------------------------------------------------------------
