@@ -65,13 +65,7 @@ type family Soften a where
 data Argument pred a
   where
     Nil  :: Argument fs ()
-    ARef :: ( pred      (Internal a)
-            , Inhabited (Internal a)
-            , Integral  (Internal a)
-            , Typeable  (Internal a)
-            , Imp.Sized (Internal a)
-            , Imp.Rep   (Internal a)
-            )
+    ARef :: (pred (Internal a), Integral (Internal a), Imp.PrimType (Internal a))
       => Ref a
       -> Argument pred b
       -> Argument pred (Ref a -> b)
@@ -80,13 +74,7 @@ data Argument pred a
 data Address pred a
   where
     Ret  :: Address fs ()
-    SRef :: ( pred      (Internal a)
-            , Inhabited (Internal a)
-            , Integral  (Internal a)
-            , Typeable  (Internal a)
-            , Imp.Sized (Internal a)
-            , Imp.Rep   (Internal a)
-            )
+    SRef :: (pred (Internal a), Integral (Internal a), Imp.PrimType (Internal a))
          => Imp.VarId
          -> Mode
          -> (Ref a -> Address pred b)

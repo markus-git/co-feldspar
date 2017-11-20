@@ -36,17 +36,17 @@ viewLitPrim _                    = Nothing
 --------------------------------------------------------------------------------
 
 -- todo: should we declare types here as well?
-compLiteral :: forall a . Rep a => (a -> String) -> a -> VHDL VHDL.Expression
+compLiteral :: forall a . PrimType a => (a -> String) -> a -> VHDL VHDL.Expression
 compLiteral f = return . exp
   where
     exp :: a -> VHDL.Expression
     exp = lift . VHDL.literal . VHDL.number . f
 
-compNum  :: Rep a => a -> VHDL VHDL.Expression
-compNum  = compLiteral printVal
+compNum  :: PrimType a => a -> VHDL VHDL.Expression
+compNum  = compLiteral primTypeVal
 
-compBits :: Rep a => a -> VHDL VHDL.Expression
-compBits = compLiteral printBits
+compBits :: PrimType a => a -> VHDL VHDL.Expression
+compBits = compLiteral primTypeBits
 
 instance CompileType HardwarePrimType
   where
@@ -84,7 +84,7 @@ instance CompileExp Prim
 --------------------------------------------------------------------------------
 
 compSize :: Int -> VHDL.Primary
-compSize = VHDL.literal . VHDL.number . printVal
+compSize = VHDL.literal . VHDL.number . primTypeVal
 
 compTypeSize :: forall a . HardwarePrimTypeRep a -> VHDL.Primary
 compTypeSize BoolHT    = compSize (1  :: Int)
@@ -99,16 +99,16 @@ compTypeSize Word32HT  = compSize (32 :: Int)
 compTypeSize Word64HT  = compSize (64 :: Int)
 
 compTypeSign :: forall a. HardwarePrimTypeRep a -> VHDL VHDL.Type
-compTypeSign BoolHT    = declare (Proxy :: Proxy a)
-compTypeSign IntegerHT = declare (Proxy :: Proxy a)
-compTypeSign Int8HT    = declare (Proxy :: Proxy a)
-compTypeSign Int16HT   = declare (Proxy :: Proxy a)
-compTypeSign Int32HT   = declare (Proxy :: Proxy a)
-compTypeSign Int64HT   = declare (Proxy :: Proxy a)
-compTypeSign Word8HT   = declare (Proxy :: Proxy a)
-compTypeSign Word16HT  = declare (Proxy :: Proxy a)
-compTypeSign Word32HT  = declare (Proxy :: Proxy a)
-compTypeSign Word64HT  = declare (Proxy :: Proxy a)
+compTypeSign BoolHT    = declareType (Proxy :: Proxy a)
+compTypeSign IntegerHT = declareType (Proxy :: Proxy a)
+compTypeSign Int8HT    = declareType (Proxy :: Proxy a)
+compTypeSign Int16HT   = declareType (Proxy :: Proxy a)
+compTypeSign Int32HT   = declareType (Proxy :: Proxy a)
+compTypeSign Int64HT   = declareType (Proxy :: Proxy a)
+compTypeSign Word8HT   = declareType (Proxy :: Proxy a)
+compTypeSign Word16HT  = declareType (Proxy :: Proxy a)
+compTypeSign Word32HT  = declareType (Proxy :: Proxy a)
+compTypeSign Word64HT  = declareType (Proxy :: Proxy a)
 
 --------------------------------------------------------------------------------
 

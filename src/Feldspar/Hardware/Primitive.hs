@@ -7,6 +7,9 @@
 {-# language MultiParamTypeClasses #-}
 {-# language TypeFamilies #-}
 
+{-# language Rank2Types #-}
+{-# language ScopedTypeVariables #-}
+
 {-# options_ghc -fwarn-incomplete-patterns #-}
 
 module Feldspar.Hardware.Primitive where
@@ -30,7 +33,12 @@ import Language.Syntactic.Functional.Tuple
 
 -- hardware-edsl.
 import Language.Embedded.Hardware.Interface
+import qualified Language.Embedded.Hardware.Expression.Represent.Bit as Imp (Bits)
+import qualified Language.Embedded.Hardware.Expression.Frontend  as Imp
+import qualified Language.Embedded.Hardware.Expression.Represent as Imp
 import qualified Language.Embedded.Hardware.Command as Imp (IArray(..))
+
+import GHC.TypeLits (KnownNat)
 
 --------------------------------------------------------------------------------
 -- * Hardware primitives.
@@ -56,6 +64,8 @@ data HardwarePrimTypeRep a
     Word16HT  :: HardwarePrimTypeRep Word16
     Word32HT  :: HardwarePrimTypeRep Word32
     Word64HT  :: HardwarePrimTypeRep Word64
+    -- bits.
+    BitsHT    :: KnownNat n => HardwarePrimTypeRep (Imp.Bits n)
 
 deriving instance Eq       (HardwarePrimTypeRep a)
 deriving instance Show     (HardwarePrimTypeRep a)
@@ -78,6 +88,10 @@ instance HardwarePrimType Word8   where hardwareRep = Word8HT
 instance HardwarePrimType Word16  where hardwareRep = Word16HT
 instance HardwarePrimType Word32  where hardwareRep = Word32HT
 instance HardwarePrimType Word64  where hardwareRep = Word64HT
+
+instance KnownNat n => HardwarePrimType (Imp.Bits n)
+  where
+    hardwareRep = BitsHT
 
 -- | Compare two primitive hardware types for equality.
 hardwarePrimTypeEq :: HardwarePrimTypeRep a -> HardwarePrimTypeRep b -> Maybe (Dict (a ~ b))
@@ -228,6 +242,68 @@ instance (HardwarePrimType a, Num a) => Num (Prim a)
     negate      = sugarSymPrim Neg
     abs         = error "Num (Prim a): abs."
     signum      = error "Num (Prim a): signum."
+
+--------------------------------------------------------------------------------
+-- hardware expressions needed for 'compileAXI', I'll make them prettier later.
+
+instance Imp.Expr Prim
+  where
+    true  = litE True
+    false = litE False
+    and   = sugarSymPrim And
+    or    = sugarSymPrim Or
+    xor   = error "todo: prim xor"
+    xnor  = error "todo: prim xnor"
+    nand  = error "todo: prim nand"
+    nor   = error "todo: prim nor"
+
+instance Imp.Rel Prim
+  where
+    eq (a :: Prim a) (b :: Prim a) =
+      case primDict (Imp.typeRep :: Imp.TypeRep a) of
+        Dict -> sugarSymPrim Eq a b
+    neq a b = Imp.not (Imp.eq a b)
+    lt  (a :: Prim a) (b :: Prim a) =
+      case primDict (Imp.typeRep :: Imp.TypeRep a) of
+        Dict -> sugarSymPrim Lt a b
+    lte (a :: Prim a) (b :: Prim a) =
+      case primDict (Imp.typeRep :: Imp.TypeRep a) of
+        Dict -> sugarSymPrim Lte a b
+    gt  (a :: Prim a) (b :: Prim a) =
+      case primDict (Imp.typeRep :: Imp.TypeRep a) of
+        Dict -> sugarSymPrim Gt a b
+    gte (a :: Prim a) (b :: Prim a) =
+      case primDict (Imp.typeRep :: Imp.TypeRep a) of
+        Dict -> sugarSymPrim Gte a b
+
+instance Imp.Factor Prim
+  where
+    exp = error "todo: prim exp."
+    abs = error "todo: prim abs."
+    not = sugarSymPrim Not
+
+instance Imp.Primary Prim
+  where
+    value (a :: a) = 
+      case primDict (Imp.typeRep :: Imp.TypeRep a) of
+        Dict -> sugarSymPrim (Lit a)
+    name  = error "todo: prim name."
+    cast  = error "todo: prim cast."
+
+primDict :: Imp.TypeRep a -> Dict (HardwarePrimType a)
+primDict rep = case rep of
+  Imp.BoolT    -> Dict
+  Imp.Int8T    -> Dict
+  Imp.Int16T   -> Dict
+  Imp.Int32T   -> Dict
+  Imp.Int64T   -> Dict
+  Imp.Word8T   -> Dict
+  Imp.Word16T  -> Dict
+  Imp.Word32T  -> Dict
+  Imp.Word64T  -> Dict
+  Imp.IntegerT -> Dict
+  Imp.BitsT    -> Dict
+  _            -> error "todo: primDict."
 
 --------------------------------------------------------------------------------
 -- syntactic instances.

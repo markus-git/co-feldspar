@@ -13,6 +13,7 @@ import Feldspar.Hardware.Primitive.Backend
 import Feldspar.Hardware.Expression
 import Feldspar.Hardware.Representation
 import Feldspar.Hardware.Optimize
+import Feldspar.Hardware.Frontend (HSig)
 import Data.Struct
 
 -- hmm..
@@ -55,6 +56,8 @@ type TargetCMD
     Oper.:+: Hard.StructuralCMD
     Oper.:+: Hard.ConstantCMD
     Oper.:+: Hard.SignalCMD
+    --
+    Oper.:+: Hard.VHDLCMD
 
 -- | Target monad during translation.
 type TargetT m = ReaderT Env (ProgramT TargetCMD (Oper.Param2 Prim HardwarePrimType) m)
@@ -223,6 +226,18 @@ compile = Hard.compile . translate
 
 icompile :: Hardware a -> IO ()
 icompile = Hard.icompile . translate
+
+--------------------------------------------------------------------------------
+-- Compiler that wraps a hardware component in an AXI-lite framework.
+
+compileAXILite :: HSig a -> String
+compileAXILite = undefined
+
+icompileAXILite :: HSig a -> IO ()
+icompileAXILite = putStrLn . compileAXILite
+
+--------------------------------------------------------------------------------
+-- Compiler that wraps a hardware program in a dummy entity, useful in testing.
 
 icompileWrap :: Hardware () -> IO ()
 icompileWrap = Hard.icompile . translate . wrap

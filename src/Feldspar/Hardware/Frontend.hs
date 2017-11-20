@@ -421,7 +421,7 @@ withHType _ f = let rep = hardwareRep :: HardwarePrimTypeRep a in
     Dict -> f
 
 withHType' :: forall a b . Proxy a
-  -> (Imp.Inhabited a => Imp.Sized a => Imp.Rep a => b)
+  -> (Imp.Inhabited a => Imp.Sized a => Imp.PrimType a => b)
   -> (HardwarePrimType a => b)
 withHType' _ f = let rep = hardwareRep :: HardwarePrimTypeRep a in
   case (inhabitedDict rep, sizedDict rep, repDict rep) of
@@ -440,7 +440,6 @@ predicateDict rep = case rep of
   Word16HT  -> Dict
   Word32HT  -> Dict
   Word64HT  -> Dict
---t         -> error ("predicateDict failed for " Prelude.++ show t)
 
 inhabitedDict :: HardwarePrimTypeRep a -> Dict (Imp.Inhabited a)
 inhabitedDict rep = case rep of
@@ -454,7 +453,6 @@ inhabitedDict rep = case rep of
   Word16HT  -> Dict
   Word32HT  -> Dict
   Word64HT  -> Dict
---t         -> error ("predicateDict failed for " Prelude.++ show t)  
 
 sizedDict :: HardwarePrimTypeRep a -> Dict (Imp.Sized a)
 sizedDict rep = case rep of
@@ -469,7 +467,7 @@ sizedDict rep = case rep of
   Word64HT  -> Dict
   t         -> error ("predicateDict failed for " Prelude.++ show t)
 
-repDict :: HardwarePrimTypeRep a -> Dict (Imp.Rep a)
+repDict :: HardwarePrimTypeRep a -> Dict (Imp.PrimType a)
 repDict rep = case rep of
   BoolHT    -> Dict
   IntegerHT -> Dict
@@ -481,7 +479,6 @@ repDict rep = case rep of
   Word16HT  -> Dict
   Word32HT  -> Dict
   Word64HT  -> Dict
---t         -> error ("predicateDict failed for " Prelude.++ show t)
 
 typeableDict :: HardwarePrimTypeRep a -> Dict (Typeable a)
 typeableDict rep = case rep of
@@ -495,7 +492,5 @@ typeableDict rep = case rep of
   Word16HT  -> Dict
   Word32HT  -> Dict
   Word64HT  -> Dict
---t         -> error ("predicateDict failed for " Prelude.++ show t)
-
 
 --------------------------------------------------------------------------------
