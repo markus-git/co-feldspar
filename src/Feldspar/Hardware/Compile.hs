@@ -4,6 +4,8 @@
 {-# language ConstraintKinds     #-}
 {-# language ScopedTypeVariables #-}
 
+{-# language MultiParamTypeClasses #-}
+
 module Feldspar.Hardware.Compile where
 
 import Feldspar.Sugar
@@ -18,6 +20,7 @@ import Data.Struct
 
 -- hmm..
 import Feldspar.Hardware.Frontend (entity, architecture, process)
+import qualified Language.Embedded.Hardware.Interface.AXI as Hard (FreePrim(..))
 
 import Control.Monad.Identity
 import Control.Monad.Reader
@@ -230,8 +233,17 @@ icompile = Hard.icompile . translate
 --------------------------------------------------------------------------------
 -- Compiler that wraps a hardware component in an AXI-lite framework.
 
+instance Hard.FreePrim Prim HardwarePrimType
+  where
+    witPred _ Dict = Dict
+
 compileAXILite :: HSig a -> String
-compileAXILite = undefined
+compileAXILite = Hard.compileAXILite . translateHSig
+  where
+    translateHSig :: HSig a -> Hard.Sig TargetCMD Prim HardwarePrimType Identity a
+    translateHSig (Hard.Ret  prg)      = Hard.Ret (translate (Hardware prg))
+    translateHSig (Hard.SSig n m sf)   = Hard.SSig n m (translateHSig . sf)
+    translateHSig (Hard.SArr n m l af) = Hard.SArr n m l (translateHSig . af)
 
 icompileAXILite :: HSig a -> IO ()
 icompileAXILite = putStrLn . compileAXILite
