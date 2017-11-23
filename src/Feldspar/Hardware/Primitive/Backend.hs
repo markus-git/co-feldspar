@@ -3,6 +3,8 @@
 {-# language ScopedTypeVariables #-}
 {-# language FlexibleContexts #-}
 
+{-# language PolyKinds #-}
+
 module Feldspar.Hardware.Primitive.Backend where
 
 import Feldspar.Hardware.Primitive
@@ -17,13 +19,17 @@ import qualified Language.Syntactic.Traversal as Syn (Args(Nil))
 -- hardware-edsl.
 import Language.Embedded.Hardware
 import Language.Embedded.Hardware.Expression.Represent
+import Language.Embedded.Hardware.Expression.Represent.Bit (Bits, ni)
 import Language.Embedded.Hardware.Expression.Hoist (lift, Kind)
 import Language.Embedded.Hardware.Command.CMD (IArray(..))
 import qualified Language.Embedded.Hardware.Expression.Hoist as Hoist
 
+-- language-vhdl.
 import Language.Embedded.VHDL (VHDL)
 import qualified Language.VHDL          as VHDL
 import qualified Language.Embedded.VHDL as VHDL
+
+import GHC.TypeLits
 
 --------------------------------------------------------------------------------
 -- * Compilation of hardware primitives.
@@ -63,6 +69,7 @@ instance CompileType HardwarePrimType
       Word16HT  -> compNum a
       Word32HT  -> compNum a
       Word64HT  -> compNum a
+      BitsHT    -> compNum a
     compileBits _ a = case hardwarePrimTypeOf a of
       BoolHT    -> compBits a
       IntegerHT -> compBits a
@@ -74,6 +81,7 @@ instance CompileType HardwarePrimType
       Word16HT  -> compBits a
       Word32HT  -> compBits a
       Word64HT  -> compBits a
+      BitsHT    -> compBits a
 
 --------------------------------------------------------------------------------
 
@@ -97,6 +105,11 @@ compTypeSize Word8HT   = compSize (8  :: Int)
 compTypeSize Word16HT  = compSize (16 :: Int)
 compTypeSize Word32HT  = compSize (32 :: Int)
 compTypeSize Word64HT  = compSize (64 :: Int)
+compTypeSize b@BitsHT  = compSizeBits b
+  where
+    compSizeBits :: forall n . KnownNat n =>
+      HardwarePrimTypeRep (Bits n) -> VHDL.Primary
+    compSizeBits rep = compSize (fromInteger (ni (Proxy :: Proxy n)))
 
 compTypeSign :: forall a. HardwarePrimTypeRep a -> VHDL VHDL.Type
 compTypeSign BoolHT    = declareType (Proxy :: Proxy a)
@@ -109,6 +122,7 @@ compTypeSign Word8HT   = declareType (Proxy :: Proxy a)
 compTypeSign Word16HT  = declareType (Proxy :: Proxy a)
 compTypeSign Word32HT  = declareType (Proxy :: Proxy a)
 compTypeSign Word64HT  = declareType (Proxy :: Proxy a)
+compTypeSign BitsHT    = declareType (Proxy :: Proxy a)
 
 --------------------------------------------------------------------------------
 

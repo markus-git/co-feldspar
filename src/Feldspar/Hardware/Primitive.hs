@@ -123,6 +123,7 @@ hardwarePrimWitType Word8HT   = Dict
 hardwarePrimWitType Word16HT  = Dict
 hardwarePrimWitType Word32HT  = Dict
 hardwarePrimWitType Word64HT  = Dict
+hardwarePrimWitType BitsHT    = Dict
 
 --------------------------------------------------------------------------------
 -- ** Hardware primitive expressions.
