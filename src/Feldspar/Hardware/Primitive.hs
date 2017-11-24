@@ -332,6 +332,7 @@ instance Eval HardwarePrim
     evalSym Mul         = (*)
     evalSym Div         = div
     evalSym Mod         = mod
+    evalSym (Cast f)    = f
     evalSym I2N         = fromIntegral
     evalSym Not         = not
     evalSym And         = (&&)
@@ -363,6 +364,7 @@ instance Symbol HardwarePrim
     symSig Mul         = signature
     symSig Div         = signature
     symSig Mod         = signature
+    symSig (Cast f)    = signature
     symSig I2N         = signature
     symSig Not         = signature
     symSig And         = signature
