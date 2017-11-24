@@ -213,18 +213,21 @@ compKind = simpleMatch (\(s :&: t) -> go t s)
     go t (Lit a)     Syn.Nil | Dict <- hardwarePrimWitType t =
       fmap Hoist.E $ compileLit (Proxy :: Proxy HardwarePrimType) a
       
+    go t (Cast f) (a :* Syn.Nil) = compCast t a
+    go t I2N (a :* Syn.Nil) = compCast t a
+
     go _ Neg (a :* Syn.Nil)      = compSimple [a]    (one VHDL.neg)
     go _ Add (a :* b :* Syn.Nil) = compSimple [a, b] VHDL.add
     go _ Sub (a :* b :* Syn.Nil) = compSimple [a, b] VHDL.sub
     go _ Mul (a :* b :* Syn.Nil) = compTerm   [a, b] VHDL.mul
+    
     go _ Div (a :* b :* Syn.Nil) = compTerm   [a, b] VHDL.div
     go _ Mod (a :* b :* Syn.Nil) = compTerm   [a, b] VHDL.mod
-
-    go t I2N (a :* Syn.Nil) = compCast t a
     
     go _ Not (a :* Syn.Nil)      = compFactor [a]    (one VHDL.not)
     go _ And (a :* b :* Syn.Nil) = compExpr   [a, b] VHDL.and
     go _ Or  (a :* b :* Syn.Nil) = compExpr   [a, b] VHDL.or
+    
     go _ Eq  (a :* b :* Syn.Nil) = compRel    [a, b] (two VHDL.eq)
     go _ Lt  (a :* b :* Syn.Nil) = compRel    [a, b] (two VHDL.lt)
     go _ Lte (a :* b :* Syn.Nil) = compRel    [a, b] (two VHDL.lte)

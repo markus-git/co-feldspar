@@ -135,11 +135,18 @@ data HardwarePrim sig
     FreeVar :: (HardwarePrimType a) => String -> HardwarePrim (Full a)
     Lit     :: (Show a, Eq a)       => a      -> HardwarePrim (Full a)
 
+    -- ^ type casting.
+    Cast :: (HardwarePrimType a, HardwarePrimType b)
+      => (a -> b) -> HardwarePrim (a :-> Full b)
+    I2N :: (HardwarePrimType a, Integral a, HardwarePrimType b, Num b)
+      => HardwarePrim (a :-> Full b)
+    
     -- ^ conditional
     Cond :: HardwarePrim (Bool :-> a :-> a :-> Full a)
     
     -- ^ array indexing.
-    ArrIx :: (HardwarePrimType a) => Imp.IArray Index a -> HardwarePrim (Index :-> Full a)
+    ArrIx :: (HardwarePrimType a)
+      => Imp.IArray Index a -> HardwarePrim (Index :-> Full a)
             
     -- ^ numerical operations.
     Neg :: (HardwarePrimType a, Num a) => HardwarePrim (a :-> Full a)
@@ -151,9 +158,6 @@ data HardwarePrim sig
     Div :: (HardwarePrimType a, Integral a) => HardwarePrim (a :-> a :-> Full a)
     Mod :: (HardwarePrimType a, Integral a) => HardwarePrim (a :-> a :-> Full a)
 
-    -- ^ type casting.
-    I2N :: (HardwarePrimType a, Integral a, HardwarePrimType b, Num b) => HardwarePrim (a :-> Full b)
-    
     -- ^ logical operations.
     Not :: HardwarePrim (Bool :-> Full Bool)
     And :: HardwarePrim (Bool :-> Bool :-> Full Bool)
@@ -164,10 +168,14 @@ data HardwarePrim sig
     BitOr    :: (HardwarePrimType a, Bits a) => HardwarePrim (a :-> a :-> Full a)
     BitXor   :: (HardwarePrimType a, Bits a) => HardwarePrim (a :-> a :-> Full a)
     BitCompl :: (HardwarePrimType a, Bits a) => HardwarePrim (a :-> Full a)
-    ShiftL   :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b) => HardwarePrim (a :-> b :-> Full a)
-    ShiftR   :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b) => HardwarePrim (a :-> b :-> Full a)
-    RotateL  :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b) => HardwarePrim (a :-> b :-> Full a)
-    RotateR  :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b) => HardwarePrim (a :-> b :-> Full a)
+    ShiftL   :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b)
+      => HardwarePrim (a :-> b :-> Full a)
+    ShiftR   :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b)
+      => HardwarePrim (a :-> b :-> Full a)
+    RotateL  :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b)
+      => HardwarePrim (a :-> b :-> Full a)
+    RotateR  :: (HardwarePrimType a, Bits a, HardwarePrimType b, Integral b)
+      => HardwarePrim (a :-> b :-> Full a)
     
     -- ^ relational operations.
     Eq  :: (HardwarePrimType a, Eq a)  => HardwarePrim (a :-> a :-> Full Bool)
@@ -289,7 +297,11 @@ instance Imp.Primary Prim
       case primDict (Imp.typeRep :: Imp.TypeRep a) of
         Dict -> sugarSymPrim (Lit a)
     name  = error "todo: prim name."
-    cast  = error "todo: prim cast."
+    cast (f :: a -> b) (a :: Prim a)  =
+      case ( primDict (Imp.typeRep :: Imp.TypeRep a)
+           , primDict (Imp.typeRep :: Imp.TypeRep b))
+      of
+        (Dict, Dict) -> sugarSymPrim (Cast f) a
 
 primDict :: Imp.TypeRep a -> Dict (HardwarePrimType a)
 primDict rep = case rep of

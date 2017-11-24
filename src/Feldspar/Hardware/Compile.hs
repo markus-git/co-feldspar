@@ -163,6 +163,8 @@ translateExp = goAST . optimize . unHExp
       | Just Neg <- prj op = liftStruct (sugarSymPrim Neg) <$> goAST a
       | Just Not <- prj op = liftStruct (sugarSymPrim Not) <$> goAST a
       | Just I2N <- prj op = liftStruct (sugarSymPrim I2N) <$> goAST a
+      | Just (Cast f) <- prj op =
+          liftStruct (sugarSymPrim (Cast f)) <$> goAST a
       | Just BitCompl <- prj op =
           liftStruct (sugarSymPrim BitCompl) <$> goAST a
     go t op (a :* b :* Syn.Nil)
