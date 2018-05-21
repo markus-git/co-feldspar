@@ -19,7 +19,6 @@ import Feldspar.Hardware.Frontend (HSig)
 import Data.Struct
 
 -- hmm..
-import Feldspar.Hardware.Frontend (entity, architecture, process)
 import qualified Language.Embedded.Hardware.Interface.AXI as Hard (FreePrim(..))
 
 import Control.Monad.Identity
@@ -56,9 +55,8 @@ type TargetCMD
     Oper.:+: Hard.LoopCMD
     Oper.:+: Hard.ConditionalCMD
     Oper.:+: Hard.ComponentCMD
-    Oper.:+: Hard.StructuralCMD
-    Oper.:+: Hard.ConstantCMD
     Oper.:+: Hard.SignalCMD
+    Oper.:+: Hard.ProcessCMD
     --
     Oper.:+: Hard.VHDLCMD
 
@@ -223,14 +221,29 @@ translate :: Hardware a -> ProgH a
 translate = flip runReaderT Map.empty . Oper.reexpressEnv unsafeTranslateSmallExp . unHardware
 
 --------------------------------------------------------------------------------
+
+translateHSig :: HSig a -> Hard.Sig TargetCMD Prim HardwarePrimType Identity a
+translateHSig (Hard.Ret  prg)      = Hard.Ret (translate (Hardware prg))
+translateHSig (Hard.SSig n m sf)   = Hard.SSig n m (translateHSig . sf)
+translateHSig (Hard.SArr n m l af) = Hard.SArr n m l (translateHSig . af)
+
+--------------------------------------------------------------------------------
 -- * Interpretation of hardware programs.
 --------------------------------------------------------------------------------
 
-compile :: Hardware a -> String
+compile :: Hardware () -> String
 compile = Hard.compile . translate
 
-icompile :: Hardware a -> IO ()
+icompile :: Hardware () -> IO ()
 icompile = Hard.icompile . translate
+
+--------------------------------------------------------------------------------
+
+compileSig :: HSig a -> String
+compileSig = Hard.compileSig . translateHSig
+
+icompileSig :: HSig a -> IO ()
+icompileSig = Hard.icompileSig . translateHSig
 
 --------------------------------------------------------------------------------
 -- Compiler that wraps a hardware component in an AXI-lite framework.
@@ -241,26 +254,8 @@ instance Hard.FreePrim Prim HardwarePrimType
 
 compileAXILite :: HSig a -> String
 compileAXILite = Hard.compileAXILite . translateHSig
-  where
-    translateHSig :: HSig a -> Hard.Sig TargetCMD Prim HardwarePrimType Identity a
-    translateHSig (Hard.Ret  prg)      = Hard.Ret (translate (Hardware prg))
-    translateHSig (Hard.SSig n m sf)   = Hard.SSig n m (translateHSig . sf)
-    translateHSig (Hard.SArr n m l af) = Hard.SArr n m l (translateHSig . af)
 
 icompileAXILite :: HSig a -> IO ()
 icompileAXILite = putStrLn . compileAXILite
-
---------------------------------------------------------------------------------
--- Compiler that wraps a hardware program in a dummy entity, useful in testing.
-
-icompileWrap :: Hardware () -> IO ()
-icompileWrap = Hard.icompile . translate . wrap
-
--- todo: use wrap from hardware-edsl.
-wrap :: Hardware () -> Hardware ()
-wrap prg = do
-  entity       "empty" $ return ()
-  architecture "empty" "behav" $
-    process [] $ prg
 
 --------------------------------------------------------------------------------

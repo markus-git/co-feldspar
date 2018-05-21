@@ -351,33 +351,6 @@ setSArr' :: forall b . HardwarePrimType b => Imp.Array Index b -> HExp Index -> 
 setSArr' = withHType (Proxy :: Proxy b) Imp.setArray
 
 --------------------------------------------------------------------------------
--- *** Structural entities.
-
-entity  :: String -> Hardware a -> Hardware a
-entity name = Hardware . (Imp.entity name) . unHardware
-
-architecture :: String -> String -> Hardware () -> Hardware ()
-architecture entity name = Hardware . (Imp.architecture entity name) . unHardware
-
-process :: [Ident] -> Hardware () -> Hardware ()
-process is = Hardware . (Imp.process is) . unHardware
-
-(.:) :: ToIdent a => a -> [Ident] -> [Ident]
-(.:) x xs = Imp.toIdent x : xs
-
-infixr .:
-
---------------------------------------------------------------------------------
-
--- | Declare a port signal and assig its initial value.
-initPort :: HardwarePrimType a => Mode -> HExp a -> Hardware (Signal a)
-initPort m e = Hardware $ Imp.initPort m e
-
--- | Declare a port.
-newPort :: HardwarePrimType a => Mode -> Hardware (Signal a)
-newPort m  = Hardware $ Imp.newPort m
-
---------------------------------------------------------------------------------
 
 -- | ...
 type HSig  = Imp.Sig  HardwareCMD HExp HardwarePrimType Identity
@@ -399,8 +372,15 @@ portmap comp = Hardware . Imp.portmap comp
 
 --------------------------------------------------------------------------------
 
+-- | Synch. process wrap.
 ret :: Hardware () -> HSig ()
-ret = Imp.ret . unHardware
+ret = Imp.ret . Imp.process [] . unHardware
+
+-- | Synch. process wrap with reset.
+retR :: Hardware () -> Hardware () -> HSig ()
+retR prg rst = Imp.ret $ Imp.processR [] (unHardware rst) (unHardware prg)
+
+--------------------------------------------------------------------------------
 
 input :: forall a b . (HType' a, Integral a)
   => (Signal a -> HSig b) -> HSig (Signal a -> b)

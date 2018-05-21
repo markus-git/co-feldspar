@@ -14,7 +14,7 @@ import Feldspar.Software
 import qualified Feldspar.Software as S (icompile)
 
 import Feldspar.Hardware
-import qualified Feldspar.Hardware as H (icompile, icompileAXILite)
+import qualified Feldspar.Hardware as H (icompile, icompileSig, icompileAXILite)
 
 --------------------------------------------------------------------------------
 -- * Example of components in co-feldspar.
@@ -27,16 +27,15 @@ plus a b c = do
   setSignal c (va + vb)
 
 plus_sig :: HSig (Signal Int8 -> Signal Int8 -> Signal Int8 -> ())
-plus_sig = input $ \a -> input $ \b -> output $ \c -> ret $ plus a b c
+plus_sig =
+  input  $ \a ->
+  input  $ \b ->
+  output $ \c ->
+  ret $ plus a b c
 
 test1 = H.icompileAXILite plus_sig
 
---------------------------------------------------------------------------------
-
-plus_hard :: Hardware ()
-plus_hard = void $ component plus_sig
-
-test2 = H.icompile plus_hard
+test2 = H.icompileSig plus_sig
 
 --------------------------------------------------------------------------------
 

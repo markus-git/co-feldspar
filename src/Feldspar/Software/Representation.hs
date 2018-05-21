@@ -17,7 +17,6 @@ import Feldspar.Storable
 import Feldspar.Array.Buffered (ArraysEq(..))
 import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
-import Feldspar.Software.Command
 import Data.Struct
 
 import Data.Int

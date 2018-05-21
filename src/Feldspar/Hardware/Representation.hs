@@ -15,7 +15,6 @@ import Feldspar.Storable
 import Feldspar.Array.Buffered (ArraysEq(..))
 import Feldspar.Hardware.Primitive
 import Feldspar.Hardware.Expression
-import Feldspar.Hardware.Command
 import Data.Struct
 
 import Data.Int
@@ -58,7 +57,7 @@ type HardwareCMD =
     -- ^ Hardware specific instructions.
   Oper.:+: Imp.SignalCMD
   Oper.:+: Imp.ArrayCMD
-  Oper.:+: Imp.StructuralCMD
+  Oper.:+: Imp.ProcessCMD
   Oper.:+: Imp.ComponentCMD
 
 -- | Monad for building hardware programs in Co-Feldspar.

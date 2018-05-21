@@ -57,6 +57,7 @@ library
     hardware-edsl >=0.1.5.2,
     language-c-quote,
     language-vhdl >=0.1.3,
+    signals >= 0.2.1,
     template-haskell
 
   hs-source-dirs:      src
