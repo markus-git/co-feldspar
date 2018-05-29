@@ -54,7 +54,7 @@ library
     syntactic >=3.6.1,
     operational-alacarte >=0.3,
     imperative-edsl >=0.7.1,
-    hardware-edsl >=0.1.5.2,
+    hardware-edsl >=0.1.6,
     language-c-quote,
     language-vhdl >=0.1.3,
     signals >= 0.2.1,
