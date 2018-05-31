@@ -278,7 +278,7 @@ compMMapCMD (Call (Address ptr sig) arg) =
       do let end = ix + toInteger len
          typ <- compArrType (Proxy :: Proxy ct) arr
          C.addStm [cstm| for (int i=$int:ix; i<$int:end; i++) { *($id:ptr + i) = (int) $id:arr[i]; } |]
-         undefined
+         traverse end (af dummy) arg
 
     dummy :: forall x . x
     dummy = error "dummy evaluated."
