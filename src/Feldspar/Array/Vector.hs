@@ -353,7 +353,7 @@ class ViewManifest m vec a | vec -> a
     viewManifest _ = Nothing
 
 instance ViewManifest m (Pull exp a) a
-instance ViewManifest m (Push m   a) a
+instance ViewManifest m (Push m a) a
 instance ViewManifest m (Manifest m a) a
   where
     viewManifest = Just

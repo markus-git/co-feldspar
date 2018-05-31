@@ -393,6 +393,8 @@ input f = withHType' (Proxy :: Proxy a) $ Imp.input $ f . veryUnsafeFreezeSignal
 inputIArr :: forall a b . (HType' a, Integral a) => Length -> (IArr (HExp a) -> HSig b) -> HSig (SArr a -> b)
 inputIArr len f = withHType' (Proxy :: Proxy a) $ Imp.inputArray len $ f . veryUnsafeFreezeSArr len
 
+-- inputVec :: forall a b . (HType' a, Integral a) => Lenght -> () -> HSig (SArr a -> b)
+
 --------------------------------------------------------------------------------
 --
 --------------------------------------------------------------------------------
