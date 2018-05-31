@@ -34,19 +34,19 @@ test1 = H.icompileAXILite plus_sig
 test2 = H.icompileSig plus_sig
 
 --------------------------------------------------------------------------------
-{-
+
 type SRef a = Reference Software (SExp a)
 
 plus_soft :: Software ()
 plus_soft =
-  do plus <- mmap "0x83C00000" plus_sig
+  do plus <- mmap "0x43C00000" plus_sig
      a :: SRef Int8 <- initRef 0
      b :: SRef Int8 <- initRef 1
      c :: SRef Int8 <- newRef
-     call plus (a .+. b .+. c .+. empty)
+     call plus (a >: b >: c >: nil)
      vc <- getRef c
      printf "plus: %d\n" vc
 
 test3 = S.icompile plus_soft
--}
+
 --------------------------------------------------------------------------------
