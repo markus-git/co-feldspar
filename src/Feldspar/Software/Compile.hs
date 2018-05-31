@@ -240,6 +240,9 @@ instance (Imp.CompExp exp, Imp.CompTypeClass ct) => Oper.Interp MMapCMD C.CGen (
   where
     interp = compMMapCMD
 
+-- todo:
+--  > only need one 'ix' for read/write to arrays in 'Call'.
+--  > 'n' in 'MMap' isn't really an '$id'.
 compMMapCMD :: forall exp ct a . (Imp.CompExp exp, Imp.CompTypeClass ct)
   => MMapCMD (Oper.Param3 C.CGen exp ct) a
   -> C.CGen a
@@ -254,30 +257,37 @@ compMMapCMD (MMap n sig) =
      C.addGlobal [cedecl| int mem_fd = -1; |]
      C.addGlobal mmap_def
      mem <- C.gensym "mem"
-     C.addLocal [cdecl| int * $id:mem = f_map($string:n); |]
+     C.addLocal [cdecl| int * $id:mem = f_map($id:n); |]
      return mem
 compMMapCMD (Call (Address ptr sig) arg) =
   do traverse 0 sig arg
   where
     traverse :: Integer -> HSig b -> Argument ct (Soften b) -> C.CGen ()
-    traverse ix (Hard.Ret _) (Nil) =
-      return ()
+    traverse ix (Hard.Ret _) (Nil) = return ()
     traverse ix (Hard.SSig _ Hard.Out rf) (ARef (Ref (Node ref@(Imp.RefComp r))) arg) =
       do typ <- compRefType (Proxy :: Proxy ct) ref
          C.addStm [cstm| $id:r = ($ty:typ) *($id:ptr + $int:ix); |]
          traverse (ix + 1) (rf dummy) arg
     traverse ix (Hard.SArr _ Hard.Out len af) (AArr (Arr _ _ (Node arr@(Imp.ArrComp a))) arg) =
       do let end = ix + toInteger len
+         i   <- C.gensym "ix"
          typ <- compArrType (Proxy :: Proxy ct) arr
-         C.addStm [cstm| for (int i=$int:ix; i<$int:end; i++) { $id:arr[i] = ($ty:typ) *($id:ptr + i); } |]
+         C.addLocal [cdecl| int $id:i; |]
+         C.addStm [cstm| for ($id:i=$int:ix; $id:i<$int:end; $id:i++) {
+                           $id:arr[$id:i] = ($ty:typ) *($id:ptr + $id:i);
+                         } |]
          traverse end (af dummy) arg
     traverse ix (Hard.SSig _ Hard.In rf) (ARef (Ref (Node (Imp.RefComp r))) arg) =
       do C.addStm [cstm| *($id:ptr + $int:ix) = (int) $id:r; |]
          traverse (ix + 1) (rf dummy) arg
     traverse ix (Hard.SArr _ Hard.In len af) (AArr (Arr _ _ (Node arr@(Imp.ArrComp a))) arg) =
       do let end = ix + toInteger len
+         i   <- C.gensym "ix"
          typ <- compArrType (Proxy :: Proxy ct) arr
-         C.addStm [cstm| for (int i=$int:ix; i<$int:end; i++) { *($id:ptr + i) = (int) $id:arr[i]; } |]
+         C.addLocal [cdecl| int $id:i; |]
+         C.addStm [cstm| for ($id:i=$int:ix; $id:i<$int:end; $id:i++) {
+                           *($id:ptr + $id:i) = (int) $id:arr[$id:i];
+                         } |]
          traverse end (af dummy) arg
 
     dummy :: forall x . x
