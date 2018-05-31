@@ -10,7 +10,7 @@ import Feldspar.Software
 import Feldspar.Software as Soft (icompile)
 
 import Feldspar.Hardware
-import Feldspar.Hardware as Hard (icompileWrap)
+import Feldspar.Hardware as Hard (icompile)
 
 --------------------------------------------------------------------------------
 -- * Basic example of how our hardware software co-design works.
@@ -46,6 +46,6 @@ soft :: IO ()
 soft = Soft.icompile example
 
 hard :: IO ()
-hard = Hard.icompileWrap example
+hard = Hard.icompile example
 
 --------------------------------------------------------------------------------

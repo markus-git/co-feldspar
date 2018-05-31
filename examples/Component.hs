@@ -20,25 +20,21 @@ import qualified Feldspar.Hardware as H (icompile, icompileSig, icompileAXILite)
 -- * Example of components in co-feldspar.
 --------------------------------------------------------------------------------
 
-plus :: Signal Int8 -> Signal Int8 -> Signal Int8 -> Hardware ()
-plus a b c = do
-  va <- getSignal a
-  vb <- getSignal b
-  setSignal c (va + vb)
+plus_impl :: HExp Int8 -> HExp Int8 -> Hardware (HExp Int8)
+plus_impl a b = return $ a + b
 
 plus_sig :: HSig (Signal Int8 -> Signal Int8 -> Signal Int8 -> ())
 plus_sig =
   input  $ \a ->
   input  $ \b ->
-  output $ \c ->
-  ret $ plus a b c
+  ret $ plus_impl a b
 
 test1 = H.icompileAXILite plus_sig
 
 test2 = H.icompileSig plus_sig
 
 --------------------------------------------------------------------------------
-
+{-
 type SRef a = Reference Software (SExp a)
 
 plus_soft :: Software ()
@@ -52,5 +48,5 @@ plus_soft =
      printf "plus: %d\n" vc
 
 test3 = S.icompile plus_soft
-
+-}
 --------------------------------------------------------------------------------
