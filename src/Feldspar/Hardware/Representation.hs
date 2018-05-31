@@ -83,13 +83,8 @@ data IArr a = IArr
   , unIArr     :: Struct HardwarePrimType (Imp.IArray Index) (Internal a)
   }
 
--- | Hardware arrays of signals.
-data SArr a = SArr
-  { sarrOffset :: HExp Index
-  , sarrLength :: HExp Length
-  , unSArr     :: Struct HardwarePrimType (Imp.Array Index) (Internal a)
-  }
-
+--------------------------------------------------------------------------------
+-- ** ...
 --------------------------------------------------------------------------------
 
 instance ArraysEq Arr IArr

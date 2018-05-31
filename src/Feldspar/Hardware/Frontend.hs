@@ -177,10 +177,6 @@ instance Finite HExp (Arr a)
   where
     length = arrLength
 
-instance Finite HExp (SArr a)
-  where
-    length = sarrLength
-
 instance Arrays Hardware
   where
     type Array Hardware = Arr
@@ -299,7 +295,8 @@ instance Control Hardware
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- *** Singals.
+-- Singals.
+--------------------------------------------------------------------------------
 
 -- | Creates a new signal with a given initial value.
 initSignal :: HType' a => HExp a -> Hardware (Signal a)
@@ -317,79 +314,87 @@ getSignal = Hardware . Imp.getSignal
 setSignal :: HType' a => Signal a -> HExp a -> Hardware ()
 setSignal s = Hardware . (Imp.setSignal s)
 
---------------------------------------------------------------------------------
--- *** Signal arrays.
---------------------------------------------------------------------------------
--- todo: These functions could use some cleaning up. 'Internal' is not really
---       necessary here, its better to assume 'SArr (HExp a)'.
---------------------------------------------------------------------------------
-
-newArray :: HType (Internal a) => HExp Index -> Hardware (SArr a)
-newArray len = Hardware $ fmap (SArr 0 len) $ mapStructA (const (Imp.newArray len)) $ typeRep
-
-initArray :: HType' (Internal a) => [Internal a] -> Hardware (SArr a)
-initArray as = Hardware $ fmap (SArr 0 len . Node) $ Imp.initArray as
-  where len = value $ genericLength as
-
-getArray :: HType (Internal a) => SArr a -> HExp Index -> Hardware (HExp (Internal a))
-getArray arr ix = Hardware $ fmap resugar $ mapStructA (flip getSArr' (ix + sarrOffset arr)) $ (unSArr arr)
-
-setArray :: HType (Internal a) => SArr a -> HExp Index -> HExp (Internal a) -> Hardware ()
-setArray arr ix a = Hardware $ sequence_ $ zipListStruct (\v a -> setSArr' a (ix + sarrOffset arr) v) (resugar a) $ unSArr arr
-
-copyArray :: HType (Internal a) => SArr a -> SArr a -> Hardware ()
-copyArray arr brr = Hardware $ sequence_ $ zipListStruct (\a b -> Imp.copyArray (a, sarrOffset arr) (b, sarrOffset brr) (length brr)) (unSArr arr) (unSArr brr)
-
---------------------------------------------------------------------------------
-
--- 'Imp.getArray' specialized to hardware.
-getSArr' :: forall b . HardwarePrimType b => Imp.Array Index b -> HExp Index -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
-getSArr' = withHType (Proxy :: Proxy b) Imp.getArray
-
--- 'Imp.setArray' specialized to hardware.
-setSArr' :: forall b . HardwarePrimType b => Imp.Array Index b -> HExp Index -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
-setSArr' = withHType (Proxy :: Proxy b) Imp.setArray
-
---------------------------------------------------------------------------------
+-- | Unsafe version of fetching the contents of a signal.
+unsafeFreezeSignal :: HType' a => Signal a -> Hardware (HExp a)
+unsafeFreezeSignal = Hardware . Imp.unsafeFreezeSignal
 
 -- | ...
-type HSig  = Imp.Sig  HardwareCMD HExp HardwarePrimType Identity
+veryUnsafeFreezeSignal :: HType' a => Signal a -> HExp a
+veryUnsafeFreezeSignal (Imp.SignalC v) = Imp.varE v
+veryUnsafeFreezeSignal _ = error "veryUnsafeFreezeSignal shouldn't be used during evaluation."
+
+--------------------------------------------------------------------------------
+-- Arrays.
+--------------------------------------------------------------------------------
+
+-- | Arrays based on signals.
+type SArr a = Imp.Array Index a
+
+-- | Creates a empty array of the given length.
+newSArr :: HType' a => HExp Index -> Hardware (SArr a)
+newSArr = Hardware . Imp.newArray
+
+-- | Initialize an array with the given elements.
+initSArr :: HType' a => [a] -> Hardware (SArr a)
+initSArr = Hardware . Imp.initArray
+
+-- | Fetches the indexed element out of the array.
+getSArr :: HType' a => SArr a -> HExp Index -> Hardware (HExp a)
+getSArr arr ix = Hardware $ Imp.getArray arr ix
+
+-- | Sets the indexed element of the array to the given value.
+setSArr :: HType' a => SArr a -> HExp Index -> HExp a -> Hardware ()
+setSArr arr ix val = Hardware $ Imp.setArray arr ix val
 
 -- | ...
-type HComp = Imp.Comp HardwareCMD HExp HardwarePrimType Identity
+veryUnsafeFreezeSArr :: HType' a => Length -> SArr a -> IArr (HExp a)
+veryUnsafeFreezeSArr len (Imp.ArrayC v) = IArr 0 (value len) $ Node $ Imp.IArrayC v
+veryUnsafeFreezeSArr _ _ = error "veryUnsafeFreezeSArr shouldn't be used during evaluation."
 
--- | ...
-type HArg  = Imp.Argument HardwarePrimType
+--------------------------------------------------------------------------------
+-- Components.
+--------------------------------------------------------------------------------
+-- todo: the `len` argument isn't strictly needed, the problem is that `IArr`
+--       length is `HExp Length` while `Imp.copyArray` expects a pure `Length`.
 
-namedComponent :: String -> HSig a -> Hardware (HComp a)
-namedComponent name sig = Hardware $ Imp.namedComponent name sig
-
-component :: HSig a -> Hardware (HComp a)
-component = namedComponent "comp"
-
-portmap :: HComp a -> HArg a -> Hardware ()
-portmap comp = Hardware . Imp.portmap comp
+-- | Hardware signature.
+type HSig  = Imp.Sig HardwareCMD HExp HardwarePrimType Identity
 
 --------------------------------------------------------------------------------
 
--- | Synch. process wrap.
-ret :: Hardware () -> HSig ()
-ret = Imp.ret . Imp.process [] . unHardware
+-- | Finalize signature with an output of a value.
+ret :: forall a . (HType' a, Integral a) => Hardware (HExp a) -> HSig (Signal a -> ())
+ret prg = withHType' (Proxy :: Proxy a) $ Imp.output $ \o -> Imp.ret $ Imp.process [] $ do
+    v <- unHardware prg
+    Imp.setSignal o v
 
--- | Synch. process wrap with reset.
-retR :: Hardware () -> Hardware () -> HSig ()
-retR prg rst = Imp.ret $ Imp.processR [] (unHardware rst) (unHardware prg)
+-- | Finalize signature with an output of a immutable array.
+retIArr :: forall a . (HType' a, Integral a) => Length -> Hardware (IArr (HExp a)) -> HSig (SArr a -> ())
+retIArr len prg = withHType' (Proxy :: Proxy a) $ Imp.outputArray len $ \o -> Imp.ret $ Imp.process [] $ do
+  (IArr _ _ (Node iarr)) <- unHardware prg
+  arr <- Imp.unsafeThawArray iarr
+  Imp.copyArray (o,0) (arr,0) (value len)
+
+-- | Finalize signature with an output of an array.
+retVArr :: forall a . (HType' a, Integral a) => Length -> Hardware (Arr (HExp a)) -> HSig (SArr a -> ())
+retVArr len prg = withHType' (Proxy :: Proxy a) $ Imp.outputArray len $ \o -> Imp.ret $ Imp.process [] $ do
+  (Arr _ _ (Node arr)) <- unHardware prg
+  iarr <- Imp.unsafeFreezeVArray arr -- this is so bad.
+  brr  <- Imp.unsafeThawArray iarr
+  Imp.copyArray (o,0) (brr, 0) (value len)
 
 --------------------------------------------------------------------------------
 
-input :: forall a b . (HType' a, Integral a)
-  => (Signal a -> HSig b) -> HSig (Signal a -> b)
-input = withHType' (Proxy::Proxy a) Imp.input
+-- | Extend signature with an input signal.
+input :: forall a b . (HType' a, Integral a) => (HExp a -> HSig b) -> HSig (Signal a -> b)
+input f = withHType' (Proxy :: Proxy a) $ Imp.input $ f . veryUnsafeFreezeSignal
 
-output :: forall a b . (HType' a, Integral a)
-  => (Signal a -> HSig b) -> HSig (Signal a -> b)
-output = withHType' (Proxy::Proxy a) Imp.output
+-- | Extend signature with an input array.
+inputIArr :: forall a b . (HType' a, Integral a) => Length -> (IArr (HExp a) -> HSig b) -> HSig (SArr a -> b)
+inputIArr len f = withHType' (Proxy :: Proxy a) $ Imp.inputArray len $ f . veryUnsafeFreezeSArr len
 
+--------------------------------------------------------------------------------
+--
 --------------------------------------------------------------------------------
 
 -- Swap an `Imp.FreePred` constraint with a `HardwarePrimType` one.

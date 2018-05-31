@@ -2,7 +2,7 @@
 {-# language TypeOperators       #-}
 {-# language FlexibleContexts    #-}
 {-# language ScopedTypeVariables #-}
-
+{-# language ConstraintKinds #-}
 {-# language TypeSynonymInstances #-}
 {-# language FlexibleInstances #-}
 {-# language MultiParamTypeClasses #-}
@@ -45,11 +45,16 @@ import qualified Language.C.Monad as C
   (CGen, addGlobal, addLocal, addInclude, addStm, gensym)
 
 -- hardware-edsl
-import Language.Embedded.Hardware.Command (Mode(..))
+import qualified Language.Embedded.Hardware.Command as Hard
 
 -- language-c-quote
 import Language.C.Quote.GCC
 import qualified Language.C.Syntax as C
+
+-- hmm!
+import Feldspar.Hardware.Primitive  (HardwarePrimType(..), HardwarePrimTypeRep(..))
+import Feldspar.Hardware.Expression (HType')
+import Feldspar.Hardware.Frontend   (HSig, withHType')
 
 -- debug.
 import Debug.Trace
@@ -251,30 +256,56 @@ compMMapCMD (MMap n sig) =
      mem <- C.gensym "mem"
      C.addLocal [cdecl| int * $id:mem = f_map($string:n); |]
      return mem
-compMMapCMD (Call addr arg) =
-  do write addr arg
-     read  addr arg
+compMMapCMD (Call (Address ptr sig) arg) =
+  do traverse 0 sig arg
   where
-    write :: Address ct b -> Argument ct b -> C.CGen ()
-    write (Ret)           (Nil)        = return ()
-    write (SRef n Out rf) (ARef r arg) = write (rf r) arg
-    write (SRef n In  rf) (ARef r arg) =
-      do let (Ref (Node (Imp.RefComp ref))) = r
-         C.addStm [cstm| $id:n = (int) $id:ref; |]
-         write (rf r) arg
+    traverse :: Integer -> HSig b -> Argument ct (Soften b) -> C.CGen ()
+    traverse ix (Hard.Ret _) (Nil) =
+      return ()
+    traverse ix (Hard.SSig _ Hard.Out rf) (ARef (Ref (Node ref@(Imp.RefComp r))) arg) =
+      do typ <- compRefType (Proxy :: Proxy ct) ref
+         C.addStm [cstm| $id:r = ($ty:typ) *($string:ptr + $int:ix); |]
+         traverse (ix + 1) (rf dummy) arg
+    traverse ix (Hard.SArr _ Hard.Out len af) (AArr (Arr _ _ (Node arr@(Imp.ArrComp a))) arg) =
+      do let end = ix + toInteger len
+         typ <- compArrType (Proxy :: Proxy ct) arr
+         C.addStm [cstm| for (int i=$int:ix; i<$int:end; i++) { $id:arr[i] = ($ty:typ) *($string:ptr + i); } |]
+         traverse end (af dummy) arg
+    traverse ix (Hard.SSig _ Hard.In rf) (ARef (Ref (Node (Imp.RefComp r))) arg) =
+      do C.addStm [cstm| *($string:ptr + $int:ix) = (int) $id:r; |]
+         traverse (ix + 1) (rf dummy) arg
+    traverse ix (Hard.SArr _ Hard.In len af) (AArr (Arr _ _ (Node arr@(Imp.ArrComp a))) arg) =
+      do let end = ix + toInteger len
+         typ <- compArrType (Proxy :: Proxy ct) arr
+         C.addStm [cstm| for (int i=$int:ix; i<$int:end; i++) { *($string:ptr + i) = (int) $id:arr[i]; } |]
+         undefined
 
-    read :: Address ct b -> Argument ct b -> C.CGen ()
-    read (Ret)           (Nil)        = return ()
-    read (SRef n In  rf) (ARef r arg) = read (rf r) arg
-    read (SRef n Out rf) (ARef r arg) =
-      do let (Ref (Node ref)) = r
-         typ <- Imp.compType (Proxy::Proxy ct) (proxy ref)
-         C.addStm [cstm| $id:ref = ($ty:typ) $id:n; |]
-         read (rf r) arg
-      where
-        proxy :: Imp.Ref c -> Proxy c
-        proxy _ = Proxy
-  
+    dummy :: forall x . x
+    dummy = error "dummy evaluated."
+
+    compRefType :: forall x . (Imp.CompTypeClass ct, HardwarePrimType x, ct x)
+      => Proxy ct -> Imp.Ref x -> C.CGen C.Type
+    compRefType ct _ = case witnessSP (Proxy :: Proxy x) of
+      Dict -> Imp.compType ct (Proxy :: Proxy x)
+
+    compArrType :: forall i x . (Imp.CompTypeClass ct, HardwarePrimType x, ct x)
+      => Proxy ct -> Imp.Arr i x -> C.CGen C.Type
+    compArrType ct _ = case witnessSP (Proxy :: Proxy x) of
+      Dict -> Imp.compType ct (Proxy :: Proxy x)
+
+    witnessSP :: forall x . HardwarePrimType x => Proxy x -> Dict (SoftwarePrimType x)
+    witnessSP _ = case hardwareRep :: HardwarePrimTypeRep x of
+      BoolHT    -> Dict
+      Int8HT    -> Dict
+      Int16HT   -> Dict
+      Int32HT   -> Dict
+      Int64HT   -> Dict
+      Word8HT   -> Dict
+      Word16HT  -> Dict
+      Word32HT  -> Dict
+      Word64HT  -> Dict
+      _         -> error "unrecognized software type used by mmap."
+
 --------------------------------------------------------------------------------
 
 mmap_def :: C.Definition

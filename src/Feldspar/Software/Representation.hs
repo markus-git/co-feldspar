@@ -55,29 +55,28 @@ import Feldspar.Hardware.Frontend (HSig)
 -- * Programs.
 --------------------------------------------------------------------------------
 
--- | ...
+-- | Soften the hardware signature of a component into a type that uses the
+--   correspoinding data types in software.
 type family Soften a where
-  Soften ()                  = ()
-  Soften (Imp.Signal a -> b) = Ref (SExp a) -> Soften b 
+  Soften ()                   = ()
+  Soften (Imp.Signal  a -> b) = Ref (SExp a) -> Soften b
+  Soften (Imp.Array i a -> b) = Arr (SExp a) -> Soften b
 
--- | ...
+-- | Software argument for a hardware component.
 data Argument pred a
   where
-    Nil  :: Argument fs ()
-    ARef :: (pred (Internal a), Integral (Internal a), Imp.PrimType (Internal a))
-      => Ref a
-      -> Argument pred b
-      -> Argument pred (Ref a -> b)
+    Nil  :: Argument pred ()
+    ARef :: (pred a, Integral a, Imp.PrimType a)
+         => Ref (SExp a)
+         -> Argument pred b
+         -> Argument pred (Ref (SExp a) -> b)
+    AArr :: (pred a, Integral a, Imp.PrimType a)
+         => Arr (SExp a)
+         -> Argument pred b
+         -> Argument pred (Arr (SExp a) -> b)
 
--- | ...
-data Address pred a
-  where
-    Ret  :: Address fs ()
-    SRef :: (pred (Internal a), Integral (Internal a), Imp.PrimType (Internal a))
-         => Imp.VarId
-         -> Mode
-         -> (Ref a -> Address pred b)
-         -> Address pred (Ref a -> b)
+-- | Software component, consists of a hardware signature and its address.
+data Address a = Address String (HSig a)
 
 -- | ...
 data MMapCMD fs a
@@ -85,10 +84,9 @@ data MMapCMD fs a
     MMap :: String
          -> HSig a
          -> MMapCMD (Param3 prog exp pred) String
-         
-    Call :: Address  pred a
-         -> Argument pred a
-         -> MMapCMD  (Param3 prog exp pred) ()
+    Call :: Address a
+         -> Argument pred (Soften a)
+         -> MMapCMD (Param3 prog exp pred) ()
 
 instance Oper.HFunctor MMapCMD
   where
@@ -145,6 +143,8 @@ data IArr a = IArr
   , unIArr     :: Struct SoftwarePrimType (Imp.IArr Index) (Internal a)
   }
 
+--------------------------------------------------------------------------------
+-- ** ...
 --------------------------------------------------------------------------------
 
 instance ArraysEq Arr IArr

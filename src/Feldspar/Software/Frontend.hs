@@ -368,12 +368,37 @@ printf = fprintf Imp.stdout
 --------------------------------------------------------------------------------
 -- *** Memory.
 
--- | ...
-type SComp  = Address SoftwarePrimType
+-- | Software argument specialized to software primitives.
+type SArg = Argument SoftwarePrimType
+
+-- | Establish a memory-mapping to a hardware signature.
+mmap :: String -> HSig a -> Software (Address a)
+mmap address sig =
+  do pointer <- Software $ Oper.singleInj $ MMap address sig
+     return $ Address pointer sig
+
+-- | Call a memory-mapped component.
+call :: Address a -> SArg (Soften a) -> Software ()
+call address arg = Software $ Oper.singleInj $ Call address arg
 
 -- | ...
-type SArg  = Argument SoftwarePrimType
+nil :: SArg ()
+nil = Nil
 
+-- | ...
+(>:) :: forall a b . (SType' a, HType' a, Integral a)
+  => Ref (SExp a) -> SArg b -> SArg (Ref (SExp a) -> b)
+(>:) = withHType' (Proxy :: Proxy a) ARef
+
+-- | ...
+(>>:) :: forall a b . (SType' a, HType' a, Integral a)
+  => Arr (SExp a) -> SArg b -> SArg (Arr (SExp a) -> b)
+(>>:) = withHType' (Proxy :: Proxy a) AArr
+
+infixr 1 >:, >>:
+
+--------------------------------------------------------------------------------
+{-
 mmap :: String -> HSig a -> Software (SComp (Soften a))
 mmap addr sig =
   do ref <- Software $ Oper.singleInj $ MMap addr sig
@@ -409,19 +434,9 @@ mmap addr sig =
       Word32HT  -> Dict
       Word64HT  -> Dict
       _         -> error "Trying to send invalid type with mmap."
-
-call :: SComp a -> SArg a -> Software ()
-call addr arg = Software $ Oper.singleInj $ Call addr arg
-
-empty :: SArg ()
-empty = Nil
-
-(.+.) :: forall a b . (SType' a, HType' a, Integral a)
-  => Ref (SExp a) -> SArg b -> SArg (Ref (SExp a) -> b)
-(.+.) = withHType' (Proxy::Proxy a) ARef
-
-infixr 1 .+.
-
+-}
+--------------------------------------------------------------------------------
+--
 --------------------------------------------------------------------------------
 
 -- Swap an `Imp.FreePred` constraint with a `SoftwarePrimType` one.
