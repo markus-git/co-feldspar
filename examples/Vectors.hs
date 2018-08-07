@@ -35,7 +35,7 @@ test1 = Soft.icompile $ printf "%d" $ sumLast5 inp
 --------------------------------------------------------------------------------
 
 dot :: (Vector exp, Pully exp vec a, Num a, Syntax exp a) => vec -> vec -> a
-dot a b = sum $ zipWith (+) a b
+dot a b = sum $ zipWith (*) a b
 
 --------------------------------------------------------------------------------
 
@@ -50,8 +50,8 @@ test2 = Soft.icompile $ printf "%d" $ scProd inp1 inp2
 
 dot_sig :: HSig (SArr Word32 -> SArr Word32 -> Signal Word32 -> ())
 dot_sig =
-  inputIArr 5 $ \a ->
-  inputIArr 5 $ \b ->
+  inputIArr 1 $ \a ->
+  inputIArr 1 $ \b ->
   ret $ pure $ dot a b
   -- `dot` is pure, so we lift its result.
 
@@ -67,8 +67,8 @@ test4 = Hard.icompileAXILite $ dot_sig
 dot_mmap :: Software ()
 dot_mmap =
   do dot <- mmap "0x43C00000" dot_sig
-     a :: Arr (SExp Word32) <- initArr [1,2,3,4,5]
-     b :: Arr (SExp Word32) <- initArr [5,4,3,2,1]
+     a :: Arr (SExp Word32) <- initArr [1]
+     b :: Arr (SExp Word32) <- initArr [1]
      c :: Ref (SExp Word32) <- newRef
      --
      call dot (a >>: b >>: c >: nil)

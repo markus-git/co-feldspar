@@ -281,6 +281,14 @@ instance (m1 ~ m2) => Pushy m1 (Push m2 a) a
   where
     toPush = id
 
+instance (MonadComp m1, VectorM m1, m1 ~ m2) => Pushy m1 (Seq m2 a) a
+  where
+    toPush (Seq len init) = Push len $ \write ->
+      do next <- init
+         for 0 (len - 1) $ \i -> do
+           a <- next i
+           write i a
+
 --------------------------------------------------------------------------------
 -- ** Push operations.
 --------------------------------------------------------------------------------
@@ -343,6 +351,61 @@ forwardPermute p vec = Push len $ \write ->
     len = length v
 
 --------------------------------------------------------------------------------
+-- *
+--------------------------------------------------------------------------------
+
+data Seq m a
+  where
+    Seq :: Expr m Length -> m (Expr m Index -> m a) -> Seq m a
+
+instance Monad m => Functor (Seq m)
+  where
+    fmap f (Seq len init) = Seq len $
+      do next <- init
+         return $ fmap f . next
+
+instance (Expr m ~ exp) => Finite exp (Seq m a)
+  where
+    length (Seq len _) = len
+
+class Sequence m vec a | vec -> a
+  where
+    toSeq :: vec -> Seq m a
+
+toSeqM :: (Sequence m vec a, Monad m) => vec -> m (Seq m a)
+toSeqM = return . toSeq
+
+instance (m1 ~ m2) => Sequence m1 (Seq m2 a) a
+  where
+    toSeq = id
+
+instance
+       ( SyntaxM m a
+       , ArrElem (IArray m a) ~ a
+       , Indexed (Expr m) (IArray m a)
+       , Finite  (Expr m) (IArray m a)
+       , MonadComp m
+       )
+    => Sequence m (Manifest m a) a
+  where
+    toSeq = toSeq . toPull
+
+instance
+       ( Expr m ~ exp
+       , ArrElem (IArray m a) ~ a
+       , Indexed (Expr m) (IArray m a)
+       , Finite  (Expr m) (IArray m a)
+       , MonadComp m
+       )
+    => Sequence m (Pull exp a) a
+  where
+    toSeq vec = Seq (length vec) $ return $ \i -> return $ vec ! i
+
+--------------------------------------------------------------------------------
+
+-- ...
+
+--------------------------------------------------------------------------------
 -- * Writing to memory.
 --------------------------------------------------------------------------------
 
@@ -354,6 +417,7 @@ class ViewManifest m vec a | vec -> a
 
 instance ViewManifest m (Pull exp a) a
 instance ViewManifest m (Push m a) a
+instance ViewManifest m (Seq m a) a
 instance ViewManifest m (Manifest m a) a
   where
     viewManifest = Just
@@ -441,5 +505,14 @@ instance (
   , Slicable (Expr m) (IArray m a)
   )
   => Manifestable m (Push m a) a
+
+instance (
+    MonadComp m
+  , SyntaxM   m a
+  , VectorM   m
+  , Finite   (Expr m) (Array m a)
+  , Slicable (Expr m) (IArray m a)
+  )
+  => Manifestable m (Seq m a) a
 
 --------------------------------------------------------------------------------

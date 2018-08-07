@@ -14,7 +14,7 @@ import Feldspar.Software
 import Feldspar.Software as Soft (icompile)
 
 import Feldspar.Hardware
-import Feldspar.Hardware as Hard (icompileWrap)
+import Feldspar.Hardware as Hard (icompile)
 
 --------------------------------------------------------------------------------
 -- * Example of arrays in co-feldspar.
