@@ -24,6 +24,7 @@ library
     Feldspar.Frontend,
     Feldspar.Array.Buffered,
     Feldspar.Array.Vector,
+    Feldspar.Array.Queue,
     Feldspar.Hardware,
     Feldspar.Hardware.Primitive,
     Feldspar.Hardware.Primitive.Backend,

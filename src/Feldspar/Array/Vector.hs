@@ -403,6 +403,21 @@ instance
 
 --------------------------------------------------------------------------------
 
+recurrenceI
+  :: ( Pushy     m fvec a
+     , Sequence  m ivec a
+     , MonadComp m
+     )
+  => fvec
+  -> ivec
+  -> (Pull m a -> b)
+  -> Seq m b
+recurrenceI ibuf ivec step = Seq len $
+  do next <- init
+     buf  <- undefined
+     undefined
+  where
+    Seq len init = toSeq ivec
 -- ...
 
 --------------------------------------------------------------------------------
