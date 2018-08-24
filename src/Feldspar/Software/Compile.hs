@@ -206,6 +206,11 @@ translateExp = goAST . optimize . unSExp
           liftStruct2 (sugarSymPrim RotateL) <$> goAST a <*> goAST b
       | Just RotateR <- prj op =
           liftStruct2 (sugarSymPrim RotateR) <$> goAST a <*> goAST b
+    go t guard (cond :* a :* Syn.Nil)
+      | Just (Guard lbl msg) <- prj guard
+      = do cond' <- extractNode <$> goAST cond
+           lift $ assert cond' msg
+           goAST a
     go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
       | Just ForLoop   <- prj loop
       , Just (LamT iv) <- prj lami
@@ -234,6 +239,14 @@ unsafeTranslateSmallExp a = do
 
 --------------------------------------------------------------------------------
 -- * Interpretation of software commands.
+--------------------------------------------------------------------------------
+
+instance (Imp.ControlCMD Oper.:<: instr) => Oper.Reexpressible AssertCMD instr Env
+  where
+    reexpressInstrEnv reexp (Assert lbl cond msg) = do
+      cond' <- reexp cond
+      lift $ Imp.assert cond' msg
+
 --------------------------------------------------------------------------------
 
 instance (Imp.CompExp exp, Imp.CompTypeClass ct) => Oper.Interp MMapCMD C.CGen (Oper.Param2 exp ct)

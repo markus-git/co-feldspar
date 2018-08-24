@@ -7,10 +7,10 @@
 module Feldspar.Array.Queue where
 
 import Feldspar
-import Feldspar.Frontend (Arrays)
+import Feldspar.Frontend (Arrays, (/=))
 import Feldspar.Array.Vector
 
-import Prelude hiding (length, mod, reverse, drop, take, (++))
+import Prelude hiding (length, mod, reverse, drop, take, (++), (/=))
 
 --------------------------------------------------------------------------------
 -- * Queues.
@@ -123,4 +123,40 @@ newDoubleQueue l =
   do buf <- newArr $ 2 * l
      queueDoubleBuffer l buf
   
+--------------------------------------------------------------------------------
+-- ** Processing using queues.
+--------------------------------------------------------------------------------
+
+recurrenceI
+  :: ( Pushy     m fvec a
+     , Sequence  m ivec a
+     , MonadComp m
+     -- ...
+     , Queues m a
+     , SyntaxM m a
+     , Manifestable m fvec a
+     , Finite (Expr m) fvec
+     , Slicable (Expr m) (IArray m a)
+     -- ...
+     , SyntaxM m b
+     , Logical (Expr m)
+     )
+  => fvec
+  -> ivec
+  -> (Pull (Expr m) a -> b)
+  -> Seq m b
+recurrenceI ibuf ivec step = Seq len $
+  do next <- init
+     buf  <- queueVector ibuf
+     return $ \i -> do
+       a <- next i
+       iff (length ibuf /= 0)
+         (queue_put buf a)
+         (return ())
+       queue_with buf (return . step)
+  where
+    Seq len init = toSeq ivec
+-- ...
+
+
 --------------------------------------------------------------------------------

@@ -119,6 +119,8 @@ instance (Vector exp, ExprOf a ~ exp) => Slicable exp (Pull exp a)
   where
     slice from n = take n . drop from
 
+type instance ExprOf (Pull exp a) = exp
+
 -- | Data structures that are 'Pull'-like.
 class    ( Indexed exp vec
          , Finite  exp vec
@@ -403,21 +405,6 @@ instance
 
 --------------------------------------------------------------------------------
 
-recurrenceI
-  :: ( Pushy     m fvec a
-     , Sequence  m ivec a
-     , MonadComp m
-     )
-  => fvec
-  -> ivec
-  -> (Pull m a -> b)
-  -> Seq m b
-recurrenceI ibuf ivec step = Seq len $
-  do next <- init
-     buf  <- undefined
-     undefined
-  where
-    Seq len init = toSeq ivec
 -- ...
 
 --------------------------------------------------------------------------------
