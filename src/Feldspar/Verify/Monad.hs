@@ -39,37 +39,36 @@ import Prelude hiding (break)
 --------------------------------------------------------------------------------
 -- Based on https://github.com/nick8325/imperative-edsl/blob/master/src/Language/Embedded/Verify.hs
 --
--- Our verification algorithm looks a lot like symbolic execution.
--- The difference is that we use an SMT solver to do the symbolic
--- reasoning.
+-- Our verification algorithm looks a lot like symbolic execution. The
+-- difference is that we use an SMT solver to do the symbolic reasoning.
 --
--- We model the state of the program as the state of the SMT solver
--- plus a context, which is a map from variable name to SMT value.
--- Symbolically executing a statement modifies this state to become
--- the state after executing the statement. Typically, this modifies
--- the context (when a variable has changed) or adds new axioms to the
--- SMT solver.
+-- We model the state of the program as the state of the SMT solver plus a
+-- context, which is a map from variable name to SMT value. Symbolically
+-- executing a statement modifies this state to become the state after executing
+-- the statement. Typically, this modifies the context (when a variable has
+-- changed) or adds new axioms to the SMT solver.
 --
--- The verification monad allows us to easily manipulate the SMT
--- solver and the context. It also provides three other features:
+-- The verification monad allows us to easily manipulate the SMT solver and the
+-- context. It also provides three other features:
 --
--- First, it supports branching on the value of a formula, executing
--- one branch if the formula is true and the other if the formula is
--- false. The monad takes care of merging the contexts from the two
--- branches afterwards, as well as making sure that any axiom we add
--- inside a branch is only assumed conditionally.
+-- First, it supports branching on the value of a formula, executing one branch
+-- if the formula is true and the other if the formula is false. The monad takes
+-- care of merging the contexts from the two branches afterwards, as well as
+-- making sure that any axiom we add inside a branch is only assumed
+-- conditionally.
 --
--- Second, it supports break statements in a rudimentary way. We can
--- record when we reach a break statement, and ask the monad for a
--- symbolic expression that tells us whether a given statement breaks.
--- However, skipping past statements after a break is the responsibility
--- of the user of the monad.
+-- Second, it supports break statements in a rudimentary way. We can record when
+-- we reach a break statement, and ask the monad for a symbolic expression that
+-- tells us whether a given statement breaks. However, skipping past statements
+-- after a break is the responsibility of the user of the monad.
 --
--- Finally, we can emit warnings during verification, for example when
--- we detect a read of an uninitialised reference.
+-- Finally, we can emit warnings during verification, for example when we detect
+-- a read of an uninitialised reference.
 --
--- The Verify monad itself is a reader/writer/state monad with the
--- following components:
+--------------------------------------------------------------------------------
+
+-- | The Verify monad itself is a reader/writer/state monad with the following
+-- components:
 --
 -- Read:  list of formulas which are true in the current branch;
 --        "chattiness level" (if > 0 then tracing messages are printed);
@@ -82,12 +81,13 @@ import Prelude hiding (break)
 --
 -- State: the context, a map from variables to SMT values.
 --
---------------------------------------------------------------------------------
-
 type Verify = RWST ([SExpr], Int, Mode) ([SExpr], Warns, [HintBody], [String]) Context SMT
 
+-- | The verification monad can prove (with and without warnings) or simply
+-- execute a computation.
 data Mode = Prove | ProveAndWarn | Execute deriving Eq
 
+-- | Warkings are either local warnings for a branch or global.
 data Warns = Warns {
     warns_here :: [String]
   , warns_all  :: [String] }
@@ -101,6 +101,7 @@ instance Monoid Warns
 
 --------------------------------------------------------------------------------
 
+-- | Run and prove a computation and record all warnings.
 runVerify :: Verify a -> IO (a, [String])
 runVerify m = runZ3 [] $ do
   SMT.setOption ":produce-models" "false"
@@ -126,6 +127,8 @@ warning x mx = do
   (_, _, mode) <- ask
   if (mode == ProveAndWarn) then mx else return x
 
+--------------------------------------------------------------------------------
+
 -- | Assume that a given formula is true.
 assume :: String -> SExpr -> Verify ()
 assume msg p = proving () $ do
@@ -150,45 +153,22 @@ provable msg p = proving False $ do
           lift $ check
           context <- get
           model   <- showModel context
-          liftIO $ putStrLn ("  (countermodel is " ++ model ++ ")")
+          liftIO $ putStrLn (" (countermodel is " ++ model ++ ")")
         Unsat   -> trace msg "Proved" p
         Unknown -> trace msg "Couldn't solve" p
     return (res == Unsat)
-
--- | Print a formula for debugging purposes.
-trace :: String -> String -> SExpr -> Verify ()
-trace msg kind p = chat $ do
-  branch <- branch >>= mapM (lift . simplify)
-  p <- lift $ simplify p
-  liftIO $ do
-    putStr (kind ++ " " ++ showSExpr p ++ " (" ++ msg ++ ")")
-    case branch of
-      []  -> putStrLn ""
-      [x] -> putStrLn (" assuming " ++ showSExpr x)
-      _   -> do
-        putStrLn " assuming:"
-        sequence_ [ putStrLn ("  " ++ showSExpr x) | x <- branch ]
-
-printContext :: String -> Verify ()
-printContext msg = do
-  ctx <- get
-  liftIO $ do
-    putStrLn (msg ++ ":")
-    forM_ (Map.toList ctx) $ \(name, val) ->
-      putStrLn ("  " ++ show name ++ " -> " ++ show val)
-    putStrLn ""
 
 -- | Run a computation but undo its effects afterwards.
 stack :: Verify a -> Verify a
 stack mx = do
   state <- get
-  read <- ask
+  read  <- ask
   fmap fst $ lift $ SMT.stack $ evalRWST mx read state
 
 -- | Branch on the value of a formula.
 ite :: SExpr -> Verify a -> Verify b -> Verify (a, b)
 ite p mx my = do
-  ctx <- get
+  ctx  <- get
   read <- ask
   let
     withBranch p
@@ -204,6 +184,8 @@ ite p mx my = do
       | otherwise = [SMT.ite p (disj break1) (disj break2)]
   tell (break, warns1 `mappend` warns2, hints1 ++ hints2, decls1 ++ decls2)
   return (x, y)
+
+--------------------------------------------------------------------------------
 
 -- | Read the current branch.
 branch :: Verify [SExpr]
@@ -248,8 +230,9 @@ warn msg = warning () $ tell ([], Warns [msg] [msg], [], [])
 hint :: TypedSExpr a => a -> Verify ()
 hint exp = tell ([], mempty, [HintBody (toSMT exp) (smtType exp)], [])
 
-hintFormula :: SExpr -> Verify ()
-hintFormula exp = tell ([], mempty, [HintBody exp tBool],[])
+-- | Add a hint for a formula to the output.
+-- hintFormula :: SExpr -> Verify ()
+-- hintFormula exp = tell ([], mempty, [HintBody exp tBool],[])
 
 -- | Run a computation but ignoring its warnings.
 noWarn :: Verify a -> Verify a
@@ -258,8 +241,9 @@ noWarn = local (\(x, y, mode) -> (x, y, f mode))
     f ProveAndWarn = Prove
     f x = x
 
-swallowWarns :: Verify a -> Verify a
-swallowWarns = censor (\(x, ws, y, z) -> (x, ws { warns_here = [] }, y, z))
+-- | Run a computation but ignoring its local warnings.
+-- swallowWarns :: Verify a -> Verify a
+-- swallowWarns = censor (\(x, ws, y, z) -> (x, ws { warns_here = [] }, y, z))
 
 -- | Run a computation and get its warnings.
 getWarns :: Verify a -> Verify (a, [String])
@@ -267,23 +251,9 @@ getWarns mx = do
   (x, (_, warns, _, _)) <- listen mx
   return (x, warns_here warns)
 
--- | Run a computation more chattily.
-chattily :: Verify a -> Verify a
-chattily = local (\(ctx, n, prove) -> (ctx, n+1, prove))
-
--- | Run a computation more quietly.
-quietly :: Verify a -> Verify a
-quietly = local (\(ctx, n, prove) -> (ctx, n-1, prove))
-
--- | Produce debug output.
-chat :: Verify () -> Verify ()
-chat mx = do
-  (_, chatty, _) <- ask
-  when (chatty > 0) mx
-
-----------------------------------------------------------------------
--- The API for verifying programs.
-----------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- ** The API for verifying programs.
+--------------------------------------------------------------------------------
 
 -- | A typeclass for things which can be symbolically executed.
 class Verifiable prog
@@ -313,54 +283,58 @@ instance (VerifyInstr f exp pred, VerifyInstr g exp pred) => VerifyInstr (f :+: 
 -- ** Expressions and invariants.
 --------------------------------------------------------------------------------
 
--- A typeclass for expressions which can be evaluated under a context.
+-- | A typeclass for expressions which can be evaluated under a context.
 class Typeable exp => SMTEval1 exp
   where
     -- The result type of evaluating the expression.
     data SMTExpr exp a
-    eval :: exp a -> Verify (SMTExpr exp a)
-
     -- A predicate which must be true of the expression type.
     type Pred exp :: * -> Constraint
-
+    -- Evaluate an expression to its SMT expression.
+    eval :: exp a -> Verify (SMTExpr exp a)
     -- Witness the fact that (SMTEval1 exp, Pred exp a) => SMTEval exp a.
     witnessPred :: Pred exp a => exp a -> Dict (SMTEval exp a)
 
 --------------------------------------------------------------------------------
 
--- A typeclass for expressions of a particular type.
+-- | A typeclass for expressions of a particular type.
 class (SMTEval1 exp, TypedSExpr (SMTExpr exp a), Typeable a) => SMTEval exp a
   where
+    -- Lift a typed constant into a SMT expression.
     fromConstant :: a -> SMTExpr exp a
-
+    -- Witness the numerical type of an expression.
     witnessNum :: Num a => exp a -> Dict (Num (SMTExpr exp a))
     witnessNum = error "witnessNum"
-
+    -- Witness the ordered type of an expression.
     witnessOrd :: Ord a => exp a -> Dict (SMTOrd (SMTExpr exp a))
     witnessOrd = error "witnessOrd"
-
+    -- Produce an index for a type.
     skolemIndex :: Ix a => SMTExpr exp a
     skolemIndex = error "skolemIndex"
 
 --------------------------------------------------------------------------------
 
+-- | A typeclass for values with a representation as an SMT expression. 
 class Fresh a => TypedSExpr a
   where
     smtType :: a -> SExpr
     toSMT   :: a -> SExpr
     fromSMT :: SExpr -> a
 
+-- | Spawn a new expression, the string is a hint for making a pretty name.
 freshSExpr :: forall a. TypedSExpr a => String -> Verify a
 freshSExpr name = fmap fromSMT (freshVar name (smtType (undefined :: a)))
 
 --------------------------------------------------------------------------------
 
+-- | A typeclass for values that support uninitialised creation.
 class Fresh a
   where
-    -- Create an uninitialised value.
-    -- The String argument is a hint for making pretty names.
+    -- Create an uninitialised value. The String argument is a hint for making
+    -- pretty names.
     fresh :: String -> Verify a
 
+-- | Create a fresh variable and initialize it.
 freshVar :: String -> SExpr -> Verify SExpr
 freshVar name ty = do
   n <- lift freshNum
@@ -370,7 +344,7 @@ freshVar name ty = do
 
 --------------------------------------------------------------------------------
 
--- A typeclass for values that can undergo predicate abstraction.
+-- | A typeclass for values that can undergo predicate abstraction.
 class (IsLiteral (Literal a), Fresh a) => Invariant a
   where
     data Literal a
@@ -910,8 +884,8 @@ updateArr name update touched = do
 
 hintArr :: forall exp i . (SMTEval exp i, SMTOrd (SMTExpr exp i), Ix i) => SMTExpr exp i -> Verify ()
 hintArr ix = do
-  hintFormula (ix .<. skolemIndex)
-  hintFormula (ix .>. skolemIndex)
+  hint (ix .<. skolemIndex)
+  hint (ix .>. skolemIndex)
 
 --------------------------------------------------------------------------------
 -- ** Predicate abstraction
@@ -1128,5 +1102,44 @@ x .==. y = toSMT x `eq` toSMT y
 
 smtIte :: TypedSExpr a => SExpr -> a -> a -> a
 smtIte cond x y = fromSMT (SMT.ite cond (toSMT x) (toSMT y))
+
+--------------------------------------------------------------------------------
+
+-- | Run a computation more chattily.
+chattily :: Verify a -> Verify a
+chattily = local (\(ctx, n, prove) -> (ctx, n+1, prove))
+
+-- | Run a computation more quietly.
+quietly :: Verify a -> Verify a
+quietly = local (\(ctx, n, prove) -> (ctx, n-1, prove))
+
+-- | Produce debug output.
+chat :: Verify () -> Verify ()
+chat mx = do
+  (_, chatty, _) <- ask
+  when (chatty > 0) mx
+
+-- | Print a formula for debugging purposes.
+trace :: String -> String -> SExpr -> Verify ()
+trace msg kind p = chat $ do
+  branch <- branch >>= mapM (lift . simplify)
+  p <- lift $ simplify p
+  liftIO $ do
+    putStr (kind ++ " " ++ showSExpr p ++ " (" ++ msg ++ ")")
+    case branch of
+      []  -> putStrLn ""
+      [x] -> putStrLn (" assuming " ++ showSExpr x)
+      _   -> do
+        putStrLn " assuming:"
+        sequence_ [ putStrLn ("  " ++ showSExpr x) | x <- branch ]
+
+-- | Print the context for debugging purposes.
+printContext :: String -> Verify ()
+printContext msg = do
+  ctx <- get
+  liftIO $ do
+    putStrLn (msg ++ ":")
+    forM_ (Map.toList ctx) $ \(name, val) -> putStrLn (" " ++ show name ++ " -> " ++ show val)
+    putStrLn ""
 
 --------------------------------------------------------------------------------

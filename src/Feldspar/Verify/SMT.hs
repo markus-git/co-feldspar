@@ -22,15 +22,14 @@ import SimpleSMT(
 import qualified SimpleSMT as SMT
 
 --------------------------------------------------------------------------------
--- Simple SMT front-end.
+-- * Simple SMT front-end.
 --------------------------------------------------------------------------------
 
 type SMT = StateT SMTState IO
 
-data SMTState =
-  SMTState {
-    st_solver :: SMT.Solver,
-    st_next   :: Integer }
+data SMTState = SMTState {
+    st_solver :: SMT.Solver
+  , st_next   :: Integer }
 
 runZ3 :: [String] -> SMT a -> IO a
 runZ3 args m = do
@@ -82,40 +81,34 @@ eq x y
   | otherwise = SMT.eq x y
 
 setOption :: String -> String -> SMT ()
-setOption opt val = withSolver $ \solver ->
-  lift (SMT.setOption solver opt val)
+setOption opt val = withSolver $ \solver -> lift (SMT.setOption solver opt val)
 
 getExpr :: SExpr -> SMT Value
-getExpr exp = withSolver $ \solver ->
-  lift (SMT.getExpr solver exp)
+getExpr exp = withSolver $ \solver -> lift (SMT.getExpr solver exp)
 
 assert :: SExpr -> SMT ()
-assert expr = withSolver $ \solver ->
-  lift (SMT.assert solver expr)
+assert expr = withSolver $ \solver -> lift (SMT.assert solver expr)
 
 simplify :: SExpr -> SMT SExpr
-simplify expr = withSolver $ \solver ->
-  lift (SMT.command solver (fun "simplify" [expr]))
+simplify expr = withSolver $ \solver -> lift (SMT.command solver (fun "simplify" [expr]))
 
 assertSimp :: SExpr -> SMT ()
 assertSimp expr = simplify expr >>= assert
 
 check :: SMT Result
-check = withSolver $ \solver ->
-  lift (SMT.check solver)
+check = withSolver $ \solver -> lift (SMT.check solver)
 
 declare :: String -> SExpr -> SMT SExpr
-declare name ty = withSolver $ \solver ->
-  lift (SMT.declare solver name ty)
+declare name ty = withSolver $ \solver -> lift (SMT.declare solver name ty)
 
 declareFun :: String -> [SExpr] -> SExpr -> SMT SExpr
-declareFun name args res = withSolver $ \solver -> do
-  lift (SMT.declareFun solver name args res)
+declareFun name args res = withSolver $ \solver -> lift (SMT.declareFun solver name args res)
 
 declareSort :: String -> SMT ()
-declareSort name = withSolver $ \solver ->
-  lift (SMT.simpleCommand solver ["declare-sort", name])
+declareSort name = withSolver $ \solver -> lift (SMT.simpleCommand solver ["declare-sort", name])
 
+--------------------------------------------------------------------------------
+-- ** Show SMT expressions.
 --------------------------------------------------------------------------------
 
 showSExpr :: SExpr -> String
@@ -130,11 +123,12 @@ showValue (Other x)  = showSExpr x
 
 showArray :: Value -> SExpr -> SMT String
 showArray n arr = do
-  vals <- sequence [ getExpr (select arr i) | i <- take cutoff (indexes n) ]
-  if length (take (cutoff+1) (indexes n)) <= cutoff then
-    return ("{" ++ intercalate ", " (map showValue vals) ++ "}")
-  else
-    return ("{" ++ intercalate ", " (map showValue vals) ++ ", ...}")
+    vals <- sequence [ getExpr (select arr i) | i <- take cutoff (indexes n) ]
+    if length (take (cutoff+1) (indexes n)) <= cutoff
+    then
+      return ("{" ++ intercalate ", " (map showValue vals) ++ "}")
+    else
+      return ("{" ++ intercalate ", " (map showValue vals) ++ ", ...}")
   where
     cutoff :: Int
     cutoff = 20
@@ -143,8 +137,9 @@ showArray n arr = do
     indexes (Int n)    = map int [0..n-1]
     indexes (Bits w n) = map (bits w) [0..n-1]
 
-bits :: Int -> Integer -> SExpr
-bits w n = List [Atom "_", Atom ("bv" ++ show m), int (fromIntegral w)]
-  where
-    m = n `mod` (2^w)
+    bits :: Int -> Integer -> SExpr
+    bits w n = List [Atom "_", Atom ("bv" ++ show m), int (fromIntegral w)]
+      where
+        m = n `mod` (2^w)
+
 --------------------------------------------------------------------------------
