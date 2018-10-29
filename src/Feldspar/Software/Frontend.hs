@@ -386,7 +386,7 @@ stdout = Imp.stdout
 
 class PrintfType r
   where
-    fprf :: Handle -> String -> [Imp.PrintfArg SExp] -> r
+    fprf :: Handle -> String -> [Imp.PrintfArg SExp SoftwarePrimType] -> r
 
 instance (a ~ ()) => PrintfType (Software a)
   where

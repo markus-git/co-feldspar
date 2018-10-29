@@ -87,7 +87,7 @@ type Verify = RWST ([SExpr], Int, Mode) ([SExpr], Warns, [HintBody], [String]) C
 -- execute a computation.
 data Mode = Prove | ProveAndWarn | Execute deriving Eq
 
--- | Warkings are either local warnings for a branch or global.
+-- | Warnings are either local warnings for a branch or global.
 data Warns = Warns {
     warns_here :: [String]
   , warns_all  :: [String] }
@@ -175,8 +175,10 @@ ite p mx my = do
       | p == bool True  = local id
       | p == bool False = local (\(_,  x, y) -> ([p],  x, y))
       | otherwise       = local (\(xs, x, y) -> (p:xs, x, y))
-  (x, ctx1, (break1, warns1, hints1, decls1)) <- lift $ runRWST (withBranch p mx) read ctx
-  (y, ctx2, (break2, warns2, hints2, decls2)) <- lift $ runRWST (withBranch (SMT.not p) my) read ctx
+  (x, ctx1, (break1, warns1, hints1, decls1)) <-
+    lift $ runRWST (withBranch p mx) read ctx
+  (y, ctx2, (break2, warns2, hints2, decls2)) <-
+    lift $ runRWST (withBranch (SMT.not p) my) read ctx
   mergeContext p ctx1 ctx2 >>= put
   let
     break
@@ -230,9 +232,9 @@ warn msg = warning () $ tell ([], Warns [msg] [msg], [], [])
 hint :: TypedSExpr a => a -> Verify ()
 hint exp = tell ([], mempty, [HintBody (toSMT exp) (smtType exp)], [])
 
--- | Add a hint for a formula to the output.
--- hintFormula :: SExpr -> Verify ()
--- hintFormula exp = tell ([], mempty, [HintBody exp tBool],[])
+-- | Add a hint for a `SExpr` to the output.
+hintFormula :: SExpr -> Verify ()
+hintFormula exp = tell ([], mempty, [HintBody exp tBool],[])
 
 -- | Run a computation but ignoring its warnings.
 noWarn :: Verify a -> Verify a
@@ -271,7 +273,8 @@ verify = fmap fst . verifyWithResult
 -- | A typeclass for instructions which can be symbolically executed.
 class VerifyInstr instr exp pred
   where
-    verifyInstr :: Verifiable prog => instr '(prog, Param2 exp pred) a -> a -> Verify (instr '(prog, Param2 exp pred) a)
+    verifyInstr :: Verifiable prog => instr '(prog, Param2 exp pred) a -> a ->
+      Verify (instr '(prog, Param2 exp pred) a)
     verifyInstr instr _ = return instr
 
 instance (VerifyInstr f exp pred, VerifyInstr g exp pred) => VerifyInstr (f :+: g) exp pred
@@ -453,7 +456,16 @@ instance Show Name
   where
     show (Name name _) = name
 
-data Entry = forall a. (Typeable a, Ord a, Mergeable a, Show a, ShowModel a, Invariant a, Exprs a) => Entry a
+data Entry = forall a .
+  ( Ord a
+  , Show a
+  , Typeable a
+  , Mergeable a
+  , ShowModel a
+  , Invariant a
+  , Exprs a
+  ) =>
+  Entry a
 
 instance Eq Entry
   where
@@ -461,7 +473,8 @@ instance Eq Entry
 
 instance Ord Entry
   where
-    compare (Entry x) (Entry y) = compare (typeOf x) (typeOf y) `mappend` compare (Just x) (cast y)
+    compare (Entry x) (Entry y) =
+      compare (typeOf x) (typeOf y) `mappend` compare (Just x) (cast y)
     
 instance Show Entry
   where
@@ -469,13 +482,14 @@ instance Show Entry
 
 type Context = Map Name Entry
 
--- Look up a value in the context.
+-- | Look up a value in the context.
 lookupContext :: forall a . Typeable a => String -> Context -> a
 lookupContext name ctx =
   case maybeLookupContext name ctx of
     Nothing -> error ("variable " ++ name ++ " not found in context")
     Just x -> x
 
+-- | ...
 maybeLookupContext :: forall a . Typeable a => String -> Context -> Maybe a
 maybeLookupContext name ctx = do
   Entry x <- Map.lookup (Name name (undefined :: a)) ctx
@@ -483,14 +497,15 @@ maybeLookupContext name ctx = do
     Nothing -> error "type mismatch in lookup"
     Just x  -> return x
 
--- Add a value to the context or modify an existing binding.
+-- | Add a value to the context or modify an existing binding.
 insertContext :: forall a . (Typeable a, Ord a, Mergeable a, Show a, ShowModel a, Invariant a, Exprs a) => String -> a -> Context -> Context
 insertContext name x ctx = Map.insert (Name name (undefined :: a)) (Entry x) ctx
 
--- modified ctx1 ctx2 returns a subset of ctx2 that contains
--- only the values that have been changed from ctx1.
+-- | Modified ctx1 ctx2 returns a subset of ctx2 that contains only the values
+--   that have been changed from ctx1.
 modified :: Context -> Context -> Context
-modified ctx1 ctx2 = Map.mergeWithKey f (const Map.empty) (const Map.empty) ctx1 ctx2
+modified ctx1 ctx2 =
+    Map.mergeWithKey f (const Map.empty) (const Map.empty) ctx1 ctx2
   where
     f _ x y
       | x == y    = Nothing
@@ -507,12 +522,12 @@ mergeContext :: SExpr -> Context -> Context -> Verify Context
 mergeContext cond ctx1 ctx2 =
   -- If a variable is bound conditionally, put it in the result
   -- context, but only define it conditionally.
-  sequence $
-    Map.mergeWithKey
-      (const combine)
-      (fmap (definedWhen cond))
-      (fmap (definedWhen (SMT.not cond)))
-      ctx1 ctx2
+  sequence $ Map.mergeWithKey
+    (const combine)
+    (fmap (definedWhen cond))
+    (fmap (definedWhen (SMT.not cond)))
+    ctx1
+    ctx2
   where
     combine :: Entry -> Entry -> Maybe (Verify Entry)
     combine x y = Just (return (merge cond x y))
@@ -548,7 +563,10 @@ instance ShowModel Context
     showModel ctx = do
       let (keys, values) = unzip (Map.toList ctx)
       values' <- mapM showModel values
-      return (intercalate ", " (zipWith (\(Name k _) v -> k ++ " = " ++ v) keys values'))
+      return $ intercalate ", "
+             $ zipWith (\(Name k _) v -> k ++ " = " ++ v)
+                 keys
+                 values'
 
 instance ShowModel Entry
   where
@@ -559,339 +577,10 @@ instance ShowModel SExpr
     showModel x = lift (getExpr x) >>= return . showValue
 
 --------------------------------------------------------------------------------
--- ** The different bindings that are stored in the context.
---------------------------------------------------------------------------------
-
--- | A normal variable binding.
-data ValBinding exp a = ValBinding {
-    vb_value :: SMTExpr exp a
-  , vb_ref   :: Maybe String }
-  deriving (Eq, Ord, Show, Typeable)
-
-instance SMTEval exp a => Mergeable (ValBinding exp a)
-  where
-    merge cond x y = case (vb_ref x, vb_ref y) of
-      (Just r1, Just r2) | r1 /= r2 -> error "immutable binding bound in two locations"
-      _ -> ValBinding {
-          vb_value = merge cond (vb_value x) (vb_value y)
-        , vb_ref   = vb_ref x `mplus` vb_ref y }
-
-instance SMTEval exp a => ShowModel (ValBinding exp a)
-  where
-    showModel = showModel . vb_value
-
-instance SMTEval exp a => Fresh (ValBinding exp a)
-  where
-    fresh name = do
-      val <- fresh name
-      return (ValBinding val Nothing)
-
-instance SMTEval exp a => Invariant (ValBinding exp a)
-  where
-    data Literal (ValBinding exp a) = LitVB deriving (Eq, Ord, Show, Typeable)
-
-instance SMTEval exp a => IsLiteral (Literal (ValBinding exp a))
-
-instance SMTEval exp a => Exprs (ValBinding exp a)
-  where
-    exprs val = [toSMT (vb_value val)]
-
-peekVal :: forall exp a. SMTEval exp a => String -> Verify (SMTExpr exp a)
-peekVal name = do
-  ValBinding val ref <- peek name
-  warning () $
-    case ref of
-      Nothing -> return ()
-      Just refName -> do
-        ref <- peek refName :: Verify (RefBinding exp a)
-        safe <- provable "reference not frozen" (val .==. rb_value ref)
-        unless safe (warn ("Unsafe use of frozen reference " ++ name))
-  return val
-
-pokeVal :: SMTEval exp a => String -> SMTExpr exp a -> Verify ()
-pokeVal name val = poke name (ValBinding val Nothing)
-
---------------------------------------------------------------------------------
-
--- | A binding for a reference.
-data RefBinding exp a = RefBinding {
-    rb_value       :: SMTExpr exp a
-  , rb_initialised :: SExpr }
-  deriving (Eq, Ord, Show, Typeable)
-
-instance SMTEval exp a => Mergeable (RefBinding exp a)
-  where
-    merge cond (RefBinding v1 i1) (RefBinding v2 i2) = RefBinding (merge cond v1 v2) (merge cond i1 i2)
-
-instance SMTEval exp a => ShowModel (RefBinding exp a)
-  where
-    showModel = showModel . rb_value
-
-instance SMTEval exp a => Fresh (RefBinding exp a)
-  where
-    fresh name = do
-      value <- fresh name
-      init  <- freshVar (name ++ ".init") tBool
-      return (RefBinding value init)
-
-instance SMTEval exp a => Invariant (RefBinding exp a)
-  where
-    data Literal (RefBinding exp a) =
-        RefInitialised String
-      | RefUnchanged String
-      deriving (Eq, Ord, Show, Typeable)
-
-    literals name _ = [RefInitialised name, RefUnchanged name]
-
-instance SMTEval exp a => IsLiteral (Literal (RefBinding exp a))
-  where
-    smtLit _ ctx (RefInitialised name) = rb_initialised (lookupContext name ctx :: RefBinding exp a)
-    smtLit old new (RefUnchanged name) = toSMT (rb_value x) `eq` toSMT (rb_value y)
-      where
-        x, y :: RefBinding exp a
-        x = lookupContext name old
-        y = lookupContext name new
-
-instance SMTEval exp a => Exprs (RefBinding exp a)
-  where
-    exprs ref = [toSMT (rb_value ref), rb_initialised ref]
-
-newRef :: SMTEval exp a => String -> exp a -> Verify ()
-newRef name (_ :: exp a) = do
-  ref <- fresh name
-  poke name (ref { rb_initialised = bool False } :: RefBinding exp a)
-
-getRef :: SMTEval exp a => String -> Verify (SMTExpr exp a)
-getRef name = do
-  ref <- peek name
-  warning () $ do
-    safe <- provable "reference initialised" (rb_initialised ref)
-    unless safe (warn (name ++ " read before initialisation"))
-  return (rb_value ref)
-
-setRef :: forall exp a. SMTEval exp a => String -> SMTExpr exp a -> Verify ()
-setRef name val = do
-  ref <- peek name :: Verify (RefBinding exp a)
-  poke name ref{rb_value = val, rb_initialised = bool True}
-
-unsafeFreezeRef :: forall exp a. SMTEval exp a => String -> String -> exp a -> Verify ()
-unsafeFreezeRef refName valName (_ :: exp a) = do
-  ref <- peek refName :: Verify (RefBinding exp a)
-  poke valName (ValBinding (rb_value ref) (Just refName))
-
---------------------------------------------------------------------------------
-
--- | A binding that represents the contents of an array.
-data ArrContents exp i a = ArrContents {
-    ac_value :: SMTArray exp i a
-  , ac_bound :: SMTExpr exp i }
-  deriving (Eq, Ord, Typeable, Show)
-
-instance (SMTEval exp a, SMTEval exp i) => Mergeable (ArrContents exp i a)
-  where
-    merge cond (ArrContents v1 b1) (ArrContents v2 b2) = ArrContents (merge cond v1 v2) (merge cond b1 b2)
-
-instance (SMTEval exp a, SMTEval exp i) => ShowModel (ArrContents exp i a)
-  where
-    showModel arr = lift $ do
-      bound <- getExpr (toSMT (ac_bound arr))
-      showArray bound (toSMT (ac_value arr))
-
-instance (SMTEval exp a, SMTEval exp i) => Fresh (ArrContents exp i a)
-  where
-    fresh name = do
-      value <- fresh (name ++ ".value")
-      bound <- fresh (name ++ ".bound")
-      return (ArrContents value bound)
-
-instance (SMTEval exp a, SMTEval exp i) => Invariant (ArrContents exp i a)
-  where
-    data Literal (ArrContents exp i a) = LitAC deriving (Eq, Ord, Show, Typeable)
-
-    havoc name arr = do
-      value <- fresh name
-      return ArrContents { ac_value = value, ac_bound = ac_bound arr }
-
-instance (SMTEval exp a, SMTEval exp i) => IsLiteral (Literal (ArrContents exp i a))
-
-instance (SMTEval exp a, SMTEval exp i) => Exprs (ArrContents exp i a)
-  where
-    exprs arr = [toSMT (ac_bound arr), toSMT (ac_value arr)]
-
---------------------------------------------------------------------------------
-
--- | A binding that represents a reference to an array.
-data ArrBinding exp i a = ArrBinding {
-    arr_source     :: Maybe String
-  , arr_accessible :: SExpr
-  , arr_readable   :: SExpr
-  , arr_failed     :: SExpr }
-  deriving (Eq, Ord, Typeable, Show)
-
-instance (SMTEval exp a, SMTEval exp i) => Mergeable (ArrBinding exp i a)
-  where
-    merge cond (ArrBinding s1 a1 r1 f1) (ArrBinding s2 a2 r2 f2) = ArrBinding (s1 `mplus` s2) (merge cond a1 a2) (merge cond r1 r2) (merge cond f1 f2)
-
-instance (SMTEval exp a, SMTEval exp i) => ShowModel (ArrBinding exp i a)
-  where
-    showModel ArrBinding{arr_source = Nothing}     = return "<unbound array>"
-    showModel ArrBinding{arr_source = Just source} = do
-      src <- peek source
-      showModel (src :: ArrContents exp i a)
-
-instance (SMTEval exp a, SMTEval exp i) => Exprs (ArrBinding exp i a)
-  where
-    exprs (ArrBinding _ a r f) = [a, r, f]
-
-instance (SMTEval exp a, SMTEval exp i) => Fresh (ArrBinding exp i a)
-  where
-    fresh name = do
-      accessible <- freshVar (name ++ ".ok") tBool
-      readable <- freshVar (name ++ ".read") tBool
-      failed <- freshVar (name ++ ".failed") tBool
-      return (ArrBinding Nothing accessible readable failed)
-
-instance (SMTEval exp a, SMTEval exp i) => Invariant (ArrBinding exp i a)
-  where
-    data Literal (ArrBinding exp i a) =
-        ArrAccessible String
-      | ArrReadable String
-      | ArrSafetyPreserved String
-      deriving (Eq, Ord, Show, Typeable)
-
-    literals name _ = [ArrAccessible name, ArrReadable name, ArrSafetyPreserved name]
-
-    havoc name arr = do
-      arr' <- fresh name :: Verify (ArrBinding exp i a)
-      return arr' { arr_source = arr_source arr }
-
-    warns1 ctx name arr = arr { arr_failed = bool False }
-    warns2 ctx name arr = arr {
-        arr_accessible = arr_accessible arr0
-      , arr_readable = arr_readable arr0
-      , arr_failed = arr_failed arr0 }
-      where
-        arr0 :: ArrBinding exp i a
-        arr0 = lookupContext name ctx
-
-    warnLiterals name arr = [(ArrAccessible name, ok), (ArrReadable name, ok)]
-      where
-        ok = SMT.not (arr_failed arr)
-    warnLiterals2 name _ = [ArrSafetyPreserved name]
-
-instance (SMTEval exp a, SMTEval exp i) => IsLiteral (Literal (ArrBinding exp i a))
-  where
-    smtLit _   ctx (ArrAccessible name)      = arr_accessible (lookupContext name ctx :: ArrBinding exp i a)
-    smtLit _   ctx (ArrReadable name)        = arr_readable (lookupContext name ctx :: ArrBinding exp i a)
-    smtLit old ctx (ArrSafetyPreserved name) = case maybeLookupContext name old of
-      Just (arr :: ArrBinding exp i a) ->
-        arr_failed arr .||.
-        SMT.not (arr_failed (lookupContext name ctx :: ArrBinding exp i a))
-      Nothing -> bool False
-
---------------------------------------------------------------------------------
-
--- | A wrapper to help with fresh name generation.
-newtype SMTArray exp i a = SMTArray SExpr deriving (Eq, Ord, Show, Mergeable)
-
-instance (SMTEval exp a, SMTEval exp i) => Fresh (SMTArray exp i a)
-  where
-    fresh = freshSExpr
-
-instance (SMTEval exp a, SMTEval exp i) => TypedSExpr (SMTArray exp i a)
-  where
-    smtType _ = tArray (smtType (undefined :: SMTExpr exp i)) (smtType (undefined :: SMTExpr exp a))
-    toSMT (SMTArray arr) = arr
-    fromSMT = SMTArray
-
-arrayBindings :: Typeable (ArrBinding exp i a) => Context -> String -> [(String, ArrBinding exp i a)]
-arrayBindings ctx name = filter p [ (name', y) | (Name name' _, Entry x) <- Map.toList ctx, Just y <- [cast x] ]
-  where
-    p (_, arr) = arr_source arr == Just name
-
-selectArray :: (SMTEval exp a, SMTEval exp i) => SMTArray exp i a -> SMTExpr exp i -> SMTExpr exp a
-selectArray arr i = fromSMT (select (toSMT arr) (toSMT i))
-
-storeArray :: (SMTEval exp a, SMTEval exp i) => SMTExpr exp i -> SMTExpr exp a -> SMTArray exp i a -> SMTArray exp i a
-storeArray i x arr = fromSMT (store (toSMT arr) (toSMT i) (toSMT x))
-
-newArr :: forall exp i a . (Num (SMTExpr exp i), SMTOrd (SMTExpr exp i), SMTEval exp i, SMTEval exp a) => String -> SMTExpr exp i -> Verify (SMTArray exp i a)
-newArr name n = do
-  value <- fresh name :: Verify (SMTArray exp i a)
-  let arr :: ArrBinding exp i a
-      arr = ArrBinding (Just name) (bool True) (bool True) (bool False)
-  poke name (ArrContents value n)
-  poke name arr
-  return value
-
-peekArr :: forall exp i a . (SMTEval exp i, SMTEval exp a) => String -> Verify (Maybe (ArrBinding exp i a, String, ArrContents exp i a))
-peekArr name = do
-  ctx <- get
-  arr <- peek name
-  safe <- provable "array accessible" (arr_accessible arr)
-  if safe then do
-    let err = error "array accessible but has no source"
-        source = fromMaybe err (arr_source arr)
-    src <- peek source
-    return (Just (arr, source, src))
-  else do
-    warn ("Unsafe use of inaccessible array " ++ name ++ " (after SwapPtr?)")
-    -- Invalidate everything to help with computing the frame
-    let
-      refs =
-        case arr_source arr of
-          Nothing -> [(name, arr)]
-          Just src -> arrayBindings ctx src
-    forM_ refs $ \(name, arr) -> do
-      arr <- havoc name arr
-      poke name (arr { arr_failed = bool True } :: ArrBinding exp i a)
-    return Nothing
-
-readArr :: forall exp i a. (SMTOrd (SMTExpr exp i), Ix i, SMTEval exp i, SMTEval exp a) => String -> SMTExpr exp i -> Verify (SMTExpr exp a)
-readArr name ix = do
-  hintArr ix
-  marr <- peekArr name
-  case marr of
-    Nothing -> fresh "unbound"
-    Just (arr :: ArrBinding exp i a, _, src) -> do
-      warning () $ do
-        let
-          prop = SMT.not (ix .==. skolemIndex) .||. arr_readable arr
-        safe <- provable "array not modified" prop
-        unless safe $ do
-          warn ("Unsafe use of frozen array " ++ name)
-          poke name (arr { arr_failed = bool True } :: ArrBinding exp i a)
-      return (selectArray (ac_value src) ix)
-
-updateArr :: forall exp i a.
-  (Ix i, SMTEval exp i, SMTEval exp a) =>
-  String ->
-  (SMTArray exp i a -> SMTArray exp i a) ->
-  (SMTExpr exp i -> SExpr) -> Verify ()
-updateArr name update touched = do
-  marr <- peekArr name
-  case marr of
-    Nothing -> do
-      return ()
-    Just (arr :: ArrBinding exp i a, source, src) -> do
-      ctx <- get
-      forM_ (arrayBindings ctx source \\ [(name, arr)]) $
-        \(name, arr) -> do
-          let readable = SMT.not (touched skolemIndex) .&&. arr_readable arr
-          poke name (arr { arr_readable = readable } :: ArrBinding exp i a)
-      poke name (arr { arr_readable = bool True } :: ArrBinding exp i a)
-      poke source (src { ac_value = update (ac_value src) } :: ArrContents exp i a)
-
-hintArr :: forall exp i . (SMTEval exp i, SMTOrd (SMTExpr exp i), Ix i) => SMTExpr exp i -> Verify ()
-hintArr ix = do
-  hint (ix .<. skolemIndex)
-  hint (ix .>. skolemIndex)
-
---------------------------------------------------------------------------------
 -- ** Predicate abstraction
 --------------------------------------------------------------------------------
-
--- The literals used in predicate abstraction.
+{-
+-- | The literals used in predicate abstraction.
 data SomeLiteral = forall a . IsLiteral a => SomeLiteral a
 
 instance Eq SomeLiteral
@@ -1061,7 +750,7 @@ evalClause :: Context -> [SomeLiteral] -> Verify SExpr
 evalClause old clause = do
   ctx <- get
   return (disj [ smtLit old ctx lit | SomeLiteral lit <- clause ])
-
+-}
 --------------------------------------------------------------------------------
 -- *** A replacement for the SMTOrd class.
 --------------------------------------------------------------------------------

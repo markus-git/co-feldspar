@@ -48,10 +48,8 @@ instance (Sign s, Width w) => Num (BV s w) where
   -- Feldspar uses the idiom b * x (where b is a boolean) to mean
   -- b ? x : 0. But the SMT solver doesn't like multiplication.
   -- Here are some transformations which simplify away that idiom.
-  BV (List [Atom "ite", b, x, y]) * z =
-    BV (ite b (unBV (BV x * z)) (unBV (BV y * z)))
-  x * BV (List [Atom "ite", b, y, z]) =
-    BV (ite b (unBV (x * BV y)) (unBV (x * BV z)))
+  BV (List [Atom "ite", b, x, y]) * z = BV (ite b (unBV (BV x * z)) (unBV (BV y * z)))
+  x * BV (List [Atom "ite", b, y, z]) = BV (ite b (unBV (x * BV y)) (unBV (x * BV z)))
   x * y | x == 0 || y == 0 = 0
   x * y | x == 1 = y
   x * y | x == 2 = y + y
@@ -65,8 +63,10 @@ instance (Sign s, Width w) => Num (BV s w) where
 instance Enum (BV s w) where
   toEnum   = error "no Enum for BV"
   fromEnum = error "no Enum for BV"
+
 instance (Sign s, Width w) => Real (BV s w) where
   toRational = error "no toRational for BV"
+
 instance (Sign s, Width w) => Integral (BV s w) where
   toInteger = error "no toInteger for BV"
   n0@(BV n) `quotRem` d0@(BV d)

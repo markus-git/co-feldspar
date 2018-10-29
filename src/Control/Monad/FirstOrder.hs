@@ -138,18 +138,6 @@ class (HFunctor instr, HTraversable (FirstOrder instr)) =>
       -> FirstOrder instr '(Sequence (FirstOrder n) '(exp, fs), '(exp, fs)) a
       -> Recovered instr n '(exp, fs) a
 
--- refuncInstr ::
---   ( Defunctionalise inv prog
---   , TypeablePred pred
---   , Substitute exp
---   , SubstPred exp ~ pred
---   , pred Bool)
---   => inv -> Subst
---   -> FirstOrder inv instr
---        '(Prog (FirstOrder inv prog) (Param2 exp pred), Param2 exp pred)
---        a
---   -> Refunc instr prog exp pred a
-
 instance (Defunctionalise instr1, Defunctionalise instr2) =>
     Defunctionalise (instr1 :+: instr2)
   where
