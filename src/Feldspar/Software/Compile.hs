@@ -37,7 +37,7 @@ import qualified Control.Monad.Operational.Higher as Oper
 
 -- imperative-edsl.
 import Language.Embedded.Expression
-import Language.Embedded.Imperative hiding (Ref, (:+:)(..), (:<:)(..))
+--import Language.Embedded.Imperative hiding (Ref, (:+:)(..), (:<:)(..))
 import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
 import qualified Language.Embedded.Backend.C  as Imp
@@ -65,17 +65,18 @@ import Debug.Trace
 
 -- | Target software instructions.
 type TargetCMD
-    =        RefCMD
-    Oper.:+: ArrCMD
-    Oper.:+: ControlCMD
-    Oper.:+: PtrCMD
-    Oper.:+: FileCMD
-    Oper.:+: C_CMD
+    =        Imp.RefCMD
+    Oper.:+: Imp.ArrCMD
+    Oper.:+: Imp.ControlCMD
+    Oper.:+: Imp.FileCMD
+    Oper.:+: Imp.PtrCMD
+    Oper.:+: Imp.C_CMD
     --
+    Oper.:+: PtrCMD
     Oper.:+: MMapCMD
 
 -- | Target monad during translation.
-type TargetT m = ReaderT Env (ProgramT TargetCMD (Oper.Param2 Prim SoftwarePrimType) m)
+type TargetT m = ReaderT Env (Oper.ProgramT TargetCMD (Oper.Param2 Prim SoftwarePrimType) m)
 
 -- | Monad for translated programs.
 type ProgC = Program TargetCMD (Oper.Param2 Prim SoftwarePrimType)
@@ -103,7 +104,7 @@ setRefV :: Monad m => Struct SoftwarePrimType Imp.Ref a -> VExp a -> TargetT m (
 setRefV r = lift . sequence_ . zipListStruct Imp.setRef r
 
 unsafeFreezeRefV :: Monad m => Struct SoftwarePrimType Imp.Ref a -> TargetT m (VExp a)
-unsafeFreezeRefV = lift . mapStructA unsafeFreezeRef
+unsafeFreezeRefV = lift . mapStructA Imp.unsafeFreezeRef
 
 --------------------------------------------------------------------------------
 
@@ -167,7 +168,7 @@ translateExp = goAST . optimize . unSExp
       | Just Cond <- prj cond = do
           res <- newRefV ty "b"
           b'  <- goSmallAST b
-          ReaderT $ \env -> iff b'
+          ReaderT $ \env -> Imp.iff b'
             (flip runReaderT env $ setRefV res =<< goAST t)
             (flip runReaderT env $ setRefV res =<< goAST f)
           unsafeFreezeRefV res
@@ -209,7 +210,7 @@ translateExp = goAST . optimize . unSExp
     go t guard (cond :* a :* Syn.Nil)
       | Just (Guard lbl msg) <- prj guard
       = do cond' <- extractNode <$> goAST cond
-           lift $ assert cond' msg
+           lift $ Imp.assert cond' msg
            goAST a
     go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
       | Just ForLoop   <- prj loop
@@ -241,24 +242,27 @@ unsafeTranslateSmallExp a = do
 -- * Interpretation of software commands.
 --------------------------------------------------------------------------------
 
-instance (Imp.ControlCMD Oper.:<: instr) => Oper.Reexpressible AssertCMD instr Env
+instance (Imp.CompExp exp, Imp.CompTypeClass ct) =>
+    Oper.Interp PtrCMD C.CGen (Oper.Param2 exp ct)
   where
-    reexpressInstrEnv reexp (Assert lbl cond msg) = do
-      cond' <- reexp cond
-      lift $ Imp.assert cond' msg
+    interp = compPtrCMD
+
+compPtrCMD :: forall exp ct a . (Imp.CompExp exp, Imp.CompTypeClass ct) =>
+  PtrCMD (Oper.Param3 C.CGen exp ct) a -> C.CGen a
+compPtrCMD = undefined
 
 --------------------------------------------------------------------------------
 
-instance (Imp.CompExp exp, Imp.CompTypeClass ct) => Oper.Interp MMapCMD C.CGen (Oper.Param2 exp ct)
+instance (Imp.CompExp exp, Imp.CompTypeClass ct) =>
+    Oper.Interp MMapCMD C.CGen (Oper.Param2 exp ct)
   where
     interp = compMMapCMD
 
 -- todo:
 --  > only need one 'ix' for read/write to arrays in 'Call'.
 --  > 'n' in 'MMap' isn't really an '$id'.
-compMMapCMD :: forall exp ct a . (Imp.CompExp exp, Imp.CompTypeClass ct)
-  => MMapCMD (Oper.Param3 C.CGen exp ct) a
-  -> C.CGen a
+compMMapCMD :: forall exp ct a . (Imp.CompExp exp, Imp.CompTypeClass ct) =>
+  MMapCMD (Oper.Param3 C.CGen exp ct) a -> C.CGen a
 compMMapCMD (MMap n sig) =
   do C.addInclude "<stdio.h>"
      C.addInclude "<stdlib.h>"

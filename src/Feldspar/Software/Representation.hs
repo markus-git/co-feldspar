@@ -23,17 +23,22 @@ import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
 import Data.Struct
 
-import qualified Feldspar.Verify.Monad as V
-import qualified Feldspar.Verify.SMT   as SMT
-import qualified Data.Map.Strict       as Map
+import Feldspar.Verify.Monad (Verify)
+import qualified Feldspar.Verify.Monad    as V
+import qualified Feldspar.Verify.SMT      as SMT
+import qualified Feldspar.Verify.Abstract as A
+import qualified Data.Map.Strict          as Map
 import qualified Control.Monad.RWS.Strict as S
 
 import Data.Array (Ix)
+import Data.Function (on)
 import Data.Maybe (fromMaybe)
+import Data.Ord
+import Data.IORef
 import Data.Int
 import Data.Word
-import Data.List (genericTake, (\\))
-import Data.Typeable (Typeable, cast)
+import Data.List (genericTake, (\\), sort, sortBy, group, groupBy, intersect, nub)
+import Data.Typeable (Typeable, cast, typeOf)
 import Data.Constraint hiding ((\\))
 import Control.Monad.Reader (ReaderT(..), runReaderT, lift)
 
@@ -86,6 +91,40 @@ instance Oper.InterpBi AssertCMD IO (Oper.Param1 SoftwarePrimType)
     interpBi (Assert _ cond msg) = do
       cond' <- cond
       unless cond' $ error $ "Assertion failed: " ++ msg
+
+instance (Imp.ControlCMD Oper.:<: instr) => Oper.Reexpressible AssertCMD instr env
+  where
+    reexpressInstrEnv reexp (Assert lbl cond msg) = do
+      cond' <- reexp cond
+      lift $ Imp.assert cond' msg
+
+--------------------------------------------------------------------------------
+
+data PtrCMD fs a
+  where
+    SwapPtr :: (pred a, Typeable a, pred i, Typeable i, Ix i, Integral i) =>
+      Imp.Arr i a -> Imp.Arr i a -> PtrCMD (Oper.Param3 prog exp pred) ()
+
+instance Oper.HFunctor PtrCMD
+  where
+    hfmap _ (SwapPtr a b) = SwapPtr a b
+
+instance Oper.HBifunctor PtrCMD
+  where
+    hbimap _ _ (SwapPtr a b) = SwapPtr a b
+
+instance Oper.InterpBi PtrCMD IO (Oper.Param1 SoftwarePrimType)
+  where
+    interpBi (SwapPtr (Imp.ArrRun a) (Imp.ArrRun b)) = do
+      arr <- readIORef a
+      brr <- readIORef b
+      writeIORef a brr
+      writeIORef b arr
+
+instance (PtrCMD Oper.:<: instr) => Oper.Reexpressible PtrCMD instr env
+  where
+    reexpressInstrEnv reexp (SwapPtr a b) = do
+      lift $ Oper.singleInj (SwapPtr a b)
 
 --------------------------------------------------------------------------------
 
@@ -151,7 +190,8 @@ type SoftwareCMD
   Oper.:+: Imp.ArrCMD
     -- ^ Software specific instructions.
   Oper.:+: Imp.FileCMD
-  Oper.:+: AssertCMD  
+  Oper.:+: AssertCMD
+  Oper.:+: PtrCMD
   Oper.:+: MMapCMD
 
 -- | Monad for building software programs in Feldspar.
@@ -713,6 +753,187 @@ instance (V.SMTEval1 exp, V.Pred exp ~ pred) =>
          return i
     verifyInstr i@(Imp.FGet{}) val = producesValue i val
     verifyInstr i _ = return i
+
+--------------------------------------------------------------------------------
+
+-- | The literals used in predicate abstraction.
+data SomeLiteral = forall a . V.IsLiteral a => SomeLiteral a
+
+instance Eq SomeLiteral
+  where
+    x == y = compare x y P.== EQ
+
+instance Show SomeLiteral
+  where
+    show (SomeLiteral x) = show x
+
+instance Ord SomeLiteral
+  where
+  compare (SomeLiteral x) (SomeLiteral y) =
+    compare (typeOf x) (typeOf y) `mappend`
+    case cast y of
+      Just y  -> compare x y
+      Nothing -> error "weird type error"
+
+-- Takes a loop body, which should break on exit, and does predicate abstraction.
+-- Leaves the verifier in a state which represents an arbitrary loop iteration.
+-- Returns a value which when run leaves the verifier in a state where the loop
+-- has terminated.
+discoverInvariant ::
+  Maybe [[SomeLiteral]] ->
+  V.Verify () ->
+  V.Verify (
+      V.Verify ()
+    , Maybe [[SomeLiteral]]
+    , V.Verify ()
+    )
+discoverInvariant minv body = do
+  (frame, hints) <- findFrameAndHints
+  (_, _, mode)   <- S.ask
+  case minv of
+    Nothing | mode P./= V.Execute ->
+      do ctx <- S.get
+         abs <- abstract ctx frame hints
+         refine frame hints abs
+    _ ->
+      do let
+           ass = assumeLiterals frame (fromMaybe [] minv)
+           brk = V.noBreak (V.breaks body) >>= V.assume "loop terminated"
+         ass >> return (brk, minv, ass)
+  where
+    -- Suppose we have a while-loop while(E) S, and we know a formula
+    -- I(0) which describes the initial state of the loop.
+    --
+    -- We can describe the state after one iteration by the formula
+    --   I(1) := sp(S, I(0) /\ ~E)
+    -- where sp(S, P) is the strongest postcondition function.
+    -- Likewise, we can describe the state after n+1 iterations by:
+    --   I(n+1) := sp(S, I(n) /\ ~E)
+    -- The invariant of the loop is then simply
+    --   I := I(0) \/ I(1) \/ I(2) \/ ...
+    --
+    -- Of course, this invariant is infinite and not very useful.
+    --
+    -- The idea of predicate abstraction is this: if we restrict the
+    -- invariant to be a boolean formula built up from a fixed set of
+    -- literals, then there are only a finite number of possible
+    -- invariants and we can in fact compute an invariant using the
+    -- procedure above - at some point I(n+1) = I(n) and then I(n) is
+    -- the invariant. We just need to be able to compute the strongest
+    -- boolean formula provable in the current verifier state -
+    -- something which Abstract.hs provides.
+    --
+    -- Often a variable is not modified by the loop body, and in that
+    -- case we don't need to bother finding an invariant for that
+    -- variable - its value is the same as on entry to the loop. We
+    -- therefore also compute the set of variables modified by the
+    -- loop body, which we call the frame, and only consider literals
+    -- that mention frame variables. We do not need to do anything
+    -- explicitly for non-frame variables - it is enough to leave them
+    -- unchanged in the context when verifying the loop body.
+    --
+    -- Recall that the goal is to put the verifier in a state
+    -- representing an arbitrary loop iteration. Here is how we do
+    -- that:
+    --   * Find n such that I(n) = I(n+1).
+    --   * Havoc the frame variables (update the context to turn them
+    --     into fresh SMT variables). This puts the SMT solver in a
+    --     state where it knows nothing about those variables, but it
+    --     still knows the values of the non-frame variables.
+    --   * Assert that I(n) holds.
+    --
+    -- To find the invariant we must be able to compute I(0),
+    -- and to go from I(n) to I(n+1). To compute I(0), we just run
+    -- predicate abstraction in the state we initially find ourselves
+    -- in. To get from I(n) to I(n+1) we do the following:
+    --   * Havoc the frame variables and then assert I(n). Similar to
+    --     above, this tells the verifier that we are in an arbitrary
+    --     state in which I(n) holds.
+    --   * Assert that the loop has not terminated yet, execute the
+    --     loop body once, and use predicate abstraction to compute a
+    --     new formula P describing the state we are in now.
+    --     This corresponds to sp(S, I(n) /\ ~E). Then let
+    --     I(n+1) = I(n) \/ P.
+    -- Note that we do all this inside a call to "stack" so that
+    -- it doesn't permanently change the verifier state.
+    findFrameAndHints = V.stack $ V.quietly $ V.noWarn $ V.quickly $ do
+      -- Put the verifier in an arbitrary state.
+      ctx <- S.get
+      let
+        op ctx (V.Name name _, V.Entry (x :: a)) = do
+          val <- V.havoc name x
+          return (V.insertContext name (val :: a) ctx)
+      before <- foldM op Map.empty (Map.toList ctx)
+      S.put before
+
+      -- Run the program and see what changed.
+      (_, _, hints, decls) <- fmap snd (S.listen body)
+      after <- S.get
+
+      let
+        atoms (SMT.Atom x) = [x]
+        atoms (SMT.List xs) = concatMap atoms xs
+
+        hints' =
+          [ V.Hint before hint
+          | hint <- nub hints,
+            null (intersect decls (atoms (V.hb_exp hint))) ]
+
+      return (Map.toList (V.modified before after), hints')
+
+    refine frame hints clauses = do
+      ctx <- S.get
+      clauses' <- V.stack $ V.quietly $ V.noWarn $ do
+        assumeLiterals frame clauses
+        V.noBreak (V.breaks body) >>= V.assume "loop not terminated" . SMT.not
+        fmap (disjunction clauses) (V.chattily (abstract ctx frame hints))
+
+      if clauses P.== clauses' then do
+        printInvariant "Invariant" frame clauses
+        let ass = assumeLiterals frame clauses
+        ass
+        return (V.noBreak (V.breaks body) >>= V.assume "loop terminated", Just clauses, ass)
+      else refine frame hints clauses'
+
+    assumeLiterals :: [(V.Name, V.Entry)] -> [[SomeLiteral]] -> Verify ()
+    assumeLiterals frame clauses = do
+      ctx <- S.get
+      forM_ frame $ \(V.Name name _, V.Entry (_ :: a)) -> do
+        val <- V.peek name >>= V.havoc name
+        V.poke name (val :: a)
+      mapM_ (\clause -> (evalClause ctx >=> V.assume (show clause)) clause) clauses
+
+    abstract old frame hints = fmap (usort . map usort) $ do
+      res <- V.quietly $ fmap concat $ mapM (A.abstract (\clause -> (evalClause old >=> V.provable (show clause)) clause)) (lits frame)
+      printInvariant "Candidate invariant" frame res
+      return res
+      where
+        lits frame =
+          partitionBy (\(SomeLiteral x) -> V.phase x) $
+          concat [ map SomeLiteral (V.literals name x) | (V.Name name _, V.Entry x) <- frame ] ++
+          [ SomeLiteral hint | hint <- hints, V.hb_type (V.hint_body hint) P.== SMT.tBool ]
+
+    printInvariant kind frame [] =
+      S.liftIO $
+        putStrLn ("No invariant found over frame " ++ show (map fst frame))
+    printInvariant kind frame clauses = S.liftIO $ do
+      putStrLn (kind ++ " over frame " ++ show (map fst frame) ++ ":")
+      sequence_ [ putStrLn ("  " ++ show clause) | clause <- clauses ]
+
+    disjunction cs1 cs2 = prune (usort [ usort (c1 ++ c2) | c1 <- cs1, c2 <- cs2 ])
+      where
+        prune cs = [ c | c <- cs, and [ c P.== c' P.|| c' \\ c P./= [] | c' <- cs ] ]
+
+    usort :: Ord a => [a] -> [a]
+    usort = map head . group . sort
+
+    partitionBy :: Ord b => (a -> b) -> [a] -> [[a]]
+    partitionBy f xs = groupBy ((P.==) `on` f) (sortBy (comparing f) xs)
+
+evalClause :: V.Context -> [SomeLiteral] -> V.Verify SMT.SExpr
+evalClause old clause = do
+  ctx <- S.get
+  return (SMT.disj [ V.smtLit old ctx lit | SomeLiteral lit <- clause ])
 
 --------------------------------------------------------------------------------
 -- **
