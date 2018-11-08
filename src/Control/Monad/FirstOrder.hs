@@ -108,90 +108,99 @@ lookupSubst s x = fromMaybe x $ do
 
 --------------------------------------------------------------------------------
 
-data Recovered instr m fs a
+data Recovered instr jnstr fs a
   where
-    Skip    :: Recovered instr m fs a
-    Discard :: instr '(Program m fs, fs) a -> Recovered instr m fs a
+    Skip    :: Recovered instr jnstr fs a
+    Discard :: instr '(Program jnstr fs, fs) a -> Recovered instr jnstr fs a
     Keep    :: (Variable a, Typeable a)
-            => instr '(Program m fs, fs) a -> Recovered instr m fs a
+            => instr '(Program jnstr fs, fs) a -> Recovered instr jnstr fs a
 
-class (HFunctor instr, HTraversable (FirstOrder instr)) =>
-    Defunctionalise (instr :: (* -> *, (* -> *, k)) -> * -> *)
+class (HFunctor instr, HTraversable (FirstOrder inv instr)) =>
+    Defunctionalise inv (instr :: (* -> *, (* -> *, (* -> Constraint, *))) -> * -> *)
   where
-    type FirstOrder instr :: (* -> *, (* -> *, k)) -> * -> *
-    type FirstOrder instr = instr
+    type FirstOrder inv instr :: (* -> *, (* -> *, (* -> Constraint, *))) -> * -> *
+    type FirstOrder inv instr = instr
 
     defunctionalise :: MonadFresh m
-      => instr '(n, fs) a
-      -> m (FirstOrder instr '(n, fs) a)
+      => inv
+      -> instr '(n, fs) a
+      -> m (FirstOrder inv instr '(n, fs) a)
 
-    default defunctionalise :: (FirstOrder instr ~ instr, MonadFresh m)
-      => instr '(n, fs) a
-      -> m (FirstOrder instr '(n, fs) a)
-    defunctionalise = return
+    default defunctionalise :: (FirstOrder inv instr ~ instr, MonadFresh m)
+      => inv
+      -> instr '(n, fs) a
+      -> m (FirstOrder inv instr '(n, fs) a)
+    defunctionalise _ = return
 
     refunctionalise ::
-         ( Defunctionalise n
+         ( Defunctionalise inv jnstr
          , Substitute exp
+         , SubstPred exp ~ pred
          )
-      => Subst
-      -> FirstOrder instr '(Sequence (FirstOrder n) '(exp, fs), '(exp, fs)) a
-      -> Recovered instr n '(exp, fs) a
+      => inv
+      -> Subst
+      -> FirstOrder inv instr '(Sequence (FirstOrder inv jnstr) (Param2 exp pred), (Param2 exp pred)) a
+      -> Recovered instr jnstr (Param2 exp pred) a
 
-instance (Defunctionalise instr1, Defunctionalise instr2) =>
-    Defunctionalise (instr1 :+: instr2)
+instance (Defunctionalise inv instr1, Defunctionalise inv instr2) =>
+    Defunctionalise inv (instr1 :+: instr2)
   where
-    type FirstOrder (instr1 :+: instr2) = FirstOrder instr1 :+: FirstOrder instr2
+    type FirstOrder inv (instr1 :+: instr2) =
+      FirstOrder inv instr1 :+: FirstOrder inv instr2
 
-    defunctionalise (Inl x) = fmap Inl (defunctionalise x)
-    defunctionalise (Inr x) = fmap Inr (defunctionalise x)
+    defunctionalise inv (Inl x) = fmap Inl (defunctionalise inv x)
+    defunctionalise inv (Inr x) = fmap Inr (defunctionalise inv x)
     
-    refunctionalise s (Inl x) = case refunctionalise s x of
+    refunctionalise inv s (Inl x) = case refunctionalise inv s x of
       Skip      -> Skip      
       Discard i -> Discard (Inl i)
       Keep i    -> Keep (Inl i)
-    refunctionalise s (Inr x) = case refunctionalise s x of
+    refunctionalise inv s (Inr x) = case refunctionalise inv s x of
       Skip      -> Skip
       Discard i -> Discard (Inr i)
       Keep i    -> Keep (Inr i)
 
 --------------------------------------------------------------------------------
 
-defuncM :: (Defunctionalise instr, DryInterp instr, MonadFresh m)
-  => Program instr fs a
-  -> m (Sequence (FirstOrder instr) fs a)
-defuncM prog = case view prog of
+defuncM :: (Defunctionalise inv instr, DryInterp instr, MonadFresh m)
+  => inv
+  -> Program instr fs a
+  -> m (Sequence (FirstOrder inv instr) fs a)
+defuncM inv prog = case view prog of
   Return val   -> return (Val val)
   (:>>=) val f -> do
     bind <- dryInterp val
-    ins  <- defunctionalise val >>= htraverse defuncM
-    tail <- defuncM (f bind)
+    ins  <- defunctionalise inv val >>= htraverse (defuncM inv)
+    tail <- defuncM inv (f bind)
     return (Seq bind ins tail)
 
-defunc :: (Defunctionalise instr, DryInterp instr)
-  => Program instr fs a
-  -> Sequence (FirstOrder instr) fs a
-defunc prog = evalState (defuncM prog) (0 :: Integer)
+defunc :: (Defunctionalise inv instr, DryInterp instr)
+  => inv
+  -> Program instr fs a
+  -> Sequence (FirstOrder inv instr) fs a
+defunc inv prog = evalState (defuncM inv prog) (0 :: Integer)
 
 --------------------------------------------------------------------------------
 
-refuncM :: (Defunctionalise instr, DryInterp instr, Substitute exp)
-  => Subst
-  -> Sequence (FirstOrder instr) '(exp, fs) a
-  -> Program instr '(exp, fs) a
-refuncM _ (Val val) = return val
-refuncM s (Seq name instr tail) = case refunctionalise s instr of
-  Skip -> refuncM s tail
+refuncM :: (Defunctionalise inv instr, DryInterp instr, Substitute exp, SubstPred exp ~ pred)
+  => inv
+  -> Subst
+  -> Sequence (FirstOrder inv instr) (Param2 exp pred) a
+  -> Program instr (Param2 exp pred) a
+refuncM _   _ (Val val) = return val
+refuncM inv s (Seq name instr tail) = case refunctionalise inv s instr of
+  Skip -> refuncM inv s tail
   Discard instr -> do
     singleton instr
-    refuncM s tail
+    refuncM inv s tail
   Keep instr -> do
     new <- singleton instr
-    refuncM (extendSubst name new s) tail
+    refuncM inv (extendSubst name new s) tail
 
-refunc :: (Defunctionalise instr, DryInterp instr, Substitute exp)
-  => Sequence (FirstOrder instr) '(exp, fs) a
-  -> Program instr '(exp, fs) a
-refunc = refuncM Map.empty
+refunc :: (Defunctionalise inv instr, DryInterp instr, Substitute exp, SubstPred exp ~ pred)
+  => inv
+  -> Sequence (FirstOrder inv instr) (Param2 exp pred) a
+  -> Program instr (Param2 exp pred) a
+refunc inv = refuncM inv Map.empty
 
 --------------------------------------------------------------------------------
