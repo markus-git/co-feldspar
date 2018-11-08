@@ -11,6 +11,7 @@
 {-# language FlexibleContexts #-}
 {-# language FlexibleInstances #-}
 {-# language FunctionalDependencies #-}
+{-# language ConstraintKinds #-}
 
 module Control.Monad.FirstOrder where
 
@@ -115,6 +116,18 @@ data Recovered instr jnstr fs a
     Keep    :: (Variable a, Typeable a)
             => instr '(Program jnstr fs, fs) a -> Recovered instr jnstr fs a
 
+class TypeablePred pred where
+  witnessTypeable :: Dict (pred a) -> Dict (Typeable a)
+{-
+recover :: forall f instr jnstr exp pred a b .
+     (TypeablePred pred, Typeable f, pred a)
+  => f a
+  -> (Typeable a => Recovered instr jnstr (Param2 exp pred) b)
+  -> Recovered instr jnstr (Param2 exp pred) b
+recover _ x = case witnessTypeable (Dict :: Dict (pred a)) of Dict -> x
+-}
+--------------------------------------------------------------------------------
+
 class (HFunctor instr, HTraversable (FirstOrder inv instr)) =>
     Defunctionalise inv (instr :: (* -> *, (* -> *, (* -> Constraint, *))) -> * -> *)
   where
@@ -136,10 +149,12 @@ class (HFunctor instr, HTraversable (FirstOrder inv instr)) =>
          ( Defunctionalise inv jnstr
          , Substitute exp
          , SubstPred exp ~ pred
+         , TypeablePred pred
          )
       => inv
       -> Subst
-      -> FirstOrder inv instr '(Sequence (FirstOrder inv jnstr) (Param2 exp pred), (Param2 exp pred)) a
+      -> FirstOrder inv instr
+           (Param3 (Sequence (FirstOrder inv jnstr) (Param2 exp pred)) exp pred) a
       -> Recovered instr jnstr (Param2 exp pred) a
 
 instance (Defunctionalise inv instr1, Defunctionalise inv instr2) =>
@@ -182,7 +197,7 @@ defunc inv prog = evalState (defuncM inv prog) (0 :: Integer)
 
 --------------------------------------------------------------------------------
 
-refuncM :: (Defunctionalise inv instr, DryInterp instr, Substitute exp, SubstPred exp ~ pred)
+refuncM :: (Defunctionalise inv instr, DryInterp instr, Substitute exp, SubstPred exp ~ pred, TypeablePred pred)
   => inv
   -> Subst
   -> Sequence (FirstOrder inv instr) (Param2 exp pred) a
@@ -197,7 +212,7 @@ refuncM inv s (Seq name instr tail) = case refunctionalise inv s instr of
     new <- singleton instr
     refuncM inv (extendSubst name new s) tail
 
-refunc :: (Defunctionalise inv instr, DryInterp instr, Substitute exp, SubstPred exp ~ pred)
+refunc :: (Defunctionalise inv instr, DryInterp instr, Substitute exp, SubstPred exp ~ pred, TypeablePred pred)
   => inv
   -> Sequence (FirstOrder inv instr) (Param2 exp pred) a
   -> Program instr (Param2 exp pred) a
