@@ -264,6 +264,59 @@ data IArr a = IArr
 -- ** ...
 --------------------------------------------------------------------------------
 
+class Verifiable prog
+  where
+    verifyWithResult :: prog a -> V.Verify (prog a, a)
+
+verify :: Verifiable prog => prog a -> V.Verify (prog a)
+verify = fmap fst . verifyWithResult
+
+class VerifyInstr instr exp pred
+  where
+    verifyInstr :: Verifiable prog =>
+      instr '(prog, Param2 exp pred) a -> a ->
+      V.Verify (instr '(prog, Param2 exp pred) a)
+    verifyInstr instr _ = return instr
+
+instance (VerifyInstr f exp pred, VerifyInstr g exp pred) =>
+    VerifyInstr (f Imp.:+: g) exp pred
+  where
+    verifyInstr (Inl m) x = fmap Inl (verifyInstr m x)
+    verifyInstr (Inr m) x = fmap Inr (verifyInstr m x)
+
+instance
+  ( VerifyInstr (FO.FirstOrder [[SomeLiteral]] prog) exp pred
+  , ControlCMD [[SomeLiteral]] Imp.:<: FO.FirstOrder [[SomeLiteral]] prog
+  , FO.TypeablePred pred
+  , FO.Substitute exp
+  , FO.SubstPred exp ~ pred
+  , pred Bool
+  , FO.Defunctionalise [[SomeLiteral]] prog
+  , FO.DryInterp prog)
+  =>
+    Verifiable (Program prog (Param2 exp pred))
+  where
+    verifyWithResult prog = do
+      let inv = undefined :: [[SomeLiteral]]
+      (prog', res) <- verifyWithResult (FO.defunc inv prog)
+      return (FO.refunc inv prog', res)
+
+instance
+  ( VerifyInstr prog exp pred
+  , ControlCMD [[SomeLiteral]] Imp.:<: prog)
+  =>
+    Verifiable (FO.Sequence prog (Param2 exp pred))
+  where
+    verifyWithResult (FO.Val x) = return (FO.Val x, x)
+    verifyWithResult (FO.Seq x m k) = do
+      ((m', breaks), warns) <- V.swallowWarns $ V.getWarns $ V.withBreaks $
+        verifyInstr m x
+      (_, (k', res)) <- V.ite (breaks) (return ()) (verifyWithResult k)
+      let comment msg prog = FO.Seq () (Oper.inj (Comment msg :: ControlCMD [[SomeLiteral]] (Param3 (FO.Sequence prog (Param2 exp pred)) exp pred) ())) prog
+      return (foldr comment (FO.Seq x m' k') warns, res)
+
+--------------------------------------------------------------------------------
+
 -- | Bindings for values.
 data ValueBinding exp a = ValueBinding {
     vb_value     :: V.SMTExpr exp a
@@ -795,6 +848,139 @@ instance (V.SMTEval1 exp, V.Pred exp ~ pred) =>
 
 --------------------------------------------------------------------------------
 
+instance (V.SMTEval1 exp, V.SMTEval exp Bool, V.Pred exp ~ pred, pred Bool) =>
+    V.VerifyInstr (ControlCMD [[SomeLiteral]]) exp pred
+  where
+    verifyInstr (Test (Nothing) msg) () =
+      return (Test (Nothing) msg)
+    verifyInstr (Test (Just cond) msg) () =
+      do b   <- V.eval cond
+         res <- V.provable "assertion" (V.toSMT b)
+         if res then do
+           return (Test (Nothing) msg)
+         else do
+           V.assume "assertion" (V.toSMT b)
+           return (Test (Just cond) msg)
+    verifyInstr i@(Hint (exp :: exp a)) () =
+      withWitness (undefined :: a) i $ 
+        do V.eval exp >>= V.hint
+    verifyInstr (If cond t f) () =
+      do b <- V.eval cond
+         (vt, vf) <- V.ite (V.toSMT b) (V.verify t) (V.verify f)
+         V.hintFormula (V.toSMT b)
+         V.hintFormula (SMT.not (V.toSMT b))
+         return (If cond vt vf)
+    verifyInstr (While inv cond body) () =
+      do let
+           loop =
+             do b   <- V.verifyWithResult cond
+                res <- V.eval (snd b)
+                V.ite (V.toSMT res) (V.verify body) V.break
+                return ()
+         (done, new, _) <- discoverInvariant inv loop
+         (vcond, vbody) <- V.stack $
+           do (vcond, b) <- V.verifyWithResult cond
+              res        <- V.eval b
+              V.assume "loop guard" (V.toSMT res)
+              vbody      <- V.verify body
+              return (vcond, vbody)
+         done
+         return (While new vcond vbody)
+    verifyInstr (For inv range@(lo, step, hi) val@(Imp.ValComp name :: Imp.Val a) body) ()
+      | Dict <- V.witnessPred (undefined :: exp a)
+      , Dict <- V.witnessNum  (undefined :: exp a)
+      , Dict <- V.witnessOrd  (undefined :: exp a) =
+      do let
+           cond =
+             do unsafeFreezeReference name name (undefined :: exp a)
+                i <- peekValue name
+                n <- V.eval (Imp.borderVal hi)
+                m <- V.eval lo
+                V.hintFormula (m V..<=. i)
+                V.hintFormula (i V..<=. n)
+                return (if Imp.borderIncl hi then i V..<=. n else i V..<. n)
+         let
+           loop body =
+             do cond <- cond
+                V.ite (SMT.not cond) V.break $
+                  do breaks <- V.breaks (V.verify body)
+                     V.ite breaks (return ()) $
+                       do i <- peekValue name :: V.Verify (V.SMTExpr exp a)
+                          setReference name (i + P.fromIntegral step)
+                return ()
+         old <- S.get
+         m   <- V.eval lo
+         newReference name (undefined :: exp a)
+         setReference name m
+         (done, inv, ass) <- discoverInvariant inv (loop body)
+         body <- V.noWarn $ V.stack $
+           do cond <- cond
+              V.assume "loop guard" cond
+              V.verify body
+         let
+           updateCtx :: V.Context ->
+                        (forall a. V.Invariant a =>
+                          V.Context ->
+                          String ->
+                          a ->
+                          a) ->
+                        Verify ()
+           updateCtx old f = forM_ (Map.toList old) $
+             \(V.Name name _, V.Entry (_ :: b)) ->
+               do (x :: b) <- V.peek name
+                  V.poke name (f old name x)
+         let
+           getLits :: (forall a. V.Invariant a =>
+                        String ->
+                        a ->
+                        [(V.Literal a, SMT.SExpr)]) ->
+                      V.Verify [SomeLiteral]
+           getLits f =
+             do new <- S.get
+                let cands = [ (SomeLiteral l, e)
+                            | (V.Name name _, V.Entry x) <- Map.toList new
+                            , (l, e) <- f name x
+                            ]
+                let ok (SomeLiteral _, e) = V.provable "magic safety invariant" e
+                fmap (map fst) (filterM ok cands)
+         (lits, lits') <- V.warning ([], []) $ V.stack $
+           do -- Iteration 1.
+              i :: V.SMTExpr exp a <- getReference name
+              updateCtx old (\ctx x -> V.warns1 ctx x . V.warns2 ctx x)
+              pre    <- S.get
+              breaks <- V.breaks (loop body)
+              mid    <- S.get
+              lits1  <- getLits V.warnLiterals
+              -- Iteration 2.
+              V.assume "loop didn't break" (SMT.not breaks)
+              ass
+              j :: V.SMTExpr exp a <- getReference name
+              updateCtx mid V.warns2
+              V.assume "distinct iterations" (i V..<. j)
+              loop body
+              lits2 <- getLits V.warnLiterals
+              ctx   <- S.get
+              lits' <- getLits $ \name x ->
+                map (\x -> (x, V.smtLit pre ctx x)) (V.warnLiterals2 name x)
+              return (lits1 `intersect` lits2, lits')
+         --
+         S.liftIO (putStrLn ("Magic safety literals (body): " ++ show lits))
+         S.liftIO (putStrLn ("Magic safety literals (invariant): " ++ show lits'))
+         --
+         ctx <- S.get
+         forM_ lits $ \(SomeLiteral lit) ->
+           V.assume "magic safety invariant" (V.smtLit old ctx lit)
+         body <- V.stack $
+           do forM_ lits $ \(SomeLiteral lit) ->
+                V.assume "magic safety invariant" (V.smtLit old ctx lit)
+              cond <- cond
+              V.assume "loop guard" cond
+              V.verify body
+         done
+         return (For (fmap (++ map return lits') inv) range val body)
+
+--------------------------------------------------------------------------------
+
 -- | The literals used in predicate abstraction.
 data SomeLiteral = forall a . V.IsLiteral a => SomeLiteral a
 
@@ -1069,6 +1255,8 @@ instance FO.Defunctionalise inv Imp.ControlCMD
       return Break
     defunctionalise _ (Imp.Assert cond msg) =
       return (Test (Just cond) msg)
+    defunctionalise _ (Imp.Hint exp) =
+      return (Hint exp)
 
     refunctionalise inv sub (If cond t f) =
       FO.Discard (Imp.If (FO.subst sub cond)
@@ -1086,6 +1274,8 @@ instance FO.Defunctionalise inv Imp.ControlCMD
       FO.Discard Imp.Break
     refunctionalise inv sub (Test (Just cond) msg) =
       FO.Discard (Imp.Assert (FO.subst sub cond) msg)
+    refunctionalise inv sub (Hint exp) =
+      FO.Discard (Imp.Hint (FO.subst sub exp))
 
 instance FO.HTraversable Imp.RefCMD
 instance FO.HTraversable Imp.ArrCMD
