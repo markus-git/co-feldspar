@@ -982,21 +982,34 @@ witnessVal :: forall f i j e pred a b . (FO.TypeablePred pred, Typeable f)
   -> (pred a     => FO.Recovered i j (Param2 e pred) b)
 witnessVal _ x = case FO.witnessTypeable (Dict :: Dict (pred a)) of Dict -> x
 
-witness :: forall f i j e pred a . (FO.TypeablePred pred, Typeable f)
+witnessArr :: forall f i j e pred a b c . (FO.TypeablePred pred, Typeable f)
+  => f a b
+  -> (Typeable a => Typeable b => FO.Recovered i j (Param2 e pred) c)
+  -> (pred a     => pred b     => FO.Recovered i j (Param2 e pred) c)
+witnessArr f x = case FO.witnessTypeable (Dict :: Dict (pred a)) of Dict -> witnessVal f x
+
+witness1 :: forall f i j e pred a . (FO.TypeablePred pred, Typeable f)
   => (Typeable a => FO.Recovered i j (Param2 e pred) (f a))
   -> (pred a     => FO.Recovered i j (Param2 e pred) (f a))
-witness x = witnessVal (undefined :: f a) x
+witness1 = witnessVal (undefined :: f a)
+
+witness2 :: forall f i j e pred a b . (FO.TypeablePred pred, Typeable f)
+  => (Typeable a => Typeable b => FO.Recovered i j (Param2 e pred) (f a b))
+  -> (pred a     => pred b     => FO.Recovered i j (Param2 e pred) (f a b))
+witness2 = witnessArr (undefined :: f a b)
 
 instance FO.Variable (Imp.Ref a) where ident = undefined
 instance FO.Variable (Imp.Val a) where ident = undefined
-instance FO.Variable (Imp.Arr i a) where ident = undefined
+instance FO.Variable (Imp.Arr  i a) where ident = undefined
+instance FO.Variable (Imp.IArr i a) where ident = undefined
+instance FO.Variable (Imp.Handle) where ident = undefined
 
 instance FO.Defunctionalise inv Imp.RefCMD
   where
     refunctionalise _ sub (Imp.NewRef name) =
-      witness (FO.Keep (Imp.NewRef name))
+      witness1 (FO.Keep (Imp.NewRef name))
     refunctionalise _ sub (Imp.InitRef name exp) =
-      witness (FO.Keep (Imp.InitRef name (FO.subst sub exp)))
+      witness1 (FO.Keep (Imp.InitRef name (FO.subst sub exp)))
     refunctionalise _ sub (Imp.GetRef ref) =
       witnessVal ref (FO.Keep (Imp.GetRef (FO.lookupSubst sub ref)))
     refunctionalise _ sub (Imp.SetRef ref exp) =
@@ -1008,16 +1021,75 @@ instance FO.Defunctionalise inv Imp.RefCMD
 instance FO.Defunctionalise inv Imp.ArrCMD
   where
     refunctionalise _ sub (Imp.NewArr name n) =
-      undefined -- witness (FO.Keep (Imp.NewArr name (FO.subst sub n)))
+      witness2 (FO.Keep (Imp.NewArr name (FO.subst sub n)))
+    refunctionalise _ sub (Imp.ConstArr name xs) =
+      witness2 (FO.Keep (Imp.ConstArr name xs))
+    refunctionalise _ sub (Imp.GetArr arr i) =
+      witnessArr arr (FO.Keep (Imp.GetArr
+        (FO.lookupSubst sub arr) (FO.subst sub i)))
+    refunctionalise _ sub (Imp.SetArr arr i exp) =
+      witnessArr arr (FO.Discard (Imp.SetArr
+        (FO.lookupSubst sub arr) (FO.subst sub i) (FO.subst sub exp)))
+    refunctionalise _ sub (Imp.CopyArr (arr, i) (brr, j) n) =
+      witnessArr arr (FO.Discard (Imp.CopyArr
+        (FO.lookupSubst sub arr, FO.subst sub i)
+        (FO.lookupSubst sub brr, FO.subst sub j)
+        (FO.subst sub n)))
+    refunctionalise _ sub (Imp.UnsafeFreezeArr arr) =
+      witness2 (FO.Keep (Imp.UnsafeFreezeArr (FO.lookupSubst sub arr)))
+    refunctionalise _ sub (Imp.UnsafeThawArr iarr) =
+      witness2 (FO.Keep (Imp.UnsafeThawArr (FO.lookupSubst sub iarr)))
+
+instance FO.Defunctionalise inv Imp.FileCMD
+  where
+    refunctionalise _ sub (Imp.FOpen name mode) =
+      FO.Keep (Imp.FOpen name mode)
+    refunctionalise _ sub (Imp.FClose h) =
+      FO.Discard (Imp.FClose (FO.lookupSubst sub h))
+    refunctionalise _ sub (Imp.FEof h) =
+      FO.Keep (Imp.FEof (FO.lookupSubst sub h))
+    refunctionalise _ sub (Imp.FPrintf h msg args) =
+      FO.Discard (Imp.FPrintf (FO.lookupSubst sub h) msg
+        (map (Imp.mapPrintfArg (FO.subst sub)) args))
+    refunctionalise _ sub (Imp.FGet h) =
+      witness1 (FO.Keep (Imp.FGet (FO.lookupSubst sub h)))
+
+instance FO.Defunctionalise inv Imp.ControlCMD
+  where
+    type FirstOrder inv Imp.ControlCMD = ControlCMD inv
+
+    defunctionalise _ (Imp.If cond t f) =
+      return (If cond t f)
+    defunctionalise _ (Imp.While cond body) =
+      return (While Nothing cond body)
+    defunctionalise _ (Imp.For range body) = do
+      ix <- fmap (Imp.ValComp . ('v':) . show) FO.fresh
+      return (For Nothing range ix (body ix))
+    defunctionalise _ (Imp.Break) =
+      return Break
+    defunctionalise _ (Imp.Assert cond msg) =
+      return (Test (Just cond) msg)
+
+    refunctionalise inv sub (If cond t f) =
+      FO.Discard (Imp.If (FO.subst sub cond)
+        (FO.refuncM inv sub t)
+        (FO.refuncM inv sub f))
+    refunctionalise inv sub (While _ cond body) =
+      FO.Discard (Imp.While
+        (FO.refuncM inv sub cond)
+        (FO.refuncM inv sub body))
+    refunctionalise inv sub (For _ (lo :: exp i, step, hi) ix body) =
+      witnessVal ix $ FO.Discard $ Imp.For
+        (FO.subst sub lo, step, fmap (FO.subst sub) hi)
+        (\jx -> FO.refuncM inv (FO.extendSubst ix jx sub) body)
+    refunctionalise inv sub (Break) =
+      FO.Discard Imp.Break
+    refunctionalise inv sub (Test (Just cond) msg) =
+      FO.Discard (Imp.Assert (FO.subst sub cond) msg)
 
 instance FO.HTraversable Imp.RefCMD
 instance FO.HTraversable Imp.ArrCMD
 instance FO.HTraversable Imp.FileCMD
-
-
--- instance FO.Defunctionalise inv Imp.ControlCMD where
-
-
 
 --------------------------------------------------------------------------------
 -- **
