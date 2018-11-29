@@ -49,7 +49,7 @@ import Control.Monad.Reader (ReaderT(..), runReaderT, lift)
 
 -- syntactic.
 import Language.Syntactic hiding (Signature, Args)
-import Language.Syntactic.Functional hiding (Lam)
+import Language.Syntactic.Functional hiding (Lam, Var)
 import Language.Syntactic.Functional.Tuple
 import qualified Language.Syntactic as Syn
 
@@ -60,6 +60,9 @@ import Control.Monad.Operational.Higher as Oper
 import qualified Language.Embedded.Expression as Imp
 import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
+import qualified Data.Loc as C
+import qualified Language.C.Syntax as C
+import qualified Language.C.Quote.C as C
 
 -- hardware-edsl.
 import Language.Embedded.Hardware.Command (Signal, Mode)
@@ -1162,33 +1165,56 @@ evalClause old clause = do
 
 --------------------------------------------------------------------------------
 
+-- reveal :: Typeable a => Variable -> a
+-- reveal (Variable a _) = fromMaybe (error "substitution type error") (cast a)
+
+type instance FO.Id (Imp.Ref a)    = C.Id
+type instance FO.Id (Imp.Val a)    = C.Id
+type instance FO.Id (Imp.Arr  i a) = C.Id
+type instance FO.Id (Imp.IArr i a) = C.Id
+type instance FO.Id (Imp.Handle)   = C.Id
+
+instance (Typeable a) => FO.Variable (Imp.Ref a)
+  where
+    hide a = FO.Hidden a (C.toIdent a C.noLoc)
+
+instance (Typeable a) => FO.Variable (Imp.Val a)
+  where
+    hide a = FO.Hidden a (C.toIdent a C.noLoc)
+
+instance (Typeable a, Typeable i) => FO.Variable (Imp.Arr i a)
+  where
+    hide a = FO.Hidden a (C.toIdent a C.noLoc)
+
+instance (Typeable a, Typeable i) => FO.Variable (Imp.IArr i a)
+  where
+    hide a = FO.Hidden a (C.toIdent a C.noLoc)
+
+instance FO.Variable (Imp.Handle)
+  where
+    hide a = FO.Hidden a (C.toIdent a C.noLoc)
+
 witnessVal :: forall f i j e pred a b . (FO.TypeablePred pred, Typeable f)
   => f a
-  -> (Typeable a => FO.Recovered i j (Param2 e pred) b)
-  -> (pred a     => FO.Recovered i j (Param2 e pred) b)
+  -> (Typeable a => FO.Recovered i j e pred b)
+  -> (pred a     => FO.Recovered i j e pred b)
 witnessVal _ x = case FO.witnessTypeable (Dict :: Dict (pred a)) of Dict -> x
 
 witnessArr :: forall f i j e pred a b c . (FO.TypeablePred pred, Typeable f)
   => f a b
-  -> (Typeable a => Typeable b => FO.Recovered i j (Param2 e pred) c)
-  -> (pred a     => pred b     => FO.Recovered i j (Param2 e pred) c)
+  -> (Typeable a => Typeable b => FO.Recovered i j e pred c)
+  -> (pred a     => pred b     => FO.Recovered i j e pred c)
 witnessArr f x = case FO.witnessTypeable (Dict :: Dict (pred a)) of Dict -> witnessVal f x
 
 witness1 :: forall f i j e pred a . (FO.TypeablePred pred, Typeable f)
-  => (Typeable a => FO.Recovered i j (Param2 e pred) (f a))
-  -> (pred a     => FO.Recovered i j (Param2 e pred) (f a))
+  => (Typeable a => FO.Recovered i j e pred (f a))
+  -> (pred a     => FO.Recovered i j e pred (f a))
 witness1 = witnessVal (undefined :: f a)
 
 witness2 :: forall f i j e pred a b . (FO.TypeablePred pred, Typeable f)
-  => (Typeable a => Typeable b => FO.Recovered i j (Param2 e pred) (f a b))
-  -> (pred a     => pred b     => FO.Recovered i j (Param2 e pred) (f a b))
+  => (Typeable a => Typeable b => FO.Recovered i j e pred (f a b))
+  -> (pred a     => pred b     => FO.Recovered i j e pred (f a b))
 witness2 = witnessArr (undefined :: f a b)
-
-instance FO.Variable (Imp.Ref a) where ident = undefined
-instance FO.Variable (Imp.Val a) where ident = undefined
-instance FO.Variable (Imp.Arr  i a) where ident = undefined
-instance FO.Variable (Imp.IArr i a) where ident = undefined
-instance FO.Variable (Imp.Handle) where ident = undefined
 
 instance FO.Defunctionalise inv Imp.RefCMD
   where
