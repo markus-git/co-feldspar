@@ -1,3 +1,5 @@
+{-# language ScopedTypeVariables #-}
+
 module Feldspar.Verify.Arithmetic where
 
 import Data.Typeable
