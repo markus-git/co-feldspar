@@ -18,7 +18,7 @@ import Feldspar.Representation
 import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
 import Feldspar.Software.Representation hiding (Nil)
-import Feldspar.Software.Verify
+import Feldspar.Software.Verify.Command
 import Feldspar.Verify.Arithmetic
 
 import Data.Struct
