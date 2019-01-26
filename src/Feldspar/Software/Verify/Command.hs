@@ -1157,7 +1157,7 @@ instance FO.DryInterp Imp.ArrCMD
     dryInterp (Imp.UnsafeFreezeArr (Imp.ArrComp arr)) =
       liftM Imp.IArrComp $ FO.freshStr (arr ++ ".")
     dryInterp (Imp.UnsafeThawArr (Imp.IArrComp iarr)) =
-      liftM Imp.ArrComp  $ FO.freshStr (iarr ++ ".")
+      liftM Imp.ArrComp $ FO.freshStr (iarr ++ ".")
 
 instance FO.DryInterp Imp.ControlCMD
   where
