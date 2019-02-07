@@ -92,6 +92,10 @@ data Warns = Warns {
     warns_here :: [String]
   , warns_all  :: [String] }
 
+instance Semigroup Warns
+  where
+    (<>) = mappend
+
 instance Monoid Warns
   where
     mempty = Warns [] []

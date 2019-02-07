@@ -18,6 +18,10 @@ module Data.Selection
 -- | Selection is a description of a set of values.
 data Selection a = Selection (a -> Bool)
 
+instance Semigroup (Selection a)
+  where
+    (<>) = mappend
+
 instance Monoid (Selection a)
   where
     mempty  = empty

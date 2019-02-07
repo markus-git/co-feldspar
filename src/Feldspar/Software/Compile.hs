@@ -159,11 +159,11 @@ translateExp = goAST . optimize . unSExp
       = Branch <$> goAST a <*> goAST b
     go t sel (ab :* Syn.Nil)
       | Just Fst <- prj sel = do
-          Branch a _ <- goAST ab
-          return a
+          branch <- goAST ab
+          case branch of (Branch a _) -> return a
       | Just Snd <- prj sel = do
-          Branch _ b <- goAST ab
-          return b
+          branch <- goAST ab
+          case branch of (Branch _ b) -> return b
     go ty cond (b :* t :* f :* Syn.Nil)
       | Just Cond <- prj cond = do
           res <- newRefV ty "b"
@@ -235,8 +235,8 @@ translateExp = goAST . optimize . unSExp
 
 unsafeTranslateSmallExp :: Monad m => SExp a -> TargetT m (Prim a)
 unsafeTranslateSmallExp a = do
-  Node b <- translateExp a
-  return b
+  node <- translateExp a
+  case node of (Node b) -> return b
 
 --------------------------------------------------------------------------------
 -- * Interpretation of software commands.

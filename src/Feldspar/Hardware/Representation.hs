@@ -1,4 +1,5 @@
 {-# language GADTs                      #-}
+{-# language DataKinds                  #-}
 {-# language TypeOperators              #-}
 {-# language TypeFamilies               #-}
 {-# language MultiParamTypeClasses      #-}
