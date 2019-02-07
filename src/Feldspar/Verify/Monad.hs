@@ -244,8 +244,8 @@ noWarn = local (\(x, y, mode) -> (x, y, f mode))
     f x = x
 
 -- | Run a computation but ignoring its local warnings.
-swallowWarns :: Verify a -> Verify a
-swallowWarns = censor (\(x, ws, y, z) -> (x, ws { warns_here = [] }, y, z))
+-- swallowWarns :: Verify a -> Verify a
+-- swallowWarns = censor (\(x, ws, y, z) -> (x, ws { warns_here = [] }, y, z))
 
 -- | Run a computation and get its warnings.
 getWarns :: Verify a -> Verify (a, [String])
