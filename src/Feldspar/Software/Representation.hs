@@ -31,8 +31,8 @@ import qualified Feldspar.Verify.Monad    as V
 import qualified Feldspar.Verify.SMT      as SMT
 import qualified Feldspar.Verify.Abstract as A
 import qualified Data.Map.Strict          as Map
-import qualified Control.Monad.FirstOrder as FO
 import qualified Control.Monad.RWS.Strict as S
+
 import Control.Monad.Identity
 
 import Data.Array (Ix)
@@ -106,12 +106,6 @@ instance (Imp.ControlCMD Oper.:<: instr) => Oper.Reexpressible AssertCMD instr e
       cond' <- reexp cond
       lift $ Imp.assert cond' msg
 
-instance FO.HTraversable AssertCMD
-
-instance FO.DryInterp AssertCMD
-  where
-    dryInterp (Assert {}) = return ()
-
 --------------------------------------------------------------------------------
 
 data ControlCMD inv fs a
@@ -174,12 +168,6 @@ instance (PtrCMD Oper.:<: instr) => Oper.Reexpressible PtrCMD instr env
     reexpressInstrEnv reexp (SwapPtr a b) = do
       lift $ Oper.singleInj (SwapPtr a b)
 
-instance FO.HTraversable PtrCMD
-
-instance FO.DryInterp PtrCMD
-  where
-    dryInterp (SwapPtr {}) = return ()
-
 --------------------------------------------------------------------------------
 
 -- | Soften the hardware signature of a component into a type that uses the
@@ -233,13 +221,6 @@ instance (MMapCMD Oper.:<: instr) => Oper.Reexpressible MMapCMD instr env
 instance Oper.InterpBi MMapCMD IO (Param1 SoftwarePrimType)
   where
     interpBi = error "todo: interpBi of mmap."
-
-instance FO.HTraversable MMapCMD
-
-instance FO.DryInterp MMapCMD
-  where
-    dryInterp (MMap s sig)    = show <$> FO.fresh
-    dryInterp (Call addr sig) = return ()
 
 --------------------------------------------------------------------------------
 

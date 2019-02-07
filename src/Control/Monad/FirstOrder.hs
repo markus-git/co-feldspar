@@ -61,11 +61,6 @@ class DryInterp instr
   where
     dryInterp :: MonadFresh n => instr '(m, fs) a -> n a
 
-instance (DryInterp instr, DryInterp jnstr) => DryInterp (instr :+: jnstr)
-  where
-    dryInterp (Inl i) = dryInterp i
-    dryInterp (Inr j) = dryInterp j
-
 --------------------------------------------------------------------------------
 
 class Monad m => MonadFresh m
@@ -80,11 +75,6 @@ instance Monad m => MonadFresh (StateT Integer m)
       ix <- get
       put (ix + 1)
       return ix
-
-freshStr :: MonadFresh m => String -> m String
-freshStr base = do
-  i <- fresh
-  return (base ++ show i)
 
 --------------------------------------------------------------------------------
 
