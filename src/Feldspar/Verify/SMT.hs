@@ -137,9 +137,9 @@ showArray n arr = do
     indexes (Int n)    = map int [0..n-1]
     indexes (Bits w n) = map (bits w) [0..n-1]
 
-bits :: Int -> Integer -> SExpr
-bits w n = List [Atom "_", Atom ("bv" ++ show m), int (fromIntegral w)]
-  where
-    m = n `mod` (2^w)
+    bits :: Int -> Integer -> SExpr
+    bits w n = List [Atom "_", Atom ("bv" ++ show m), int (fromIntegral w)]
+      where
+        m = n `mod` (2^w)
 
 --------------------------------------------------------------------------------

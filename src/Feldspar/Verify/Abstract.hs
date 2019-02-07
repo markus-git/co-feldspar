@@ -71,5 +71,3 @@ withNewSolver :: (MonadIO m, MonadAsyncException m) => (Solver -> m a) -> m a
 withNewSolver h =
   do s <- liftIO newSolver
      h s `finally` liftIO (deleteSolver s)
-
---------------------------------------------------------------------------------
