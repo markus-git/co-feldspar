@@ -21,10 +21,7 @@ import Feldspar.Storable
 import Feldspar.Array.Buffered (ArraysEq(..))
 import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
-
 import Data.Struct
-
-import qualified Control.Monad.FirstOrder as FO
 
 import Feldspar.Verify.Monad (Verify)
 import qualified Feldspar.Verify.Monad    as V
@@ -32,8 +29,6 @@ import qualified Feldspar.Verify.SMT      as SMT
 import qualified Feldspar.Verify.Abstract as A
 import qualified Data.Map.Strict          as Map
 import qualified Control.Monad.RWS.Strict as S
-
-import Control.Monad.Identity
 
 import Data.Array (Ix)
 import Data.Function (on)
@@ -102,40 +97,6 @@ instance (Imp.ControlCMD Oper.:<: instr) => Oper.Reexpressible AssertCMD instr e
     reexpressInstrEnv reexp (Assert lbl cond msg) = do
       cond' <- reexp cond
       lift $ Imp.assert cond' msg
-
---------------------------------------------------------------------------------
-
-data ControlCMD inv fs a
-  where
-    If :: exp Bool -> prog () -> prog () ->
-      ControlCMD inv (Oper.Param3 prog exp pred) ()
-    While :: Maybe inv -> prog (exp Bool) -> prog () ->
-      ControlCMD inv (Oper.Param3 prog exp pred) ()
-    For :: (pred i, Integral i) =>
-      Maybe inv -> Imp.IxRange (exp i) -> Imp.Val i -> prog () ->
-      ControlCMD inv (Oper.Param3 prog exp pred) ()
-    Break :: ControlCMD inv (Oper.Param3 prog exp pred) ()
-    --
-    Test :: Maybe (exp Bool) -> String ->
-      ControlCMD inv (Oper.Param3 prog exp pred) ()
-    Hint :: pred a => exp a ->
-      ControlCMD inv (Oper.Param3 prog exp pred) ()
-    Comment :: String ->
-      ControlCMD inv (Oper.Param3 prog exp pred) ()
-
-instance Oper.HFunctor (ControlCMD inv)
-  where
-    hfmap f ins = runIdentity (FO.htraverse (pure . f) ins)
-
-instance FO.HTraversable (ControlCMD inv)
-  where
-    htraverse f (If cond tru fls) = (If cond) <$> f tru <*> f fls
-    htraverse f (While inv cond body) = (While inv) <$> f cond <*> f body
-    htraverse f (For inv range val body) = (For inv range val) <$> f body
-    htraverse _ (Break) = pure Break
-    htraverse _ (Test cond msg) = pure (Test cond msg)
-    htraverse _ (Hint val) = pure (Hint val)
-    htraverse _ (Comment msg) = pure (Comment msg)
 
 --------------------------------------------------------------------------------
 
@@ -973,21 +934,6 @@ evalClause :: V.Context -> [SomeLiteral] -> V.Verify SMT.SExpr
 evalClause old clause = do
   ctx <- S.get
   return (SMT.disj [ V.smtLit old ctx lit | SomeLiteral lit <- clause ])
-
---------------------------------------------------------------------------------
-
-instance FO.Defunctionalise inv Imp.RefCMD
-  where
-    refunctionalise _ sub (Imp.NewRef name) = undefined
-
-instance FO.HTraversable Imp.RefCMD
-instance FO.HTraversable Imp.ArrCMD
-instance FO.HTraversable Imp.FileCMD
-
-
--- instance FO.Defunctionalise inv Imp.ControlCMD where
-
-
 
 --------------------------------------------------------------------------------
 -- **
