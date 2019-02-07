@@ -976,39 +976,9 @@ evalClause old clause = do
 
 --------------------------------------------------------------------------------
 
-witnessVal :: forall f i j e pred a b . (FO.TypeablePred pred, Typeable f)
-  => f a
-  -> (Typeable a => FO.Recovered i j (Param2 e pred) b)
-  -> (pred a     => FO.Recovered i j (Param2 e pred) b)
-witnessVal _ x = case FO.witnessTypeable (Dict :: Dict (pred a)) of Dict -> x
-
-witness :: forall f i j e pred a . (FO.TypeablePred pred, Typeable f)
-  => (Typeable a => FO.Recovered i j (Param2 e pred) (f a))
-  -> (pred a     => FO.Recovered i j (Param2 e pred) (f a))
-witness x = witnessVal (undefined :: f a) x
-
-instance FO.Variable (Imp.Ref a) where ident = undefined
-instance FO.Variable (Imp.Val a) where ident = undefined
-instance FO.Variable (Imp.Arr i a) where ident = undefined
-
 instance FO.Defunctionalise inv Imp.RefCMD
   where
-    refunctionalise _ sub (Imp.NewRef name) =
-      witness (FO.Keep (Imp.NewRef name))
-    refunctionalise _ sub (Imp.InitRef name exp) =
-      witness (FO.Keep (Imp.InitRef name (FO.subst sub exp)))
-    refunctionalise _ sub (Imp.GetRef ref) =
-      witnessVal ref (FO.Keep (Imp.GetRef (FO.lookupSubst sub ref)))
-    refunctionalise _ sub (Imp.SetRef ref exp) =
-      witnessVal ref (FO.Discard (Imp.SetRef
-        (FO.lookupSubst sub ref) (FO.subst sub exp)))
-    refunctionalise _ sub (Imp.UnsafeFreezeRef ref) =
-      witnessVal ref (FO.Keep (Imp.UnsafeFreezeRef (FO.lookupSubst sub ref)))
-
-instance FO.Defunctionalise inv Imp.ArrCMD
-  where
-    refunctionalise _ sub (Imp.NewArr name n) =
-      undefined -- witness (FO.Keep (Imp.NewArr name (FO.subst sub n)))
+    refunctionalise _ sub (Imp.NewRef name) = undefined
 
 instance FO.HTraversable Imp.RefCMD
 instance FO.HTraversable Imp.ArrCMD
