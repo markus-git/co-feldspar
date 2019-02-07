@@ -12,7 +12,7 @@
 {-# language FlexibleInstances #-}
 {-# language FunctionalDependencies #-}
 
-module Control.Monad.FirstOrder where
+module Data.FirstOrder where
 
 import Control.Monad.Identity
 import Control.Monad.State
