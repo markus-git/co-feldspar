@@ -41,9 +41,6 @@ library
     Feldspar.Software.Frontend,
     Feldspar.Software.Compile,
     Feldspar.Software.Optimize,
-    Feldspar.Verify.Abstract,
-    Feldspar.Verify.Monad,
-    Feldspar.Verify.SMT,
     Data.Struct,
     Data.Selection
     

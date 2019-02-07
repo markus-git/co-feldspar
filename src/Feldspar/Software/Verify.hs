@@ -74,15 +74,15 @@ instance V.Verifiable
   where
     verifyWithResult (FO.Val a)     = return (FO.Val a, a)
     verifyWithResult (FO.Seq a m k) = do
-      ((m', breaks), warns) <-
-        V.swallowWarns $ V.getWarns $ V.withBreaks $ V.verifyInstr m a
+      ((m', breaks), warns) <- V.swallowWarns $ 
+        V.getWarns $ V.withBreaks $ V.verifyInstr m a
       (_, (k', res)) <-
         V.ite breaks (return ()) (V.verifyWithResult k)
       let
         comment msg prog = flip (FO.Seq ()) prog (inj
           (Comment msg :: ControlCMD [[SomeLiteral]] (Param3
             (FO.Sequence prog (Param2 Prim SoftwarePrimType))
-              (Prim) (SoftwarePrimType)) ()))
+            (Prim) (SoftwarePrimType)) ()))
       return (foldr comment (FO.Seq a m' k') warns, res)
 
 --------------------------------------------------------------------------------

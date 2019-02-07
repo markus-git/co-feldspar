@@ -27,7 +27,19 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Map.Strict as Map
 
 --------------------------------------------------------------------------------
--- *
+-- * First-order representation of programs.
+--------------------------------------------------------------------------------
+
+-- | First-Order representation of programs, as a sequence of instructions.
+data Sequence instr fs a
+  where
+    Val :: a -> Sequence instr fs a
+    Seq :: b                                -- Binder.
+        -> instr '(Sequence instr fs, fs) b -- Instruction.
+        -> Sequence instr fs a
+        -> Sequence instr fs a
+  deriving Typeable
+
 --------------------------------------------------------------------------------
 
 class HFunctor instr => HTraversable instr
@@ -45,22 +57,9 @@ instance (HTraversable f, HTraversable g) => HTraversable (f :+: g)
 
 --------------------------------------------------------------------------------
 
-class Monad m => MonadFresh m
-  where
-    fresh :: m Integer
-    default fresh :: (m ~ t n, MonadTrans t, MonadFresh n) => m Integer
-    fresh = lift fresh
-
-instance Monad m => MonadFresh (StateT Integer m)
-  where
-    fresh = do {ix <- get; put (ix + 1); return ix}
-
-freshStr :: MonadFresh m => String -> m String
-freshStr base = (\i -> base ++ show i) <$> fresh
-
 class DryInterp instr
   where
-    dryInterp :: MonadFresh m => instr fs a -> m a
+    dryInterp :: MonadFresh n => instr '(m, fs) a -> n a
 
 instance (DryInterp instr, DryInterp jnstr) => DryInterp (instr :+: jnstr)
   where
@@ -69,100 +68,71 @@ instance (DryInterp instr, DryInterp jnstr) => DryInterp (instr :+: jnstr)
 
 --------------------------------------------------------------------------------
 
-data Value = forall a. (Typeable a, Eq (Name a), Ord (Name a), Show (Name a)) =>
-  Value (Name a) a
+class Monad m => MonadFresh m
+  where
+    fresh :: m Integer
+    default fresh :: (m ~ t n, MonadTrans t, MonadFresh n) => m Integer
+    fresh = lift fresh
 
-instance Eq Value
+instance Monad m => MonadFresh (StateT Integer m)
+  where
+    fresh = do
+      ix <- get
+      put (ix + 1)
+      return ix
+
+freshStr :: MonadFresh m => String -> m String
+freshStr base = do
+  i <- fresh
+  return (base ++ show i)
+
+--------------------------------------------------------------------------------
+
+type family Id a :: *
+
+data Hidden
+  where
+    Hidden :: (Typeable a, Eq (Id a), Ord (Id a), Show (Id a)) => a -> Id a -> Hidden
+
+instance Eq Hidden
   where
     x == y = compare x y == EQ
 
-instance Ord Value
+instance Ord Hidden
   where
-    compare (Value nx vx) (Value ny vy) = compare (show nx) (show ny) `mappend`
-      compare (typeOf vx) (typeOf vy)
+    compare (Hidden vx ix) (Hidden vy iy) =
+      compare (show ix) (show iy) `mappend` compare (typeOf vx) (typeOf vy)
 
-type Sub = Map.Map Value Value
-
-class (Typeable a, Eq (Name a), Ord (Name a), Show (Name a)) => Identify a
+class Variable a
   where
-    type Name a :: *
-    name :: a -> Name a
+    hide :: a -> Hidden
+
+type Subst exp = Map.Map Hidden Hidden
 
 class Substitute exp
   where
-    type SubPred exp :: * -> Constraint
-    substitute :: SubPred exp a => Sub -> exp a -> exp a
+    type SubstPred exp :: * -> Constraint
+    subst :: SubstPred exp a => Subst exp -> exp a -> exp a
 
-extendSub :: forall exp a. Identify a => a -> a -> Sub -> Sub
-extendSub x y = Map.insert (Value (name x) x) (Value (name y) y)
+extendSubst :: forall exp a . (Variable a, Typeable a) => a -> a -> Subst exp -> Subst exp
+extendSubst x y = Map.insert (hide x) (hide y)
 
-lookupSub :: forall exp a. Identify a => Sub -> a -> a
-lookupSub sub x = case Map.lookup (Value (name x) x) sub of
-  Just (Value ny vy) -> case cast vy of
-    Just val -> val
-    Nothing  -> error "type error in substitution."
-  Nothing -> error "could not find substitution."
-
---------------------------------------------------------------------------------
-
-data Dry instr fs a
-  where
-    Dry :: a -> instr fs a -> Dry instr fs a
-
-dryTranslate ::
-  ( MonadFresh m
-  , DryInterp instr
-  , HFunctor instr
-  , HTraversable (FirstOrder inv instr)
-  , Defunctionalise inv instr
-  )
-  => inv
-  -> Sub
-  -> Program instr fs a
-  -> m (Program (Dry (FirstOrder inv instr)) fs a)
-dryTranslate inv sub prog = case view prog of
-  Return value   -> return $ return value
-  (:>>=) instr f ->
-    do name   <- dryInterp instr
-       jnstr' <- defunctionalise inv instr
-       jnstr  <- htraverse (dryTranslate inv sub) jnstr'
-       prog   <- dryTranslate inv sub $ f name
-       return $ (singleton (Dry name jnstr)) >>= \val ->
-         _ -- dryReplace (extendSub name val sub) prog
-
-dryReplace :: Sub -> Program instr fs a -> Program instr fs a
-dryReplace = undefined
-
-{-
-    defunctionalise :: MonadFresh m
-      => inv
-      -> instr '(n, fs) a
-      -> m (FirstOrder inv instr '(n, fs) a)
--}
-
---------------------------------------------------------------------------------
--- * First-order representation of programs.
---------------------------------------------------------------------------------
-
--- | First-Order representation of programs, as a sequence of instructions.
-data Sequence instr fs a
-  where
-    Val :: a -> Sequence instr fs a
-    Seq :: b                                -- Binder.
-        -> instr '(Sequence instr fs, fs) b -- Instruction.
-        -> Sequence instr fs a
-        -> Sequence instr fs a
-  deriving Typeable
+lookupSubst :: forall exp a . (Variable a, Typeable a) => Subst exp -> a -> a
+lookupSubst s x = fromMaybe x $
+  do (Hidden y _) <- Map.lookup (hide x) s
+     return $ fromMaybe (error "type error in subst.") (cast y)
 
 --------------------------------------------------------------------------------
 
 data Recovered instr jnstr exp pred a
   where
+    Skip ::
+      Recovered instr jnstr exp pred a
     Discard ::
-      instr '(Program jnstr (Param2 exp pred), (Param2 exp pred)) () ->
-      Recovered instr jnstr exp pred ()
+      instr '(Program jnstr (Param2 exp pred), (Param2 exp pred)) a ->
+      Recovered instr jnstr exp pred a
     Keep ::
-      (Identify a, Typeable a) =>
+      (Variable a, Typeable a) =>
       instr '(Program jnstr (Param2 exp pred), (Param2 exp pred)) a ->
       Recovered instr jnstr exp pred a
 
@@ -188,6 +158,19 @@ class (HFunctor instr, HTraversable (FirstOrder inv instr)) =>
       -> m (FirstOrder inv instr '(n, fs) a)
     defunctionalise _ = return
 
+    refunctionalise ::
+         ( Defunctionalise inv jnstr
+         , Substitute exp
+         , SubstPred exp ~ pred
+         , TypeablePred pred
+         , pred Bool
+         )
+      => inv
+      -> Subst exp
+      -> FirstOrder inv instr
+           (Param3 (Sequence (FirstOrder inv jnstr) (Param2 exp pred)) exp pred) a
+      -> Recovered instr jnstr exp pred a
+
 instance (Defunctionalise inv instr1, Defunctionalise inv instr2) =>
     Defunctionalise inv (instr1 :+: instr2)
   where
@@ -196,6 +179,15 @@ instance (Defunctionalise inv instr1, Defunctionalise inv instr2) =>
 
     defunctionalise inv (Inl x) = fmap Inl (defunctionalise inv x)
     defunctionalise inv (Inr x) = fmap Inr (defunctionalise inv x)
+    
+    refunctionalise inv s (Inl x) = case refunctionalise inv s x of
+      Skip      -> Skip      
+      Discard i -> Discard (Inl i)
+      Keep i    -> Keep (Inl i)
+    refunctionalise inv s (Inr x) = case refunctionalise inv s x of
+      Skip      -> Skip
+      Discard i -> Discard (Inr i)
+      Keep i    -> Keep (Inr i)
 
 --------------------------------------------------------------------------------
 
@@ -219,3 +211,37 @@ defunc inv prog = evalState (defuncM inv prog) (0 :: Integer)
 
 --------------------------------------------------------------------------------
 
+refuncM ::
+     ( Defunctionalise inv instr
+     , Substitute exp
+     , SubstPred exp ~ pred
+     , TypeablePred pred
+     , pred Bool
+     )
+  => inv
+  -> Subst exp
+  -> Sequence (FirstOrder inv instr) (Param2 exp pred) a
+  -> Program instr (Param2 exp pred) a
+refuncM _   _ (Val val) = return val
+refuncM inv s (Seq name instr tail) = case refunctionalise inv s instr of
+  Skip -> refuncM inv s tail
+  Discard instr -> do
+    singleton instr
+    refuncM inv s tail
+  Keep instr -> do
+    new <- singleton instr
+    refuncM inv (extendSubst name new s) tail
+
+refunc ::
+     ( Defunctionalise inv instr
+     , Substitute exp
+     , SubstPred exp ~ pred
+     , TypeablePred pred
+     , pred Bool
+     )
+  => inv
+  -> Sequence (FirstOrder inv instr) (Param2 exp pred) a
+  -> Program instr (Param2 exp pred) a
+refunc inv = refuncM inv Map.empty
+
+--------------------------------------------------------------------------------
