@@ -150,7 +150,6 @@ class (HFunctor instr, HTraversable (FirstOrder inv instr)) =>
          , Substitute exp
          , SubstPred exp ~ pred
          , TypeablePred pred
-         , pred Bool
          )
       => inv
       -> Subst
@@ -198,7 +197,7 @@ defunc inv prog = evalState (defuncM inv prog) (0 :: Integer)
 
 --------------------------------------------------------------------------------
 
-refuncM :: (Defunctionalise inv instr, Substitute exp, SubstPred exp ~ pred, TypeablePred pred, pred Bool)
+refuncM :: (Defunctionalise inv instr, DryInterp instr, Substitute exp, SubstPred exp ~ pred, TypeablePred pred)
   => inv
   -> Subst
   -> Sequence (FirstOrder inv instr) (Param2 exp pred) a
@@ -213,7 +212,7 @@ refuncM inv s (Seq name instr tail) = case refunctionalise inv s instr of
     new <- singleton instr
     refuncM inv (extendSubst name new s) tail
 
-refunc :: (Defunctionalise inv instr, Substitute exp, SubstPred exp ~ pred, TypeablePred pred, pred Bool)
+refunc :: (Defunctionalise inv instr, DryInterp instr, Substitute exp, SubstPred exp ~ pred, TypeablePred pred)
   => inv
   -> Sequence (FirstOrder inv instr) (Param2 exp pred) a
   -> Program instr (Param2 exp pred) a
