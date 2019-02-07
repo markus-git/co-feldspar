@@ -28,7 +28,7 @@ import qualified Control.Monad.Operational.Higher as Oper (Program, Param2)
 import qualified Language.Embedded.Imperative     as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 
-import Prelude hiding (length, Word, (<=), (==), not)
+import Prelude hiding (length, Word, (<=))
 
 --------------------------------------------------------------------------------
 -- * ...
@@ -122,11 +122,6 @@ class Logical exp
 
 infix 3 &&
 infix 2 ||
-
-(/=) :: (Equality exp, Logical exp, Eq a, Primitive exp a) => exp a -> exp a -> exp Bool
-(/=) a b = not $ a == b
-
-infix 4 /=
 
 class Multiplicative exp
   where

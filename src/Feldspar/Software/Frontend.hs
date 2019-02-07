@@ -45,7 +45,7 @@ import Feldspar.Hardware.Primitive  (HardwarePrimType(..), HardwarePrimTypeRep(.
 import Feldspar.Hardware.Expression (HType')
 import Feldspar.Hardware.Frontend   (HSig, withHType')
 
-import Prelude hiding (length, Word, (<=), (<), (>=))
+import Prelude hiding (length, Word, (<=))
 import qualified Prelude
 
 --------------------------------------------------------------------------------
@@ -145,14 +145,6 @@ resugar = Syntactic.resugar
 
 --------------------------------------------------------------------------------
 
-assert :: SExp Bool -> String -> Software ()
-assert = assertLabel $ UserAssertion ""
-
-assertLabel :: AssertionLabel -> SExp Bool -> String -> Software ()
-assertLabel lbl cond msg = Software $ Oper.singleInj $ Assert lbl cond msg
-
---------------------------------------------------------------------------------
-
 instance References Software
   where
     type Reference Software = Ref    
@@ -186,12 +178,7 @@ freezeRef' = withSType (Proxy :: Proxy b) Imp.unsafeFreezeRef
 
 instance Slicable SExp (Arr a)
   where
-    slice from len (Arr o l arr) = Arr o' l' arr
-      where
-        o' = guardLabel InternalAssertion (from <= l)
-               "arrSlice: index out of bounds." (o + from)
-        l' = guardLabel InternalAssertion (from + len <= l)
-               "arrSlice: slice to large." (len)
+    slice from len (Arr o l arr) = Arr (o+from) len arr
 
 instance Finite SExp (Arr a)
   where
@@ -211,33 +198,24 @@ instance Arrays Software
       $ Imp.constArr elems
       where len = value $ genericLength elems      
     getArr arr ix
-      = do assertLabel InternalAssertion
-             (ix < length arr)
-             "getArr: index out of bounds."
-           Software
-             $ fmap resugar
-             $ mapStructA (flip getArr' (ix + arrOffset arr))
-             $ unArr arr    
+      = Software
+      $ fmap resugar
+      $ mapStructA (flip getArr' (ix + arrOffset arr))
+      $ unArr arr    
     setArr arr ix a
-      = do assertLabel InternalAssertion
-             (ix < length arr)
-             "setArr: index out of bounds."
-           Software
-             $ sequence_
-             $ zipListStruct
-                 (\a' arr' -> setArr' arr' (ix + arrOffset arr) a')
-                 (resugar a)
-             $ unArr arr
+      = Software
+      $ sequence_
+      $ zipListStruct
+         (\a' arr' -> setArr' arr' (ix + arrOffset arr) a')
+         (resugar a)
+      $ unArr arr
     copyArr arr brr
-      = do assertLabel InternalAssertion
-             (length arr >= length brr)
-             "copyArr: destination too small."
-           Software
-             $ sequence_
-             $ zipListStruct (\a b ->
-                   Imp.copyArr (a, arrOffset arr) (b, arrOffset brr) (length brr))
-                 (unArr arr)
-                 (unArr brr)
+      = Software
+      $ sequence_
+      $ zipListStruct (\a b ->
+          Imp.copyArr (a, arrOffset arr) (b, arrOffset brr) (length brr))
+        (unArr arr)
+        (unArr brr)
 
 -- 'Imp.getArr' specialized to software.
 getArr' :: forall b . SoftwarePrimType b
@@ -258,20 +236,12 @@ instance Syntax SExp a => Indexed SExp (IArr a)
     type ArrElem (IArr a) = a
     (!) (IArr off len a) ix = resugar $ mapStruct index a
       where
-        index :: forall b . SoftwarePrimType b => Imp.IArr Index b -> SExp b
-        index arr = sugarSymPrimSoftware
-          (Guard InternalAssertion "arrIndex: index out of bounds.")
-          (ix < len)
-          (sugarSymPrimSoftware (ArrIx arr) (ix + off) :: SExp b)
+        index :: SoftwarePrimType b => Imp.IArr Index b -> SExp b
+        index arr = sugarSymPrimSoftware (ArrIx arr) (ix + off)
 
 instance Slicable SExp (IArr a)
   where
-    slice from len (IArr o l arr) = IArr o' l' arr
-      where
-        o' = guardLabel InternalAssertion (from <= l)
-               "arrSlice: index out of bounds." (o + from)
-        l' = guardLabel InternalAssertion (from + len <= l)
-               "arrSlice: slice to large." (len)
+    slice from len (IArr o l arr) = IArr (o+from) len arr
 
 instance Finite SExp (IArr a)
   where
@@ -335,15 +305,6 @@ instance Control Software
 --------------------------------------------------------------------------------
 -- ** Software instructions.
 --------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
--- *** Assertions.
-
-guard :: Syntax SExp a => SExp Bool -> String -> a -> a
-guard = guardLabel $ UserAssertion ""
-
-guardLabel :: Syntax SExp a => AssertionLabel -> SExp Bool -> String -> a -> a
-guardLabel lbl cond msg = sugarSymSoftware (Guard lbl msg) cond
 
 --------------------------------------------------------------------------------
 -- *** File handling.

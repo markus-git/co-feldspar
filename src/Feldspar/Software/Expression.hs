@@ -89,24 +89,7 @@ type SType    = Type SoftwarePrimType
 type SType'   = PrimType SoftwarePrimType
 
 --------------------------------------------------------------------------------
-
-data AssertionLabel =
-    -- ^ Internal assertion to guarantee meaningful results.
-    InternalAssertion
-    -- ^ User made assertion.
-  | UserAssertion String
-  deriving (Eq, Show)
-
--- | Guard a value with an assertion.
-data Guard sig
-  where
-    Guard :: AssertionLabel -> String -> Guard (Bool :-> a :-> Full a)
-
-deriving instance Eq       (Guard a)
-deriving instance Show     (Guard a)
-deriving instance Typeable (Guard a)
-
---------------------------------------------------------------------------------
+-- ** Software expression symbols.
 
 -- | For loop.
 data ForLoop sig
@@ -127,7 +110,6 @@ type SoftwareConstructs =
   Syn.:+: Tuple
   Syn.:+: SoftwarePrimConstructs
   -- ^ Software specific symbol.
-  Syn.:+: Guard
   Syn.:+: ForLoop
 
 -- | Software symbols tagged with their type representation.
@@ -213,30 +195,6 @@ instance FreeExp SExp
 --------------------------------------------------------------------------------
 -- syntactic instances.
 
-instance Eval Guard
-  where
-    evalSym (Guard InternalAssertion msg) = \cond a ->
-      if cond then a else error $ "Internal assertion failure: " ++ show msg
-    evalSym (Guard (UserAssertion ass) msg) = \cond a ->
-      if cond then a else error $ "User assertion " ++ show ass ++ " failure: " ++ show msg
-
-instance Symbol Guard
-  where
-    symSig (Guard _ _) = signature
-
-instance Render Guard
-  where
-    renderSym  = show
-    renderArgs = renderArgsSmart
-
-instance EvalEnv Guard env
-
-instance StringTree Guard
-
-instance Equality Guard
-
---------------------------------------------------------------------------------
-
 instance Eval ForLoop
   where
     evalSym ForLoop = \len init body ->
@@ -291,14 +249,9 @@ instance {-# OVERLAPPING #-} Project SoftwarePrimConstructs SoftwareConstructs
     prj (InjR (InjR (InjR (InjL a)))) = Just a
     prj _ = Nothing
 
-instance {-# OVERLAPPING #-} Project Guard SoftwareConstructs
-  where
-    prj (InjR (InjR (InjR (InjR (InjL a))))) = Just a
-    prj _ = Nothing
-
 instance {-# OVERLAPPING #-} Project ForLoop SoftwareConstructs
   where
-    prj (InjR (InjR (InjR (InjR (InjR a))))) = Just a
+    prj (InjR (InjR (InjR (InjR a)))) = Just a
     prj _ = Nothing
 
 --------------------------------------------------------------------------------

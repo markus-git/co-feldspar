@@ -55,29 +55,6 @@ import Feldspar.Hardware.Frontend (HSig)
 -- * Programs.
 --------------------------------------------------------------------------------
 
-data AssertCMD fs a
-  where
-    Assert :: AssertionLabel
-           -> exp Bool
-           -> String
-           -> AssertCMD (Oper.Param3 prog exp pred) ()
-
-instance Oper.HFunctor AssertCMD
-  where
-    hfmap _ (Assert lbl cond msg) = Assert lbl cond msg
-
-instance Oper.HBifunctor AssertCMD
-  where
-    hbimap _ g (Assert lbl cond msg) = Assert lbl (g cond) msg
-
-instance Oper.InterpBi AssertCMD IO (Oper.Param1 SoftwarePrimType)
-  where
-    interpBi (Assert _ cond msg) = do
-      cond' <- cond
-      unless cond' $ error $ "Assertion failed: " ++ msg
-
---------------------------------------------------------------------------------
-
 -- | Soften the hardware signature of a component into a type that uses the
 --   correspoinding data types in software.
 type family Soften a where
@@ -106,10 +83,10 @@ data MMapCMD fs a
   where
     MMap :: String
          -> HSig a
-         -> MMapCMD (Oper.Param3 prog exp pred) String
+         -> MMapCMD (Param3 prog exp pred) String
     Call :: Address a
          -> Argument pred (Soften a)
-         -> MMapCMD (Oper.Param3 prog exp pred) ()
+         -> MMapCMD (Param3 prog exp pred) ()
 
 instance Oper.HFunctor MMapCMD
   where
@@ -140,7 +117,7 @@ type SoftwareCMD
   Oper.:+: Imp.ArrCMD
     -- ^ Software specific instructions.
   Oper.:+: Imp.FileCMD
-  Oper.:+: AssertCMD  
+    -- ^ ...
   Oper.:+: MMapCMD
 
 -- | Monad for building software programs in Feldspar.
