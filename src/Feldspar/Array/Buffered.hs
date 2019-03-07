@@ -97,4 +97,38 @@ store
   => Store m a -> vec -> m (Manifest m a)
 store st vec = setStore st vec >> unsafeFreezeStore (length vec) st
 
+loopStore
+  :: ( Manifestable m vec1 a
+     , Finite (Expr m) vec1
+     , Manifestable m vec2 a
+     , Finite (Expr m) vec2
+     , SyntaxM m a
+     , MonadComp m
+     --
+     , SyntaxM' m (Expr m Length)
+     --
+     , Finite   (Expr m) (Array  m a)
+     , Slicable (Expr m) (IArray m a)
+     , Num (Expr m Index)
+     --
+     , ArraysSwap m
+     , ArraysEq (Array m) (IArray m)
+     )
+  => Store m a
+  -> Expr m Length  -- ^ Lower bound
+  -> Expr m Length  -- ^ Upper bound
+  -> (Expr m Index -> Manifest m a -> m vec1)
+  -> vec2
+  -> m (Manifest m a)
+loopStore store low high body init = do
+  setStore store init
+  ilen <- initRef $ length init
+  for low high $ \ix -> do
+    len  <- unsafeFreezeRef ilen
+    next <- body ix =<< unsafeFreezeStore len store
+    setStore store next
+    setRef ilen $ length next
+  len <- unsafeFreezeRef ilen
+  unsafeFreezeStore len store
+
 --------------------------------------------------------------------------------
