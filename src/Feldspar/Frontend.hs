@@ -12,6 +12,7 @@ import Feldspar.Representation
 
 import Data.Bits (Bits, FiniteBits)
 import Data.Constraint
+import Data.Int
 import Data.Struct
 import Data.Proxy
 import Data.Word hiding (Word)
@@ -170,11 +171,20 @@ rotateL = rol
 rotateR :: (Bitwise exp, Bits a, Primitive exp a, Integral b, Primitive exp b) => exp a -> exp b -> exp a
 rotateR = ror
 
-infixl 8 `shiftL`, `shiftR`, `rotateL`, `rotateR`
+(.<<.)  :: (Bitwise exp, Bits a, Primitive exp a, Primitive exp Int32) => exp a -> exp Int32 -> exp a
+(.<<.) = shiftL
+
+(.>>.)  :: (Bitwise exp, Bits a, Primitive exp a, Primitive exp Int32) => exp a -> exp Int32 -> exp a
+(.>>.) = shiftR
+
+infixl 8 `shiftL`, `shiftR`, `rotateL`, `rotateR`, .<<., .>>.
 
 bitSize :: forall exp a. FiniteBits a => exp a -> Word64
 bitSize _ = fromIntegral $ Bits.finiteBitSize (a :: a)
   where a = error "Bits.finiteBitSize evaluated its argument"
+
+ones :: (Bitwise exp, Bits a, Num (exp a), Primitive exp a) => exp a
+ones = complement 0
 
 class Casting exp
   where

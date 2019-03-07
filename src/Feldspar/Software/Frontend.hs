@@ -19,6 +19,7 @@ import Feldspar.Software.Representation
 import Data.Struct
 
 import Data.Bits (Bits)
+import Data.Complex
 import Data.Constraint hiding (Sub)
 import Data.Proxy
 import Data.List (genericLength)
@@ -122,6 +123,35 @@ instance (Num a, SType' a) => Num (SExp a)
     negate      = sugarSymPrimSoftware Neg
     abs         = error "todo: abs not implemeted for `SExp`"
     signum      = error "todo: signum not implemented for `SExp`"
+
+--------------------------------------------------------------------------------
+
+complex :: (Num a, SType' a, SType' (Complex a)) =>
+  SExp a -> -- ^ Real
+  SExp a -> -- ^ Imaginary
+  SExp (Complex a)
+complex = sugarSymPrimSoftware Complex
+
+polar :: (Floating a, SType' a, SType' (Complex a)) =>
+  SExp a -> -- ^ Magnitude
+  SExp a -> -- ^ Phase
+  SExp (Complex a)
+polar = sugarSymPrimSoftware Polar
+
+real :: (SType' a, SType' (Complex a)) => SExp (Complex a) -> SExp a
+real = sugarSymPrimSoftware Real
+
+imaginary :: (SType' a, SType' (Complex a)) => SExp (Complex a) -> SExp a
+imaginary = sugarSymPrimSoftware Imag
+
+magnitude :: (RealFloat a, SType' a, SType' (Complex a)) => SExp (Complex a) -> SExp a
+magnitude = sugarSymPrimSoftware Magnitude
+
+phase :: (RealFloat a, SType' a, SType' (Complex a)) => SExp (Complex a) -> SExp a
+phase = sugarSymPrimSoftware Phase
+
+conjugate :: (RealFloat a, SType' a, SType' (Complex a)) => SExp (Complex a) -> SExp (Complex a)
+conjugate = sugarSymPrimSoftware Conjugate
 
 --------------------------------------------------------------------------------
 -- * Instructions.
