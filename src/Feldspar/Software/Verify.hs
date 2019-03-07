@@ -14,9 +14,7 @@ import Feldspar.Software.Verify.Command
 import Feldspar.Software.Verify.Primitive
 
 import qualified Feldspar.Verify.Monad as V
-import qualified Control.Monad.FirstOrder as FO
-
-import Control.Monad.Identity
+import qualified Feldspar.Verify.FirstOrder as FO
 
 -- imperative-edsl.
 import qualified Language.Embedded.Imperative.CMD as Imp
@@ -26,7 +24,21 @@ import qualified Language.Embedded.Backend.C as Imp
 import Control.Monad.Operational.Higher
 
 --------------------------------------------------------------------------------
--- *
+-- * Verification of Software programs.
+--------------------------------------------------------------------------------
+
+verifySoft :: Software () -> IO ()
+verifySoft = verifiedSoft Imp.icompile
+
+verifiedSoft :: (ProgC () -> IO a) -> Software () -> IO a
+verifiedSoft comp prog =
+  do (prg, ws) <- V.runVerify $ do
+       return $ declareFeldsparGlobals
+       V.verify $ translate $ prog
+     comp prg <* unless (null ws) (do
+       putStrLn "Warnings:"
+       sequence_ [ putStrLn ('\t' : warn) | warn <- ws])
+
 --------------------------------------------------------------------------------
 
 instance V.Verifiable
@@ -38,27 +50,14 @@ instance V.Verifiable
        :+: Imp.PtrCMD
        :+: Imp.C_CMD
        :+: PtrCMD
-       :+: MMapCMD)
+       :+: MMapCMD
+      )
       (Param2 Prim SoftwarePrimType))
   where
     verifyWithResult prog = do
       let inv = undefined :: [[SomeLiteral]]
-      (p, r) <- V.verifyWithResult (FO.defunc inv prog)
-      undefined
-
-instance FO.Defunctionalise inv AssertCMD
-  where refunctionalise = error "todo: assert"
-instance FO.Defunctionalise inv PtrCMD
-  where refunctionalise = error "todo: ptr"
-instance FO.Defunctionalise inv MMapCMD
-  where refunctionalise = error "todo: mmap"
-
-instance V.VerifyInstr AssertCMD exp pred
-  where verifyInstr = error "todo: assert"
-instance V.VerifyInstr PtrCMD    exp pred
-  where verifyInstr = error "todo: ptr"
-instance V.VerifyInstr MMapCMD   exp pred
-  where verifyInstr = error "todo: mmap"
+      (p, r) <- V.verifyWithResult (FO.defunctionalise inv prog)
+      return (FO.refunctionalise inv p, r)
 
 instance V.Verifiable
     (FO.Sequence
@@ -69,7 +68,8 @@ instance V.Verifiable
        :+: Imp.PtrCMD
        :+: Imp.C_CMD
        :+: PtrCMD
-       :+: MMapCMD)
+       :+: MMapCMD
+      )
       (Param2 Prim SoftwarePrimType))
   where
     verifyWithResult (FO.Val a)     = return (FO.Val a, a)
@@ -87,16 +87,12 @@ instance V.Verifiable
 
 --------------------------------------------------------------------------------
 
-verifySoft :: Software () -> IO ()
-verifySoft = verifiedSoft Imp.icompile
+instance FO.Defunctionalise inv AssertCMD where refunc = error "todo: assert"
+instance FO.Defunctionalise inv PtrCMD    where refunc = error "todo: ptr"
+instance FO.Defunctionalise inv MMapCMD   where refunc = error "todo: mmap"
 
-verifiedSoft :: (ProgC () -> IO a) -> Software () -> IO a
-verifiedSoft comp prog =
-  do (prg, ws) <- V.runVerify $ do
-       return $ declareFeldsparGlobals
-       V.verify $ translate $ prog
-     comp prg <* unless (null ws) (do
-       putStrLn "Warnings:"
-       sequence_ [ putStrLn ('\t' : warn) | warn <- ws])
+instance V.VerifyInstr AssertCMD exp pred where verifyInstr = error "todo: assert"
+instance V.VerifyInstr PtrCMD    exp pred where verifyInstr = error "todo: ptr"
+instance V.VerifyInstr MMapCMD   exp pred where verifyInstr = error "todo: mmap"
 
 --------------------------------------------------------------------------------

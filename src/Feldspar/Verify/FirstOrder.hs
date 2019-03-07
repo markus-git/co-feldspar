@@ -56,9 +56,25 @@ class Defunctionalise inv instr
       inv -> instr fs a -> m (FO inv instr fs a)
     defunc _ = return
 
-    refunc :: (Sub exp pred, pred Bool) => inv -> Subst ->
-      FO inv instr (Param3 (Sequence (FO inv instr) (Param2 exp pred)) exp pred) a ->
-      HO     instr (Param3 (Program instr (Param2 exp pred)) exp pred) a
+    refunc :: (Defunctionalise inv jnstr, Sub exp pred, pred Bool) => inv -> Subst ->
+      FO inv instr (Param3 (Sequence (FO inv jnstr) (Param2 exp pred)) exp pred) a ->
+      HO     instr (Param3 (Program jnstr (Param2 exp pred)) exp pred) a
+
+instance (Defunctionalise inv instr, Defunctionalise inv jnstr) =>
+    Defunctionalise inv (instr :+: jnstr)
+  where
+    type FO inv (instr :+: jnstr) = FO inv instr :+: FO inv jnstr
+
+    defunc inv (Inl instr) = fmap Inl $ defunc inv instr
+    defunc inv (Inr jnstr) = fmap Inr $ defunc inv jnstr
+
+    refunc inv sub (Inl instr) = case refunc inv sub instr of
+      Named i   -> Named $ Inl i
+      Unnamed i -> Unnamed $ Inl i
+
+    refunc inv sub (Inr jnstr) = case refunc inv sub jnstr of
+      Named j   -> Named $ Inr j
+      Unnamed j -> Unnamed $ Inr j
 
 --------------------------------------------------------------------------------
 

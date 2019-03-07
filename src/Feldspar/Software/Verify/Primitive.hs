@@ -674,7 +674,7 @@ verifyPrim ShiftL (x :* (y :: ASTF SoftwarePrimDomain b) :* Nil)
   | Dict <- witnessBits (undefined :: Prim (DenResult a)),
     Dict <- V.witnessPred (undefined :: Prim b),
     Dict <- witnessIntegral (undefined :: Prim b) = do
-    -- XXX should check for undefined behaviour
+    -- todo: should check for undefined behaviour
     x <- V.eval (Prim x)
     y <- V.eval (Prim y)
     return (shiftL x (i2n y))
@@ -682,7 +682,7 @@ verifyPrim ShiftR (x :* (y :: ASTF SoftwarePrimDomain b) :* Nil)
   | Dict <- witnessBits (undefined :: Prim (DenResult a)),
     Dict <- V.witnessPred (undefined :: Prim b),
     Dict <- witnessIntegral (undefined :: Prim b) = do
-    -- XXX should check for undefined behaviour
+    -- todo: should check for undefined behaviour
     x <- V.eval (Prim x)
     y <- V.eval (Prim y)
     return (shiftR x (i2n y))
