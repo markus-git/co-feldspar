@@ -26,9 +26,7 @@ import Data.Maybe
 import Data.Array
 import Data.ALaCarte
 
-import Control.Monad.FirstOrder hiding (fresh)
 import Feldspar.Verify.SMT hiding (not, ite, stack, concat)
-import qualified Control.Monad.FirstOrder as FO
 import qualified Feldspar.Verify.SMT as SMT
 import qualified Feldspar.Verify.Abstract as Abstract
 

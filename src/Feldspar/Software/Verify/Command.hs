@@ -10,6 +10,7 @@
 {-# language GADTs #-}
 {-# language ConstraintKinds #-}
 {-# language GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Feldspar.Software.Verify.Command where
 
@@ -20,20 +21,17 @@ import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
 import Feldspar.Software.Representation
 
-import Data.Struct
-
-import qualified Control.Monad.FirstOrder as FO
-
+import Feldspar.Verify.FirstOrder (FO)
 import Feldspar.Verify.Monad (Verify)
-import qualified Feldspar.Verify.Monad    as V
-import qualified Feldspar.Verify.SMT      as SMT
+import qualified Feldspar.Verify.FirstOrder as FO
+import qualified Feldspar.Verify.Monad as V
+import qualified Feldspar.Verify.SMT as SMT
 import qualified Feldspar.Verify.Abstract as A
-import qualified Data.Map.Strict          as Map
-import qualified Control.Monad.RWS.Strict as S
-
-import Control.Monad.Identity
+import qualified Data.Map.Strict as Map
 
 import Data.Array (Ix)
+import Data.Constraint hiding ((\\))
+import Data.Functor.Identity
 import Data.Function (on)
 import Data.Maybe (fromMaybe)
 import Data.Ord
@@ -42,16 +40,21 @@ import Data.Int
 import Data.Word
 import Data.List (genericTake, (\\), sort, sortBy, group, groupBy, intersect, nub)
 import Data.Typeable (Typeable, cast, typeOf)
-import Data.Constraint hiding ((\\))
+import Data.Struct
+
+import Data.Typeable
+
 import Control.Monad.Reader (ReaderT(..), runReaderT, lift)
+import qualified Control.Monad.RWS.Strict as S
 
 -- syntactic.
-import Language.Syntactic hiding (Signature, Args)
+import Language.Syntactic hiding (Signature, Args, (:+:), (:<:))
 import Language.Syntactic.Functional hiding (Lam, Var)
 import Language.Syntactic.Functional.Tuple
 import qualified Language.Syntactic as Syn
 
 -- operational-higher.
+import Control.Monad.Operational.Higher ((:+:), (:<:))
 import Control.Monad.Operational.Higher as Oper
 
 -- imperative-edsl.
@@ -89,7 +92,7 @@ class VerifyInstr instr exp pred
     verifyInstr instr _ = return instr
 
 instance (VerifyInstr f exp pred, VerifyInstr g exp pred) =>
-    VerifyInstr (f Imp.:+: g) exp pred
+    VerifyInstr (f :+: g) exp pred
   where
     verifyInstr (Inl m) x = fmap Inl (verifyInstr m x)
     verifyInstr (Inr m) x = fmap Inr (verifyInstr m x)
@@ -97,21 +100,23 @@ instance (VerifyInstr f exp pred, VerifyInstr g exp pred) =>
 --------------------------------------------------------------------------------
 
 instance
-  ( VerifyInstr (FO.FirstOrder [[SomeLiteral]] instr) exp pred
-  , ControlCMD [[SomeLiteral]] Imp.:<: FO.FirstOrder [[SomeLiteral]] instr
+  ( VerifyInstr (FO [[SomeLiteral]] instr) exp pred
+  , ControlCMD [[SomeLiteral]] :<: FO [[SomeLiteral]] instr
+  , HFunctor instr
+  , FO.HTraversable (FO [[SomeLiteral]] instr)
+  , FO.Defunctionalise [[SomeLiteral]] instr
+  , FO.Symbol instr
   , FO.TypeablePred pred
   , FO.Substitute exp
   , FO.SubstPred exp ~ pred
-  , pred Bool
-  , FO.Defunctionalise [[SomeLiteral]] instr
-  , FO.DryInterp instr)
+  , pred Bool)
   =>
     Verifiable (Program instr (Param2 exp pred))
   where
     verifyWithResult prog = do
       let inv = undefined :: [[SomeLiteral]]
-      (prog', res) <- verifyWithResult (FO.defunc inv prog)
-      return (FO.refunc inv prog', res)
+      (prog', res) <- verifyWithResult (FO.defunctionalise inv prog)
+      return (FO.refunctionalise inv prog', res)
 
 instance
   ( VerifyInstr instr exp pred
@@ -121,11 +126,22 @@ instance
   where
     verifyWithResult (FO.Val x) = return (FO.Val x, x)
     verifyWithResult (FO.Seq x m k) = do
-      ((m', breaks), warns) <- V.swallowWarns $ V.getWarns $ V.withBreaks $
-        verifyInstr m x
-      (_, (k', res)) <- V.ite (breaks) (return ()) (verifyWithResult k)
-      let comment msg prog = FO.Seq () (Oper.inj (Comment msg :: ControlCMD [[SomeLiteral]] (Param3 (FO.Sequence prog (Param2 exp pred)) exp pred) ())) prog
-      return (foldr comment (FO.Seq x m' k') warns, res)
+      ((m',bs),ws) <- V.swallowWarns $ V.getWarns $ V.withBreaks $ verifyInstr m x
+      (_,(k',res)) <- V.ite bs (return ()) $ verifyWithResult k
+      return (addWarns ws (FO.Seq x m' k'), res)
+
+addWarns :: ControlCMD [[SomeLiteral]] Imp.:<: instr =>
+  [String] ->
+  FO.Sequence instr (Param2 exp pred) a ->
+  FO.Sequence instr (Param2 exp pred) a
+addWarns ws prog = foldr addComment prog ws
+
+addComment :: ControlCMD [[SomeLiteral]] Imp.:<: instr =>
+  String -> 
+  FO.Sequence instr (Param2 exp pred) a ->
+  FO.Sequence instr (Param2 exp pred) a
+addComment msg prog = flip (FO.Seq ()) prog (Oper.inj (Comment msg ::
+  ControlCMD [[SomeLiteral]] (Param3 (FO.Sequence prg fs) exp pred) ()))
 
 --------------------------------------------------------------------------------
 
@@ -987,148 +1003,157 @@ evalClause old clause = do
 -- reveal :: Typeable a => Variable -> a
 -- reveal (Variable a _) = fromMaybe (error "substitution type error") (cast a)
 
-type instance FO.Id (Imp.Ref a)    = C.Id
-type instance FO.Id (Imp.Val a)    = C.Id
-type instance FO.Id (Imp.Arr  i a) = C.Id
-type instance FO.Id (Imp.IArr i a) = C.Id
-type instance FO.Id (Imp.Handle)   = C.Id
+instance FO.Name (Imp.Handle)   where name a = show $ C.toIdent a C.noLoc
+instance FO.Name (Imp.Ref a)    where name a = show $ C.toIdent a C.noLoc
+instance FO.Name (Imp.Val a)    where name a = show $ C.toIdent a C.noLoc
+instance FO.Name (Imp.Arr  i a) where name a = show $ C.toIdent a C.noLoc
+instance FO.Name (Imp.IArr i a) where name a = show $ C.toIdent a C.noLoc
 
-instance (Typeable a) => FO.Variable (Imp.Ref a)
-  where
-    hide a = FO.Hidden a (C.toIdent a C.noLoc)
+instance FO.Ex (Imp.Handle)     where hide = FO.E
+instance FO.Ex (Imp.Ref a)      where hide = FO.E
+instance FO.Ex (Imp.Val a)      where hide = FO.E
+instance FO.Ex (Imp.Arr  i a)   where hide = FO.E
+instance FO.Ex (Imp.IArr i a)   where hide = FO.E
 
-instance (Typeable a) => FO.Variable (Imp.Val a)
-  where
-    hide a = FO.Hidden a (C.toIdent a C.noLoc)
+witnessF1 :: forall f instr prog exp pred a b .
+     (FO.TypeablePred pred, Typeable f) => f a
+  -> (Typeable a => FO.HO instr (Param3 prog exp pred) b)
+  -> (pred a     => FO.HO instr (Param3 prog exp pred) b)
+witnessF1 _ x = case FO.witnessTypeable (Dict :: Dict (pred a)) of
+  Dict -> x
 
-instance (Typeable a, Typeable i) => FO.Variable (Imp.Arr i a)
-  where
-    hide a = FO.Hidden a (C.toIdent a C.noLoc)
+witnessF2 :: forall f instr prog exp pred a b c .
+     (FO.TypeablePred pred, Typeable f) => f a b
+  -> (Typeable a => Typeable b => FO.HO instr (Param3 prog exp pred) c)
+  -> (pred a     => pred b     => FO.HO instr (Param3 prog exp pred) c)
+witnessF2 f x = case FO.witnessTypeable (Dict :: Dict (pred a)) of
+  Dict -> witnessF1 f x
 
-instance (Typeable a, Typeable i) => FO.Variable (Imp.IArr i a)
-  where
-    hide a = FO.Hidden a (C.toIdent a C.noLoc)
+--------------------------------------------------------------------------------
 
-instance FO.Variable (Imp.Handle)
-  where
-    hide a = FO.Hidden a (C.toIdent a C.noLoc)
+named1 :: forall f instr prog exp pred a .
+     (FO.TypeablePred pred, Typeable f, FO.Ex (f a))
+  => (Typeable a =>       instr (Param3 prog exp pred) (f a))
+  -> (pred a     => FO.HO instr (Param3 prog exp pred) (f a))
+named1 instr = witnessF1 (undefined :: f a) (FO.Named instr)
 
-witnessVal :: forall f i j e pred a b . (FO.TypeablePred pred, Typeable f)
-  => f a
-  -> (Typeable a => FO.Recovered i j e pred b)
-  -> (pred a     => FO.Recovered i j e pred b)
-witnessVal _ x = case FO.witnessTypeable (Dict :: Dict (pred a)) of Dict -> x
+named2 :: forall f instr prog exp pred a b .
+     (FO.TypeablePred pred, Typeable f, FO.Ex (f a b))
+  => (Typeable a => Typeable b =>       instr (Param3 prog exp pred) (f a b))
+  -> (pred a     => pred b     => FO.HO instr (Param3 prog exp pred) (f a b))
+named2 instr = witnessF2 (undefined :: f a b) (FO.Named instr)
 
-witnessArr :: forall f i j e pred a b c . (FO.TypeablePred pred, Typeable f)
-  => f a b
-  -> (Typeable a => Typeable b => FO.Recovered i j e pred c)
-  -> (pred a     => pred b     => FO.Recovered i j e pred c)
-witnessArr f x = case FO.witnessTypeable (Dict :: Dict (pred a)) of Dict -> witnessVal f x
+unnamed1 :: forall f instr prog exp pred a .
+     (FO.TypeablePred pred, Typeable f) => f a
+  -> (Typeable a =>       instr (Param3 prog exp pred) ())
+  -> (pred a     => FO.HO instr (Param3 prog exp pred) ())
+unnamed1 f instr = witnessF1 f (FO.Unnamed instr)
 
-witness1 :: forall f i j e pred a . (FO.TypeablePred pred, Typeable f)
-  => (Typeable a => FO.Recovered i j e pred (f a))
-  -> (pred a     => FO.Recovered i j e pred (f a))
-witness1 = witnessVal (undefined :: f a)
+unnamed2 :: forall f instr prog exp pred a b .
+     (FO.TypeablePred pred, Typeable f) => f a b
+  -> (Typeable a => Typeable b =>       instr (Param3 prog exp pred) ())
+  -> (pred a     => pred b     => FO.HO instr (Param3 prog exp pred) ())
+unnamed2 f instr = witnessF2 f (FO.Unnamed instr)
 
-witness2 :: forall f i j e pred a b . (FO.TypeablePred pred, Typeable f)
-  => (Typeable a => Typeable b => FO.Recovered i j e pred (f a b))
-  -> (pred a     => pred b     => FO.Recovered i j e pred (f a b))
-witness2 = witnessArr (undefined :: f a b)
+--------------------------------------------------------------------------------
 
 instance FO.Defunctionalise inv Imp.RefCMD
   where
-    refunctionalise _ sub (Imp.NewRef name) =
-      witness1 (FO.Keep (Imp.NewRef name))
-    refunctionalise _ sub (Imp.InitRef name exp) =
-      witness1 (FO.Keep (Imp.InitRef name (FO.subst sub exp)))
-    refunctionalise _ sub (Imp.GetRef ref) =
-      witnessVal ref (FO.Keep (Imp.GetRef (FO.lookupSubst sub ref)))
-    refunctionalise _ sub (Imp.SetRef ref exp) =
-      witnessVal ref (FO.Discard (Imp.SetRef
-        (FO.lookupSubst sub ref) (FO.subst sub exp)))
-    refunctionalise _ sub (Imp.UnsafeFreezeRef ref) =
-      witnessVal ref (FO.Keep (Imp.UnsafeFreezeRef (FO.lookupSubst sub ref)))
+    refunc _ sub (Imp.NewRef name) =
+      named1 $ Imp.NewRef name
+    refunc _ sub (Imp.InitRef name exp) =
+      named1 $ Imp.InitRef name $ FO.subst sub exp
+    refunc _ sub (Imp.GetRef ref) =
+      named1 $ Imp.GetRef $ FO.lookupSubst sub ref
+    refunc _ sub (Imp.SetRef ref exp) =
+      unnamed1 ref $ Imp.SetRef (FO.lookupSubst sub ref) (FO.subst sub exp)
+    refunc _ sub (Imp.UnsafeFreezeRef ref) =
+      named1 $ Imp.UnsafeFreezeRef $ FO.lookupSubst sub ref
 
 instance FO.Defunctionalise inv Imp.ArrCMD
   where
-    refunctionalise _ sub (Imp.NewArr name n) =
-      witness2 (FO.Keep (Imp.NewArr name (FO.subst sub n)))
-    refunctionalise _ sub (Imp.ConstArr name xs) =
-      witness2 (FO.Keep (Imp.ConstArr name xs))
-    refunctionalise _ sub (Imp.GetArr arr i) =
-      witnessArr arr (FO.Keep (Imp.GetArr
-        (FO.lookupSubst sub arr) (FO.subst sub i)))
-    refunctionalise _ sub (Imp.SetArr arr i exp) =
-      witnessArr arr (FO.Discard (Imp.SetArr
-        (FO.lookupSubst sub arr) (FO.subst sub i) (FO.subst sub exp)))
-    refunctionalise _ sub (Imp.CopyArr (arr, i) (brr, j) n) =
-      witnessArr arr (FO.Discard (Imp.CopyArr
+    refunc _ sub (Imp.NewArr name n) =
+      named2 $ Imp.NewArr name $ FO.subst sub n
+    refunc _ sub (Imp.ConstArr name xs) =
+      named2 $ Imp.ConstArr name xs
+    refunc _ sub (Imp.GetArr arr i) =
+      witnessF2 arr $ FO.Named $
+        Imp.GetArr (FO.lookupSubst sub arr) (FO.subst sub i)
+    refunc _ sub (Imp.SetArr arr i exp) =
+      unnamed2 arr $ Imp.SetArr
+        (FO.lookupSubst sub arr)
+        (FO.subst sub i)
+        (FO.subst sub exp)
+    refunc _ sub (Imp.CopyArr (arr, i) (brr, j) n) =
+      unnamed2 arr $ Imp.CopyArr
         (FO.lookupSubst sub arr, FO.subst sub i)
         (FO.lookupSubst sub brr, FO.subst sub j)
-        (FO.subst sub n)))
-    refunctionalise _ sub (Imp.UnsafeFreezeArr arr) =
-      witness2 (FO.Keep (Imp.UnsafeFreezeArr (FO.lookupSubst sub arr)))
-    refunctionalise _ sub (Imp.UnsafeThawArr iarr) =
-      witness2 (FO.Keep (Imp.UnsafeThawArr (FO.lookupSubst sub iarr)))
+        (FO.subst sub n)
+    refunc _ sub (Imp.UnsafeFreezeArr arr) =
+      named2 $ Imp.UnsafeFreezeArr (FO.lookupSubst sub arr)
+    refunc _ sub (Imp.UnsafeThawArr iarr) =
+      named2 $ Imp.UnsafeThawArr (FO.lookupSubst sub iarr)
 
 instance FO.Defunctionalise inv Imp.FileCMD
   where
-    refunctionalise _ sub (Imp.FOpen name mode) =
-      FO.Keep (Imp.FOpen name mode)
-    refunctionalise _ sub (Imp.FClose h) =
-      FO.Discard (Imp.FClose (FO.lookupSubst sub h))
-    refunctionalise _ sub (Imp.FEof h) =
-      FO.Keep (Imp.FEof (FO.lookupSubst sub h))
-    refunctionalise _ sub (Imp.FPrintf h msg args) =
-      FO.Discard (Imp.FPrintf (FO.lookupSubst sub h) msg
-        (map (Imp.mapPrintfArg (FO.subst sub)) args))
-    refunctionalise _ sub (Imp.FGet h) =
-      witness1 (FO.Keep (Imp.FGet (FO.lookupSubst sub h)))
+    refunc _ sub (Imp.FOpen name mode) =
+      FO.Named $ Imp.FOpen name mode
+    refunc _ sub (Imp.FClose h) =
+      FO.Unnamed $ Imp.FClose $ FO.lookupSubst sub h
+    refunc _ sub (Imp.FEof h) =
+      FO.Named $ Imp.FEof $ FO.lookupSubst sub h
+    refunc _ sub (Imp.FPrintf h msg args) =
+      FO.Unnamed $ Imp.FPrintf
+        (FO.lookupSubst sub h) msg
+        (map (Imp.mapPrintfArg (FO.subst sub)) args)
+    refunc _ sub (Imp.FGet h) =
+      named1 $ Imp.FGet (FO.lookupSubst sub h)
 
 instance FO.Defunctionalise inv Imp.ControlCMD
   where
-    type FirstOrder inv Imp.ControlCMD = ControlCMD inv
+    type FO inv Imp.ControlCMD = ControlCMD inv
 
-    defunctionalise _ (Imp.If cond t f) =
+    defunc _ (Imp.If cond t f) =
       return (If cond t f)
-    defunctionalise _ (Imp.While cond body) =
+    defunc _ (Imp.While cond body) =
       return (While Nothing cond body)
-    defunctionalise _ (Imp.For range body) = do
+    defunc _ (Imp.For range body) = do
       ix <- fmap (Imp.ValComp . ('v':) . show) FO.fresh
       return (For Nothing range ix (body ix))
-    defunctionalise _ (Imp.Break) =
+    defunc _ (Imp.Break) =
       return Break
-    defunctionalise _ (Imp.Assert cond msg) =
+    defunc _ (Imp.Assert cond msg) =
       return (Test (Just cond) msg)
-    defunctionalise _ (Imp.Hint exp) =
+    defunc _ (Imp.Hint exp) =
       return (Hint exp)
 
-    refunctionalise inv sub (If cond t f) =
-      FO.Discard (Imp.If (FO.subst sub cond)
-        (FO.refuncM inv sub t)
-        (FO.refuncM inv sub f))
-    refunctionalise inv sub (While _ cond body) =
-      FO.Discard (Imp.While
-        (FO.refuncM inv sub cond)
-        (FO.refuncM inv sub body))
-    refunctionalise inv sub (For _ (lo :: exp i, step, hi) ix body) =
-      witnessVal ix $ FO.Discard $ Imp.For
+    refunc inv sub (If cond t f) =
+      FO.Unnamed $ Imp.If
+        (FO.subst sub cond)
+        (FO.refunctionaliseM inv sub t)
+        (FO.refunctionaliseM inv sub f)
+    refunc inv sub (While _ cond body) =
+      FO.Unnamed $ Imp.While
+        (FO.refunctionaliseM inv sub cond)
+        (FO.refunctionaliseM inv sub body)
+    refunc inv sub (For _ (lo :: exp i, step, hi) ix body) =
+      witnessF1 ix $ FO.Unnamed $ Imp.For
         (FO.subst sub lo, step, fmap (FO.subst sub) hi)
-        (\jx -> FO.refuncM inv (FO.extendSubst ix jx sub) body)
-    refunctionalise inv sub (Break) =
-      FO.Discard Imp.Break
-    refunctionalise inv sub (Test (Just cond) msg) =
-      FO.Discard (Imp.Assert (FO.subst sub cond) msg)
-    refunctionalise inv sub (Hint exp) =
-      FO.Discard (Imp.Hint (FO.subst sub exp))
+        (\jx -> FO.refunctionaliseM inv (FO.extendSubst ix jx sub) body)
+    refunc inv sub (Break) =
+      FO.Unnamed $ Imp.Break
+    refunc inv sub (Test (Just cond) msg) =
+      FO.Unnamed $ Imp.Assert (FO.subst sub cond) msg
+    refunc inv sub (Hint exp) =
+      FO.Unnamed $ Imp.Hint $ FO.subst sub exp
 
 instance FO.Defunctionalise inv Imp.PtrCMD
   where
-    refunctionalise = error "don't know how to refunc. pointers."
+    refunc = error "don't know how to refunc. pointers."
 
 instance FO.Defunctionalise inv Imp.C_CMD
   where
-    refunctionalise = error "don't know how to refunc. C commands."
+    refunc = error "don't know how to refunc. C commands."
 
 --------------------------------------------------------------------------------
 
@@ -1138,62 +1163,62 @@ instance FO.HTraversable Imp.FileCMD
 instance FO.HTraversable Imp.PtrCMD
 instance FO.HTraversable Imp.C_CMD
 
-instance FO.DryInterp Imp.RefCMD
+instance FO.Symbol Imp.RefCMD
   where
-    dryInterp (Imp.NewRef base)    = liftM Imp.RefComp $ FO.freshStr base
-    dryInterp (Imp.InitRef base _) = liftM Imp.RefComp $ FO.freshStr base
-    dryInterp (Imp.GetRef _)       = liftM Imp.ValComp $ FO.freshStr "v"
-    dryInterp (Imp.SetRef _ _)     = return ()
-    dryInterp (Imp.UnsafeFreezeRef (Imp.RefComp ref)) =
+    dry (Imp.NewRef base)    = liftM Imp.RefComp $ FO.freshStr base
+    dry (Imp.InitRef base _) = liftM Imp.RefComp $ FO.freshStr base
+    dry (Imp.GetRef _)       = liftM Imp.ValComp $ FO.freshStr "v"
+    dry (Imp.SetRef _ _)     = return ()
+    dry (Imp.UnsafeFreezeRef (Imp.RefComp ref)) =
       liftM Imp.ValComp $ FO.freshStr (ref ++ ".")
 
-instance FO.DryInterp Imp.ArrCMD
+instance FO.Symbol Imp.ArrCMD
   where
-    dryInterp (Imp.NewArr base _)   = liftM Imp.ArrComp $ FO.freshStr base
-    dryInterp (Imp.ConstArr base _) = liftM Imp.ArrComp $ FO.freshStr base
-    dryInterp (Imp.GetArr _ _)      = liftM Imp.ValComp $ FO.freshStr "v"
-    dryInterp (Imp.SetArr _ _ _)    = return ()
-    dryInterp (Imp.CopyArr _ _ _)   = return ()
-    dryInterp (Imp.UnsafeFreezeArr (Imp.ArrComp arr)) =
+    dry (Imp.NewArr base _)   = liftM Imp.ArrComp $ FO.freshStr base
+    dry (Imp.ConstArr base _) = liftM Imp.ArrComp $ FO.freshStr base
+    dry (Imp.GetArr _ _)      = liftM Imp.ValComp $ FO.freshStr "v"
+    dry (Imp.SetArr _ _ _)    = return ()
+    dry (Imp.CopyArr _ _ _)   = return ()
+    dry (Imp.UnsafeFreezeArr (Imp.ArrComp arr)) =
       liftM Imp.IArrComp $ FO.freshStr (arr ++ ".")
-    dryInterp (Imp.UnsafeThawArr (Imp.IArrComp iarr)) =
+    dry (Imp.UnsafeThawArr (Imp.IArrComp iarr)) =
       liftM Imp.ArrComp  $ FO.freshStr (iarr ++ ".")
 
-instance FO.DryInterp Imp.ControlCMD
+instance FO.Symbol Imp.ControlCMD
   where
-    dryInterp (Imp.If _ _ _)   = return ()
-    dryInterp (Imp.While _ _)  = return ()
-    dryInterp (Imp.For _ _)    = return ()
-    dryInterp (Imp.Break)      = return ()
-    dryInterp (Imp.Assert _ _) = return ()
-    dryInterp (Imp.Hint _)     = return ()
+    dry (Imp.If _ _ _)   = return ()
+    dry (Imp.While _ _)  = return ()
+    dry (Imp.For _ _)    = return ()
+    dry (Imp.Break)      = return ()
+    dry (Imp.Assert _ _) = return ()
+    dry (Imp.Hint _)     = return ()
 
-instance FO.DryInterp Imp.FileCMD
+instance FO.Symbol Imp.FileCMD
   where
-    dryInterp (Imp.FOpen _ _)     = liftM Imp.HandleComp $ FO.freshStr "h"
-    dryInterp (Imp.FClose _)      = return ()
-    dryInterp (Imp.FPrintf _ _ _) = return ()
-    dryInterp (Imp.FGet _)        = liftM Imp.ValComp $ FO.freshStr "v"
-    dryInterp (Imp.FEof _)        = liftM Imp.ValComp $ FO.freshStr "v"
+    dry (Imp.FOpen _ _)     = liftM Imp.HandleComp $ FO.freshStr "h"
+    dry (Imp.FClose _)      = return ()
+    dry (Imp.FPrintf _ _ _) = return ()
+    dry (Imp.FGet _)        = liftM Imp.ValComp $ FO.freshStr "v"
+    dry (Imp.FEof _)        = liftM Imp.ValComp $ FO.freshStr "v"
 
-instance FO.DryInterp Imp.PtrCMD
+instance FO.Symbol Imp.PtrCMD
   where
-    dryInterp (Imp.SwapPtr _ _) = return ()
+    dry (Imp.SwapPtr _ _) = return ()
 
-instance FO.DryInterp Imp.C_CMD
+instance FO.Symbol Imp.C_CMD
   where
-    dryInterp (Imp.NewCArr base _ _)     = liftM Imp.ArrComp $ FO.freshStr base
-    dryInterp (Imp.ConstCArr base _ _)   = liftM Imp.ArrComp $ FO.freshStr base
-    dryInterp (Imp.NewPtr base)          = liftM Imp.PtrComp $ FO.freshStr base
-    dryInterp (Imp.PtrToArr (Imp.PtrComp p)) = return $ Imp.ArrComp p
-    dryInterp (Imp.NewObject base t p)   =
+    dry (Imp.NewCArr base _ _)     = liftM Imp.ArrComp $ FO.freshStr base
+    dry (Imp.ConstCArr base _ _)   = liftM Imp.ArrComp $ FO.freshStr base
+    dry (Imp.NewPtr base)          = liftM Imp.PtrComp $ FO.freshStr base
+    dry (Imp.PtrToArr (Imp.PtrComp p)) = return $ Imp.ArrComp p
+    dry (Imp.NewObject base t p)   =
       liftM (Imp.Object p t) $ FO.freshStr base
-    dryInterp (Imp.AddInclude _)         = return ()
-    dryInterp (Imp.AddDefinition _)      = return ()
-    dryInterp (Imp.AddExternFun _ _ _)   = return ()
-    dryInterp (Imp.AddExternProc _ _)    = return ()
-    dryInterp (Imp.CallFun _ _)          = liftM Imp.ValComp $ FO.freshStr "v"
-    dryInterp (Imp.CallProc _ _ _)       = return ()
-    dryInterp (Imp.InModule _ _)         = return ()
+    dry (Imp.AddInclude _)         = return ()
+    dry (Imp.AddDefinition _)      = return ()
+    dry (Imp.AddExternFun _ _ _)   = return ()
+    dry (Imp.AddExternProc _ _)    = return ()
+    dry (Imp.CallFun _ _)          = liftM Imp.ValComp $ FO.freshStr "v"
+    dry (Imp.CallProc _ _ _)       = return ()
+    dry (Imp.InModule _ _)         = return ()
 
 --------------------------------------------------------------------------------

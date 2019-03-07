@@ -21,17 +21,18 @@ import Feldspar.Software.Representation hiding (Nil)
 import Feldspar.Software.Verify.Command
 import Feldspar.Verify.Arithmetic
 
-import Data.Struct
-
-import qualified Control.Monad.FirstOrder as FO
-import qualified SimpleSMT as SMT hiding (not, declareFun)
-
 import Feldspar.Verify.Monad (Verify)
-import qualified Feldspar.Verify.Monad    as V
-import qualified Feldspar.Verify.SMT      as SMT
+import qualified Feldspar.Verify.FirstOrder as FO
+import qualified Feldspar.Verify.Monad as V
+import qualified Feldspar.Verify.SMT as SMT
 import qualified Feldspar.Verify.Abstract as A
-import qualified Data.Map.Strict          as Map
+
+import Data.Struct
+import qualified Data.Map.Strict as Map
+
 import qualified Control.Monad.RWS.Strict as S
+
+import qualified SimpleSMT as SMT hiding (not, declareFun)
 
 import qualified Language.Embedded.Expression as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
@@ -173,8 +174,7 @@ witnessFractional (_ :: Prim a) = case softwareRep :: SoftwarePrimTypeRep a of
 
 witnessIntegral :: (SoftwarePrimType a, Integral a) =>
   Prim a ->
-  Dict ( Integral (V.SMTExpr Prim a)
-       , Bits (V.SMTExpr Prim a))
+  Dict (Integral (V.SMTExpr Prim a), Bits (V.SMTExpr Prim a))
 witnessIntegral (_ :: Prim a) = case softwareRep :: SoftwarePrimTypeRep a of
   Int8ST   -> Dict
   Int16ST  -> Dict

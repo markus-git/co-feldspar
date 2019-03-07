@@ -43,8 +43,7 @@ data Sequence instr fs a
 data HO instr fs a
   where
     Unnamed :: instr fs a -> HO instr fs a
-    Named   :: (Ex a) =>
-      instr fs a -> HO instr fs a
+    Named   :: (Ex a, Typeable a) => instr fs a -> HO instr fs a
 
 class Defunctionalise inv instr
   where
@@ -57,9 +56,9 @@ class Defunctionalise inv instr
       inv -> instr fs a -> m (FO inv instr fs a)
     defunc _ = return
 
-    refunc :: inv -> Subst ->
-      FO inv instr '(Sequence (FO inv instr) fs, fs) a ->
-      HO     instr '(Program instr fs,           fs) a
+    refunc :: (Sub exp pred, pred Bool) => inv -> Subst ->
+      FO inv instr (Param3 (Sequence (FO inv instr) (Param2 exp pred)) exp pred) a ->
+      HO     instr (Param3 (Program instr (Param2 exp pred)) exp pred) a
 
 --------------------------------------------------------------------------------
 
@@ -92,12 +91,17 @@ defunctionaliseM inv prg = case view prg of
 
 --------------------------------------------------------------------------------
 
-refunctionalise :: (Defunctionalise inv instr) =>
-  inv -> Sequence (FO inv instr) fs a -> Program instr fs a
+refunctionalise :: (Defunctionalise inv instr, Sub exp pred, pred Bool) =>
+  inv ->
+  Sequence (FO inv instr) (Param2 exp pred) a ->
+  Program instr (Param2 exp pred) a
 refunctionalise inv = refunctionaliseM inv Map.empty
 
-refunctionaliseM :: (Defunctionalise inv instr) =>
-  inv -> Subst -> Sequence (FO inv instr) fs a -> Program instr fs a
+refunctionaliseM :: (Defunctionalise inv instr, Sub exp pred, pred Bool) =>
+  inv ->
+  Subst ->
+  Sequence (FO inv instr) (Param2 exp pred) a ->
+  Program instr (Param2 exp pred) a
 refunctionaliseM _   _   (Val val)       = return val
 refunctionaliseM inv sub (Seq n fo tail) =
   case refunc inv sub fo of
@@ -158,7 +162,7 @@ class Name a
 
 data E
   where
-    E :: (Typeable a, Eq a, Ord a, Name a) => a -> E
+    E :: (Typeable a, Name a) => a -> E
 
 instance Eq E
   where
@@ -171,7 +175,7 @@ instance Ord E
 
 class Ex a
   where
-    hide :: a -> E
+    hide :: Typeable a => a -> E
 
 --------------------------------------------------------------------------------
 
@@ -182,7 +186,13 @@ class Substitute exp
     type SubstPred exp :: * -> Constraint
     subst :: SubstPred exp a => Subst -> exp a -> exp a
 
-extendSubst :: Ex a => a -> a -> Subst -> Subst
+class TypeablePred pred
+  where
+    witnessTypeable :: Dict (pred a) -> Dict (Typeable a)
+
+type Sub exp pred = (Substitute exp, SubstPred exp ~ pred, TypeablePred pred)
+
+extendSubst :: (Ex a, Typeable a) => a -> a -> Subst -> Subst
 extendSubst x y = Map.insert (hide x) (hide y)
 
 lookupSubst :: (Ex a, Typeable a) => Subst -> a -> a

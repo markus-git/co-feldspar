@@ -22,21 +22,16 @@ import Feldspar.Array.Buffered (ArraysEq(..))
 import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
 
-import Data.Struct
-
-import qualified Control.Monad.FirstOrder as FO
-
 import Feldspar.Verify.Monad (Verify)
-import qualified Feldspar.Verify.Monad    as V
-import qualified Feldspar.Verify.SMT      as SMT
+import qualified Feldspar.Verify.FirstOrder as FO
+import qualified Feldspar.Verify.Monad as V
+import qualified Feldspar.Verify.SMT as SMT
 import qualified Feldspar.Verify.Abstract as A
-import qualified Data.Map.Strict          as Map
-import qualified Control.Monad.FirstOrder as FO
-import qualified Control.Monad.RWS.Strict as S
-import Control.Monad.Identity
 
 import Data.Array (Ix)
+import Data.Constraint hiding ((\\))
 import Data.Function (on)
+import Data.Functor.Identity
 import Data.Maybe (fromMaybe)
 import Data.Ord
 import Data.IORef
@@ -44,7 +39,9 @@ import Data.Int
 import Data.Word
 import Data.List (genericTake, (\\), sort, sortBy, group, groupBy, intersect, nub)
 import Data.Typeable (Typeable, cast, typeOf)
-import Data.Constraint hiding ((\\))
+import Data.Struct
+import qualified Data.Map.Strict as Map
+
 import Control.Monad.Reader (ReaderT(..), runReaderT, lift)
 
 -- syntactic.
@@ -108,9 +105,9 @@ instance (Imp.ControlCMD Oper.:<: instr) => Oper.Reexpressible AssertCMD instr e
 
 instance FO.HTraversable AssertCMD
 
-instance FO.DryInterp AssertCMD
+instance FO.Symbol AssertCMD
   where
-    dryInterp (Assert {}) = return ()
+    dry (Assert {}) = return ()
 
 --------------------------------------------------------------------------------
 
@@ -176,9 +173,9 @@ instance (PtrCMD Oper.:<: instr) => Oper.Reexpressible PtrCMD instr env
 
 instance FO.HTraversable PtrCMD
 
-instance FO.DryInterp PtrCMD
+instance FO.Symbol PtrCMD
   where
-    dryInterp (SwapPtr {}) = return ()
+    dry (SwapPtr {}) = return ()
 
 --------------------------------------------------------------------------------
 
@@ -236,10 +233,10 @@ instance Oper.InterpBi MMapCMD IO (Param1 SoftwarePrimType)
 
 instance FO.HTraversable MMapCMD
 
-instance FO.DryInterp MMapCMD
+instance FO.Symbol MMapCMD
   where
-    dryInterp (MMap s sig)    = show <$> FO.fresh
-    dryInterp (Call addr sig) = return ()
+    dry (MMap s sig)    = show <$> FO.fresh
+    dry (Call addr sig) = return ()
 
 --------------------------------------------------------------------------------
 
