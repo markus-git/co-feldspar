@@ -43,10 +43,10 @@ import qualified Prelude as P
 -- | Collection of constraints for `exp` to support Pull/Push vectors.
 type Vector exp = (
   -- expressions needed to implement most Pull/Push vectors operations:
-    Value   exp
-  , Cond    exp
-  , Ordered exp
-  , Loop    exp
+    Value     exp
+  , Cond      exp
+  , Ordered   exp
+  , Iterate   exp
   -- constraints needed to support indexing:
   , Primitive exp Length
   , Syntax'   exp (exp Length)
@@ -80,6 +80,7 @@ listManifest :: forall m a .
   ( MonadComp m
   , SyntaxM   m a
   , VectorM   m
+  , Loop      m
   -- ToDo: These two constraints are quite common.
   , Finite   (Expr m) (Array  m a)
   , Slicable (Expr m) (IArray m a)
@@ -210,7 +211,7 @@ zipWith f a b = fmap (uncurry f) $ zip a b
 --   operator.
 fold :: (Syntax exp a, Vector exp, Pully exp vec a)
   => (a -> a -> a) -> a -> vec -> a
-fold f init vec = loop (length vec) init $ \i st -> f (vec!i) st
+fold f init vec = iter (length vec) init $ \i st -> f (vec!i) st
 
 -- | Sums the elements in a vector.
 sum :: (Syntax exp a, Num a, Vector exp, Pully exp vec a) => vec -> a
@@ -264,17 +265,17 @@ class Pushy m vec a | vec -> a
 toPushM :: (Pushy m vec a, Monad m) => vec -> m (Push m a)
 toPushM = return . toPush
 
-instance (MonadComp m, VectorM m, Pully (Expr m) (IArray m a) a)
+instance (MonadComp m, VectorM m, Loop m, Pully (Expr m) (IArray m a) a)
     => Pushy m (Manifest m a) a
   where
     toPush = toPush . toPull
 
 -- ToDo: `exp ~ ...` hmm...
-instance (MonadComp m, VectorM m, exp ~ Expr m)
+instance (MonadComp m, VectorM m, Loop m, exp ~ Expr m)
     => Pushy m (Pull exp a) a
   where
     toPush vec = Push len $ \write ->
-      for 0 (len - 1) $ \i ->
+      for 0 1 (len - 1) $ \i ->
         write i (vec ! i)
       where
         len = length vec
@@ -283,11 +284,11 @@ instance (m1 ~ m2) => Pushy m1 (Push m2 a) a
   where
     toPush = id
 
-instance (MonadComp m1, VectorM m1, m1 ~ m2) => Pushy m1 (Seq m2 a) a
+instance (MonadComp m1, Loop m1, VectorM m1, m1 ~ m2) => Pushy m1 (Seq m2 a) a
   where
     toPush (Seq len init) = Push len $ \write ->
       do next <- init
-         for 0 (len - 1) $ \i -> do
+         for 0 1 (len - 1) $ \i -> do
            a <- next i
            write i a
 
@@ -470,6 +471,7 @@ class ViewManifest m vec a => Manifestable m vec a | vec -> a
         :: ( MonadComp m
            , SyntaxM   m a
            , VectorM   m
+           , Loop      m
            , Finite   (Expr m) (Array  m a)
            , Slicable (Expr m) (IArray m a)
            , Num (Expr m Length)
@@ -481,7 +483,7 @@ class ViewManifest m vec a => Manifestable m vec a | vec -> a
         -> m ()
     manifestStore loc v = void $ manifestArr loc (toPush v :: Push m a)
 
-instance (MonadComp m, SyntaxM m a, Finite (Expr m) (IArray m a))
+instance (MonadComp m, SyntaxM m a, Loop m, Finite (Expr m) (IArray m a))
     => Manifestable m (Manifest m a) a
   where
     manifestArr _     = return
@@ -493,6 +495,7 @@ instance (
     MonadComp m
   , SyntaxM   m a
   , VectorM   m
+  , Loop      m
   , Finite   exp (Array m a)
   , Slicable exp (IArray m a)
   , exp ~ Expr m
@@ -503,6 +506,7 @@ instance (
     MonadComp m
   , SyntaxM   m a
   , VectorM   m
+  , Loop      m
   , Finite   (Expr m) (Array m a)
   , Slicable (Expr m) (IArray m a)
   )
@@ -512,6 +516,7 @@ instance (
     MonadComp m
   , SyntaxM   m a
   , VectorM   m
+  , Loop      m
   , Finite   (Expr m) (Array m a)
   , Slicable (Expr m) (IArray m a)
   )

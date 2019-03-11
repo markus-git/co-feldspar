@@ -248,6 +248,8 @@ type SoftwareCMD
   Oper.:+: Imp.ArrCMD
     -- ^ Software specific instructions.
   Oper.:+: Imp.FileCMD
+  Oper.:+: Imp.PtrCMD
+    -- new stuff
   Oper.:+: AssertCMD
   Oper.:+: PtrCMD
   Oper.:+: MMapCMD

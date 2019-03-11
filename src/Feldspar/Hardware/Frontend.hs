@@ -53,9 +53,9 @@ instance Share HExp
   where
     share = sugarSymHardware (Let "")
 
-instance Loop HExp
+instance Iterate HExp
   where
-    loop = sugarSymHardware ForLoop
+    iter = sugarSymHardware ForLoop
 
 instance Cond HExp
   where
@@ -98,6 +98,8 @@ instance Bitwise HExp
 instance Casting HExp
   where
     i2n = sugarSymPrimHardware I2N
+    i2b = error "todo: i2b"
+    b2i = error "todo: b2i"
 
 --------------------------------------------------------------------------------
 
@@ -278,12 +280,16 @@ instance Control Hardware
       $ Imp.iff (resugar c)
           (unHardware t)
           (unHardware f)
+
+-- todo: not synthesizable in general, fix to static ranges and add exit.
+instance Loop Hardware
+  where
     while c body
       = Hardware
       $ Imp.while
           (fmap resugar $ unHardware c)
           (unHardware body)
-    for lower upper body
+    for lower _ upper body
       = Hardware
       $ Imp.for
           (resugar lower)

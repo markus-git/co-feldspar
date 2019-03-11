@@ -61,6 +61,9 @@ swapStore
   => Store m a -> m ()
 swapStore Store {..} = unsafeArrSwap activeBuf freeBuf
 
+replaceFreeStore :: (SyntaxM m a, Arrays m) => Expr m Length -> Store m a -> m (Store m a)
+replaceFreeStore l Store {..} = Store activeBuf <$> newArr l
+
 -- | Write a 1-dimensional vector to a 'Store'. The operation may become a no-op
 --   if the vector is already in the 'Store'.
 setStore
@@ -104,6 +107,7 @@ loopStore
      , Finite (Expr m) vec2
      , SyntaxM m a
      , MonadComp m
+     , Loop m
      --
      , SyntaxM' m (Expr m Length)
      --
@@ -115,15 +119,16 @@ loopStore
      , ArraysEq (Array m) (IArray m)
      )
   => Store m a
-  -> Expr m Length  -- ^ Lower bound
-  -> Expr m Length  -- ^ Upper bound
+  -> Expr m Length  -- ^ Lower bound.
+  -> Int            -- ^ Step.
+  -> Expr m Length  -- ^ Upper bound.
   -> (Expr m Index -> Manifest m a -> m vec1)
   -> vec2
   -> m (Manifest m a)
-loopStore store low high body init = do
+loopStore store low step high body init = do
   setStore store init
   ilen <- initRef $ length init
-  for low high $ \ix -> do
+  for low step high $ \ix -> do
     len  <- unsafeFreezeRef ilen
     next <- body ix =<< unsafeFreezeStore len store
     setStore store next

@@ -76,9 +76,9 @@ class Share exp
   where
     share :: (Syntax exp a, Syntax exp b) => a -> (a -> b) -> b
 
-class Loop exp
+class Iterate exp
   where
-    loop :: Syntax exp st => exp Length -> st -> (exp Index -> st -> st) -> st
+    iter :: Syntax exp st => exp Length -> st -> (exp Index -> st -> st) -> st
 
 class Cond exp
   where
@@ -189,6 +189,8 @@ ones = complement 0
 class Casting exp
   where
     i2n :: (Integral a, Primitive exp a, Num b, Primitive exp b) => exp a -> exp b
+    i2b :: (Integral a, Primitive exp a, Primitive exp Bool) => exp a -> exp Bool
+    b2i :: (Integral a, Primitive exp a, Primitive exp Bool) => exp Bool -> exp a
 
 --------------------------------------------------------------------------------
 -- * Instructions.
@@ -297,6 +299,9 @@ class Monad m => Control m
       -> m ()            -- ^ False branch.
       -> m ()
 
+
+class Monad m => Loop m
+  where
     -- | While-loop.
     while ::
          m (Expr m Bool) -- ^ Condition.
@@ -306,6 +311,7 @@ class Monad m => Control m
     -- | For-loop.
     for :: (Integral a, SyntaxM' m (Expr m a))
       => Expr m a           -- ^ Lower bound (inclusive).
+      -> Int                -- ^ Inc./dec. step.
       -> Expr m a           -- ^ Upper bound (inclusive).
       -> (Expr m a -> m ()) -- ^ Step function.
       -> m ()
