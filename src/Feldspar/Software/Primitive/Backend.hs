@@ -203,12 +203,74 @@ float _Complex feld_complexSignf(float _Complex c) {
       return (crealf(c)/z + I*(cimagf(c)/z));
 } |]
 
+compDiv
+  :: MonadC m
+  => SoftwarePrimTypeRep a
+  -> ASTF SoftwarePrimDomain a
+  -> ASTF SoftwarePrimDomain b
+  -> m C.Exp
+compDiv Int64ST a b = do
+  addGlobal ldiv_def
+  compFun "feld_ldiv" (a :* b :* Nil)
+compDiv t a b | integerType t = do
+  addGlobal mod_def
+  compFun "feld_mod" (a :* b :* Nil)
+compDiv t a b | wordType t = do
+  compBinOp C.Mod a b
+compDiv t a b = do
+  error $ "compDiv: type " ++ show t ++ " not supported"
+
+ldiv_def = [cedecl|
+long int feld_ldiv(long int x, long int y) {
+    int q = x/y;
+    int r = x%y;
+    if ((r!=0) && ((r<0) != (y<0))) --q;
+    return q;
+} |]
+
+mod_def = [cedecl|
+int feld_mod(int x, int y) {
+    int r = x%y;
+    if ((r!=0) && ((r<0) != (y<0))) { r += y; }
+    return r;
+} |]
+
+compMod
+  :: MonadC m
+  => SoftwarePrimTypeRep a
+  -> ASTF SoftwarePrimDomain a
+  -> ASTF SoftwarePrimDomain b
+  -> m C.Exp
+compMod Int64ST a b = do
+  addGlobal lmod_def
+  compFun "feld_lmod" (a :* b :* Nil)
+compMod t a b | integerType t = do
+  addGlobal div_def
+  compFun "feld_div" (a :* b :* Nil)
+compMod t a b | wordType t = do
+  compBinOp C.Mod a b
+compMod t a b = do
+  error $ "compMod: type " ++ show t ++ " not supported"
+
+div_def = [cedecl|
+int feld_div(int x, int y) {
+    int q = x/y;
+    int r = x%y;
+    if ((r!=0) && ((r<0) != (y<0))) --q;
+    return q;
+} |]
+
+lmod_def = [cedecl|
+long int feld_lmod(long int x, long int y) {
+    int r = x%y;
+    if ((r!=0) && ((r<0) != (y<0))) { r += y; }
+    return r;
+} |]
+
 compRound :: (SoftwarePrimType a, Num a, RealFrac b, MonadC m)
   => SoftwarePrimTypeRep a
   -> ASTF SoftwarePrimDomain b
   -> m C.Exp
-compRound t a | boolType t = do
-  error "compSign: type BoolST not supported"
 compRound t a | integerType t || wordType t = do
   addInclude "<tgmath.h>"
   p <- compFun "lround" (a :* Nil)
@@ -217,6 +279,8 @@ compRound t a | floatingType t || complexType t = do
   addInclude "<tgmath.h>"
   p <- compFun "round"  (a :* Nil)
   compCastExp t p
+compRound t a = do
+  error $ "compSign: type " ++ show t ++ " not supported"
   
 --------------------------------------------------------------------------------
 
@@ -237,10 +301,10 @@ compPrim = simpleMatch (\(s :&: t) -> go t s) . unPrim
     go _ Add  (a :* b :* Nil) = compBinOp C.Add a b
     go _ Sub  (a :* b :* Nil) = compBinOp C.Sub a b
     go _ Mul  (a :* b :* Nil) = compBinOp C.Mul a b
-    go _ Div  (a :* b :* Nil) = compBinOp C.Div a b
+    go t Div  (a :* b :* Nil) = compDiv t a b
     go _ Quot (a :* b :* Nil) = compBinOp C.Div a b
     go _ Rem  (a :* b :* Nil) = compBinOp C.Mod a b
-    go _ Mod  (a :* b :* Nil) = compBinOp C.Mod a b
+    go t Mod  (a :* b :* Nil) = compMod t a b
     go t Abs  (a :* Nil)      = compAbs t a
     go t Sign (a :* Nil)      = compSign t a
     go _ FDiv (a :* b :* Nil) = compBinOp C.Div a b
