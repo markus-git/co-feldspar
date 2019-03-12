@@ -17,6 +17,7 @@ import Feldspar.Representation
 import Feldspar.Software.Primitive
 import Data.Struct
 
+import Data.Complex (Complex)
 import Data.Int
 import Data.Word
 import Data.List (genericTake)
@@ -66,6 +67,8 @@ instance Type SoftwarePrimType Word32 where typeRep = Node Word32ST
 instance Type SoftwarePrimType Word64 where typeRep = Node Word64ST
 instance Type SoftwarePrimType Float  where typeRep = Node FloatST
 instance Type SoftwarePrimType Double where typeRep = Node DoubleST
+instance Type SoftwarePrimType (Complex Float)  where typeRep = Node ComplexFloatST
+instance Type SoftwarePrimType (Complex Double) where typeRep = Node ComplexDoubleST
 
 -- | Compare two software types for equality.
 softwareTypeEq :: STypeRep a -> STypeRep b -> Maybe (Dict (a ~ b))

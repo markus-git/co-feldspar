@@ -539,5 +539,7 @@ predicateDict rep = case rep of
   Word32ST -> Dict
   Word64ST -> Dict
   FloatST  -> Dict
+  ComplexFloatST  -> Dict
+  ComplexDoubleST -> Dict
 
 --------------------------------------------------------------------------------

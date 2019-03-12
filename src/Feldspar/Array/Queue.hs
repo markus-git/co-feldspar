@@ -108,6 +108,7 @@ queueDoubleVector :: forall m vec a .
   , Pushy m vec a
   , SyntaxM m a
   , MonadComp m
+  , Loop m
   , Queues m a
   )
   => vec -> m (Queue m a)
