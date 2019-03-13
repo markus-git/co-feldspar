@@ -40,23 +40,22 @@ fftCore st inverse n vec =
     ilv2 :: SExp Index -> Manifest Software (SExp (Complex a)) ->
       Push Software (SExp (Complex a))
     ilv2 k vec = Push len $ \write ->
-        dumpPush (toPush vec2) $ \i (a, b) -> do
-          write (left  i) a
-          write (right i) b
+        for 0 1 (len2 - 1) $ \i -> do
+          lix <- shareM (left  i)
+          rix <- shareM (right i)
+          a   <- shareM (vec ! lix)
+          b   <- shareM (vec ! rix)
+          write lix (a + b)
+          write rix ((twid rix) * (a - b))
       where
-        len  = length vec  :: SExp Index
-        len2 = len `div` 2 :: SExp Index
-        ix   = i2n k       :: SExp Int32
-        ix2  = 1 .<<. ix   :: SExp Index
+        pi'   = if inverse then pi else -pi
+        len   = length vec  :: SExp Index
+        len2  = len `div` 2 :: SExp Index
+        ix    = i2n k       :: SExp Int32
+        ix2   = 1 .<<. ix   :: SExp Index
         left  = zeroBit k
         right = flipBit k . left
-        vec2  = Pull len2 ixf
-        ixf j = (a+b, twid * (a-b))
-          where
-            a    = vec ! (left  j)
-            b    = vec ! (right j)
-            pi'  = if inverse then pi else -pi
-            twid = polar 1 (pi' * i2n (leastBits ix (right j)) / i2n ix2)
+        twid rix = polar 1 (pi' * i2n (leastBits ix rix) / i2n ix2)
 
 fftContainer
   :: ( Manifestable Software vec (SExp (Complex a))
