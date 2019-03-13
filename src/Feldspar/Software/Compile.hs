@@ -412,12 +412,15 @@ icompile :: Software a -> IO ()
 icompile = Imp.icompile . translate
 
 runCompiled :: Software a -> IO ()
-runCompiled = Imp.runCompiled . translate
+runCompiled = Imp.runCompiled' opts . translate
 
 withCompiled :: Software a -> ((String -> IO String) -> IO b) -> IO b
-withCompiled = Imp.withCompiled . translate
+withCompiled = Imp.withCompiled' opts . translate
 
 compareCompiled :: Software a -> IO a -> String -> IO ()
-compareCompiled = Imp.compareCompiled . translate
+compareCompiled = Imp.compareCompiled' opts . translate
+
+opts :: Imp.ExternalCompilerOpts
+opts = Imp.def { Imp.externalFlagsPost = ["-lm"] }
 
 --------------------------------------------------------------------------------

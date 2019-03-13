@@ -185,15 +185,6 @@ compSign ComplexDoubleST a = do
   -- wrong. They should return -0.0. I don't know whether it's correct for other
   -- strange values.
 
-complexSign_def = [cedecl|
-double _Complex feld_complexSign(double _Complex c) {
-    double z = cabs(c);
-    if (z == 0)
-      return 0;
-    else
-      return (creal(c)/z + I*(cimag(c)/z));
-} |]
-
 complexSignf_def = [cedecl|
 float _Complex feld_complexSignf(float _Complex c) {
     float z = cabsf(c);
@@ -201,6 +192,15 @@ float _Complex feld_complexSignf(float _Complex c) {
       return 0;
     else
       return (crealf(c)/z + I*(cimagf(c)/z));
+} |]
+    
+complexSign_def = [cedecl|
+double _Complex feld_complexSign(double _Complex c) {
+    double z = cabs(c);
+    if (z == 0)
+      return 0;
+    else
+      return (creal(c)/z + I*(cimag(c)/z));
 } |]
 
 compDiv
