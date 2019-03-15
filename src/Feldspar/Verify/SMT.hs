@@ -33,8 +33,8 @@ data SMTState = SMTState {
 
 runZ3 :: [String] -> SMT a -> IO a
 runZ3 args m = do
-  -- logger <- fmap Just (newLogger 0)
-  let logger = Nothing
+  logger <- fmap Just (SMT.newLogger 0)
+  --let logger = Nothing
   solver <- SMT.newSolver "z3" (["-smt2", "-in"] ++ args) logger
   evalStateT m (SMTState solver 0)
 
