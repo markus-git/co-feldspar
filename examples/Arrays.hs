@@ -32,7 +32,7 @@ arrays
      , Num (Expr m Int8)
      , Num (Expr m Length)
      -- ...
-     , Elem (IArray m (Expr m Int8)) ~ Expr m Int8
+     , ArrElem (IArray m (Expr m Int8)) ~ Expr m Int8
      -- ...
      , SyntaxM' m (Expr m Bool)
      , SyntaxM' m (Expr m Int8)
@@ -52,5 +52,5 @@ arrays =
        (setArr arr 1 2)
        (setArr arr 1 3)
      setRef ref (iarr ! (1 :: Expr m Index))
-     
+
 --------------------------------------------------------------------------------
