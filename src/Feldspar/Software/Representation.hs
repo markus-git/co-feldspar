@@ -6,7 +6,8 @@
 {-# language FlexibleContexts           #-}
 {-# language FlexibleInstances          #-}
 {-# language GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE PolyKinds                  #-}
+{-# language PolyKinds                  #-}
+{-# language DataKinds #-}
 
 module Feldspar.Software.Representation where
 
@@ -56,8 +57,8 @@ import qualified Language.Embedded.Imperative.CMD as Imp
 
 -- hardware-edsl.
 import Language.Embedded.Hardware.Command (Signal, Mode)
-import qualified Language.Embedded.Hardware.Command as Imp
-import qualified Language.Embedded.Hardware.Expression.Represent as Imp
+import qualified Language.Embedded.Hardware.Command as Hard
+import qualified Language.Embedded.Hardware.Expression.Represent as Hard
 
 import Prelude hiding ((==))
 import qualified Prelude as P
@@ -176,18 +177,18 @@ instance FO.Symbol PtrCMD
 --   correspoinding data types in software.
 type family Soften a where
   Soften ()                   = ()
-  Soften (Imp.Signal  a -> b) = Ref (SExp a) -> Soften b
-  Soften (Imp.Array i a -> b) = Arr (SExp a) -> Soften b
+  Soften (Hard.Signal  a -> b) = Ref (SExp a) -> Soften b
+  Soften (Hard.Array i a -> b) = Arr (SExp a) -> Soften b
 
 -- | Software argument for a hardware component.
 data Argument pred a
   where
     Nil  :: Argument pred ()
-    ARef :: (pred a, Integral a, Imp.PrimType a)
+    ARef :: (pred a, Integral a, Hard.PrimType a)
          => Ref (SExp a)
          -> Argument pred b
          -> Argument pred (Ref (SExp a) -> b)
-    AArr :: (pred a, Integral a, Imp.PrimType a)
+    AArr :: (pred a, Integral a, Hard.PrimType a)
          => Arr (SExp a)
          -> Argument pred b
          -> Argument pred (Arr (SExp a) -> b)

@@ -22,12 +22,11 @@ import Feldspar.Software.Representation
 
 import Data.Struct
 
-import qualified Control.Monad.FirstOrder as FO
-
 import Feldspar.Verify.Monad (Verify)
 import qualified Feldspar.Verify.Monad    as V
 import qualified Feldspar.Verify.SMT      as SMT
 import qualified Feldspar.Verify.Abstract as A
+import qualified Feldspar.Verify.FirstOrder as FO
 import qualified Data.Map.Strict          as Map
 import qualified Control.Monad.RWS.Strict as S
 
@@ -1113,6 +1112,5 @@ instance FO.Defunctionalise inv Imp.ControlCMD
 instance FO.HTraversable Imp.RefCMD
 instance FO.HTraversable Imp.ArrCMD
 instance FO.HTraversable Imp.FileCMD
->>>>>>> parent of c968efb... Revert "verify software primitives."
 
 --------------------------------------------------------------------------------

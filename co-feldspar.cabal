@@ -55,6 +55,7 @@ library
     exception-transformers,
     minisat,
     simple-smt,
+    srcloc,
     syntactic >=3.6.1,
     operational-alacarte >=0.3,
     imperative-edsl >=0.7.1,
