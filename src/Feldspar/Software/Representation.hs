@@ -17,13 +17,27 @@ import Feldspar.Storable
 import Feldspar.Array.Buffered (ArraysEq(..))
 import Feldspar.Software.Primitive
 import Feldspar.Software.Expression
-import Data.Struct
 
+import Feldspar.Verify.Monad (Verify)
+import qualified Feldspar.Verify.FirstOrder as FO
+import qualified Feldspar.Verify.Monad as V
+import qualified Feldspar.Verify.SMT as SMT
+import qualified Feldspar.Verify.Abstract as A
+
+import Data.Array (Ix)
+import Data.Constraint hiding ((\\))
+import Data.Function (on)
+import Data.Functor.Identity
+import Data.Maybe (fromMaybe)
+import Data.Ord
+import Data.IORef
 import Data.Int
 import Data.Word
-import Data.List (genericTake)
-import Data.Typeable (Typeable)
-import Data.Constraint
+import Data.List (genericTake, (\\), sort, sortBy, group, groupBy, intersect, nub)
+import Data.Typeable (Typeable, cast, typeOf)
+import Data.Struct
+import qualified Data.Map.Strict as Map
+
 import Control.Monad.Reader (ReaderT(..), runReaderT, lift)
 
 -- syntactic.
@@ -53,6 +67,109 @@ import Feldspar.Hardware.Frontend (HSig)
 
 --------------------------------------------------------------------------------
 -- * Programs.
+--------------------------------------------------------------------------------
+
+data AssertCMD fs a
+  where
+    Assert :: AssertionLabel
+           -> exp Bool
+           -> String
+           -> AssertCMD (Oper.Param3 prog exp pred) ()
+
+instance Oper.HFunctor AssertCMD
+  where
+    hfmap _ (Assert lbl cond msg) = Assert lbl cond msg
+
+instance Oper.HBifunctor AssertCMD
+  where
+    hbimap _ g (Assert lbl cond msg) = Assert lbl (g cond) msg
+
+instance Oper.InterpBi AssertCMD IO (Oper.Param1 SoftwarePrimType)
+  where
+    interpBi (Assert _ cond msg) = do
+      cond' <- cond
+      unless cond' $ error $ "Assertion failed: " ++ msg
+
+instance (Imp.ControlCMD Oper.:<: instr) => Oper.Reexpressible AssertCMD instr env
+  where
+    reexpressInstrEnv reexp (Assert lbl cond msg) = do
+      cond' <- reexp cond
+      lift $ Imp.assert cond' msg
+
+instance FO.HTraversable AssertCMD
+
+instance FO.Symbol AssertCMD
+  where
+    dry (Assert {}) = return ()
+
+--------------------------------------------------------------------------------
+
+data ControlCMD inv fs a
+  where
+    If :: exp Bool -> prog () -> prog () ->
+      ControlCMD inv (Oper.Param3 prog exp pred) ()
+    While :: Maybe inv -> prog (exp Bool) -> prog () ->
+      ControlCMD inv (Oper.Param3 prog exp pred) ()
+    For :: (pred i, Integral i) =>
+      Maybe inv -> Imp.IxRange (exp i) -> Imp.Val i -> prog () ->
+      ControlCMD inv (Oper.Param3 prog exp pred) ()
+    Break :: ControlCMD inv (Oper.Param3 prog exp pred) ()
+    --
+    Test :: Maybe (exp Bool) -> String ->
+      ControlCMD inv (Oper.Param3 prog exp pred) ()
+    Hint :: pred a => exp a ->
+      ControlCMD inv (Oper.Param3 prog exp pred) ()
+    Comment :: String ->
+      ControlCMD inv (Oper.Param3 prog exp pred) ()
+
+instance Oper.HFunctor (ControlCMD inv)
+  where
+    hfmap f ins = runIdentity (FO.htraverse (pure . f) ins)
+
+instance FO.HTraversable (ControlCMD inv)
+  where
+    htraverse f (If cond tru fls) = (If cond) <$> f tru <*> f fls
+    htraverse f (While inv cond body) = (While inv) <$> f cond <*> f body
+    htraverse f (For inv range val body) = (For inv range val) <$> f body
+    htraverse _ (Break) = pure Break
+    htraverse _ (Test cond msg) = pure (Test cond msg)
+    htraverse _ (Hint val) = pure (Hint val)
+    htraverse _ (Comment msg) = pure (Comment msg)
+
+--------------------------------------------------------------------------------
+
+data PtrCMD fs a
+  where
+    SwapPtr :: (pred a, Typeable a, pred i, Typeable i, Ix i, Integral i) =>
+      Imp.Arr i a -> Imp.Arr i a -> PtrCMD (Oper.Param3 prog exp pred) ()
+
+instance Oper.HFunctor PtrCMD
+  where
+    hfmap _ (SwapPtr a b) = SwapPtr a b
+
+instance Oper.HBifunctor PtrCMD
+  where
+    hbimap _ _ (SwapPtr a b) = SwapPtr a b
+
+instance Oper.InterpBi PtrCMD IO (Oper.Param1 SoftwarePrimType)
+  where
+    interpBi (SwapPtr (Imp.ArrRun a) (Imp.ArrRun b)) = do
+      arr <- readIORef a
+      brr <- readIORef b
+      writeIORef a brr
+      writeIORef b arr
+
+instance (PtrCMD Oper.:<: instr) => Oper.Reexpressible PtrCMD instr env
+  where
+    reexpressInstrEnv reexp (SwapPtr a b) = do
+      lift $ Oper.singleInj (SwapPtr a b)
+
+instance FO.HTraversable PtrCMD
+
+instance FO.Symbol PtrCMD
+  where
+    dry (SwapPtr {}) = return ()
+
 --------------------------------------------------------------------------------
 
 -- | Soften the hardware signature of a component into a type that uses the
@@ -107,6 +224,13 @@ instance Oper.InterpBi MMapCMD IO (Param1 SoftwarePrimType)
   where
     interpBi = error "todo: interpBi of mmap."
 
+instance FO.HTraversable MMapCMD
+
+instance FO.Symbol MMapCMD
+  where
+    dry (MMap s sig)    = show <$> FO.fresh
+    dry (Call addr sig) = return ()
+
 --------------------------------------------------------------------------------
 
 -- | Software instructions.
@@ -117,7 +241,10 @@ type SoftwareCMD
   Oper.:+: Imp.ArrCMD
     -- ^ Software specific instructions.
   Oper.:+: Imp.FileCMD
-    -- ^ ...
+  Oper.:+: Imp.PtrCMD
+    -- new stuff
+  Oper.:+: AssertCMD
+  Oper.:+: PtrCMD
   Oper.:+: MMapCMD
 
 -- | Monad for building software programs in Feldspar.

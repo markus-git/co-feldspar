@@ -39,6 +39,19 @@ class Arrays m => ArraysSwap m
 newStore :: (SyntaxM m a, MonadComp m) => Expr m Length -> m (Store m a)
 newStore l = Store <$> newArr l <*> newArr l
 
+-- | Create a new 'Store' from a single array.
+newInPlaceStore
+  :: ( SyntaxM m a
+     , MonadComp m
+     , Finite (Expr m) (IArray m a)
+     , Finite (Expr m) (Array m a)
+     )
+  => Expr m Length -> m (Store m a)
+newInPlaceStore l = do
+  arr <- newArr l
+  brr <- unsafeFreezeArr arr >>= unsafeThawArr
+  return (Store arr brr)
+
 -- | Read the contents of a 'Store' without making a copy. This is generally
 --   only safe if the the 'Store' is not updated as long as the resulting vector
 --   is alive.
@@ -61,7 +74,10 @@ swapStore
   => Store m a -> m ()
 swapStore Store {..} = unsafeArrSwap activeBuf freeBuf
 
--- | Write a 1-dimensional vector to a 'Store'. The operation may become a no-op
+replaceFreeStore :: (SyntaxM m a, Arrays m) => Expr m Length -> Store m a -> m (Store m a)
+replaceFreeStore l Store {..} = Store activeBuf <$> newArr l
+
+-- | Write a vector to a 'Store'. The operation may become a no-op
 --   if the vector is already in the 'Store'.
 setStore
   :: forall m a vec .
@@ -96,5 +112,41 @@ store
      )
   => Store m a -> vec -> m (Manifest m a)
 store st vec = setStore st vec >> unsafeFreezeStore (length vec) st
+
+loopStore
+  :: ( Manifestable m vec1 a
+     , Finite (Expr m) vec1
+     , Manifestable m vec2 a
+     , Finite (Expr m) vec2
+     , SyntaxM m a
+     , MonadComp m
+     , Loop m
+     --
+     , SyntaxM' m (Expr m Length)
+     --
+     , Finite   (Expr m) (Array  m a)
+     , Slicable (Expr m) (IArray m a)
+     , Num (Expr m Index)
+     --
+     , ArraysSwap m
+     , ArraysEq (Array m) (IArray m)
+     )
+  => Store m a
+  -> Expr m Length  -- ^ Lower bound.
+  -> Int            -- ^ Step.
+  -> Expr m Length  -- ^ Upper bound.
+  -> (Expr m Index -> Manifest m a -> m vec1)
+  -> vec2
+  -> m (Manifest m a)
+loopStore store low step high body init = do
+  setStore store init
+  ilen <- initRef $ length init
+  for low step high $ \ix -> do
+    len  <- unsafeFreezeRef ilen
+    next <- body ix =<< unsafeFreezeStore len store
+    setStore store next
+    setRef ilen $ length next
+  len <- unsafeFreezeRef ilen
+  unsafeFreezeStore len store
 
 --------------------------------------------------------------------------------

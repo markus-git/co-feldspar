@@ -53,9 +53,9 @@ instance Share HExp
   where
     share = sugarSymHardware (Let "")
 
-instance Loop HExp
+instance Iterate HExp
   where
-    loop = sugarSymHardware ForLoop
+    iter = sugarSymHardware ForLoop
 
 instance Cond HExp
   where
@@ -98,6 +98,8 @@ instance Bitwise HExp
 instance Casting HExp
   where
     i2n = sugarSymPrimHardware I2N
+    i2b = error "todo: i2b"
+    b2i = error "todo: b2i"
 
 --------------------------------------------------------------------------------
 
@@ -278,12 +280,16 @@ instance Control Hardware
       $ Imp.iff (resugar c)
           (unHardware t)
           (unHardware f)
+
+-- todo: not synthesizable in general, fix to static ranges and add exit.
+instance Loop Hardware
+  where
     while c body
       = Hardware
       $ Imp.while
           (fmap resugar $ unHardware c)
           (unHardware body)
-    for lower upper body
+    for lower _ upper body
       = Hardware
       $ Imp.for
           (resugar lower)
@@ -371,14 +377,16 @@ ret prg = withHType' (Proxy :: Proxy a) $ Imp.output $ \o -> Imp.ret $ Imp.proce
 -- | Finalize signature with an output of a immutable array.
 retIArr :: forall a . (HType' a, Integral a) => Length -> Hardware (IArr (HExp a)) -> HSig (SArr a -> ())
 retIArr len prg = withHType' (Proxy :: Proxy a) $ Imp.outputArray len $ \o -> Imp.ret $ Imp.process [] $ do
-  (IArr _ _ (Node iarr)) <- unHardware prg
+  (IArr _ _ node) <- unHardware prg
+  let iarr = case node of (Node iarr) -> iarr
   arr <- Imp.unsafeThawArray iarr
   Imp.copyArray (o,0) (arr,0) (value len)
 
 -- | Finalize signature with an output of an array.
 retVArr :: forall a . (HType' a, Integral a) => Length -> Hardware (Arr (HExp a)) -> HSig (SArr a -> ())
 retVArr len prg = withHType' (Proxy :: Proxy a) $ Imp.outputArray len $ \o -> Imp.ret $ Imp.process [] $ do
-  (Arr _ _ (Node arr)) <- unHardware prg
+  (Arr _ _ node) <- unHardware prg
+  let arr = case node of (Node arr) -> arr
   iarr <- Imp.unsafeFreezeVArray arr -- this is so bad.
   brr  <- Imp.unsafeThawArray iarr
   Imp.copyArray (o,0) (brr, 0) (value len)

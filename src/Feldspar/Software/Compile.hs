@@ -158,11 +158,11 @@ translateExp = goAST . optimize . unSExp
       = Branch <$> goAST a <*> goAST b
     go t sel (ab :* Syn.Nil)
       | Just Fst <- prj sel = do
-          Branch a _ <- goAST ab
-          return a
+          branch <- goAST ab
+          case branch of (Branch a _) -> return a
       | Just Snd <- prj sel = do
-          Branch _ b <- goAST ab
-          return b
+          branch <- goAST ab
+          case branch of (Branch _ b) -> return b
     go ty cond (b :* t :* f :* Syn.Nil)
       | Just Cond <- prj cond = do
           res <- newRefV ty "b"
@@ -172,13 +172,33 @@ translateExp = goAST . optimize . unSExp
             (flip runReaderT env $ setRefV res =<< goAST f)
           unsafeFreezeRefV res
     go _ op (a :* Syn.Nil)
-      | Just Neg <- prj op = liftStruct (sugarSymPrim Neg) <$> goAST a
-      | Just Not <- prj op = liftStruct (sugarSymPrim Not) <$> goAST a
-      | Just Sin <- prj op = liftStruct (sugarSymPrim Sin) <$> goAST a
-      | Just Cos <- prj op = liftStruct (sugarSymPrim Cos) <$> goAST a
-      | Just Tan <- prj op = liftStruct (sugarSymPrim Tan) <$> goAST a
-      | Just I2N <- prj op = liftStruct (sugarSymPrim I2N) <$> goAST a
-      | Just BitCompl <- prj op = liftStruct (sugarSymPrim BitCompl) <$> goAST a
+      | Just Neg       <- prj op = liftStruct (sugarSymPrim Neg)       <$> goAST a
+      | Just Not       <- prj op = liftStruct (sugarSymPrim Not)       <$> goAST a
+      | Just Exp       <- prj op = liftStruct (sugarSymPrim Exp)       <$> goAST a
+      | Just Log       <- prj op = liftStruct (sugarSymPrim Log)       <$> goAST a
+      | Just Sqrt      <- prj op = liftStruct (sugarSymPrim Sqrt)      <$> goAST a
+      | Just Sin       <- prj op = liftStruct (sugarSymPrim Sin)       <$> goAST a
+      | Just Cos       <- prj op = liftStruct (sugarSymPrim Cos)       <$> goAST a
+      | Just Tan       <- prj op = liftStruct (sugarSymPrim Tan)       <$> goAST a
+      | Just Asin      <- prj op = liftStruct (sugarSymPrim Asin)      <$> goAST a
+      | Just Acos      <- prj op = liftStruct (sugarSymPrim Acos)      <$> goAST a
+      | Just Atan      <- prj op = liftStruct (sugarSymPrim Atan)      <$> goAST a
+      | Just Sinh      <- prj op = liftStruct (sugarSymPrim Sinh)      <$> goAST a
+      | Just Cosh      <- prj op = liftStruct (sugarSymPrim Cosh)      <$> goAST a
+      | Just Tanh      <- prj op = liftStruct (sugarSymPrim Tanh)      <$> goAST a
+      | Just Asinh     <- prj op = liftStruct (sugarSymPrim Asinh)     <$> goAST a
+      | Just Acosh     <- prj op = liftStruct (sugarSymPrim Acosh)     <$> goAST a
+      | Just Atanh     <- prj op = liftStruct (sugarSymPrim Atanh)     <$> goAST a
+      | Just Real      <- prj op = liftStruct (sugarSymPrim Real)      <$> goAST a
+      | Just Imag      <- prj op = liftStruct (sugarSymPrim Imag)      <$> goAST a
+      | Just Magnitude <- prj op = liftStruct (sugarSymPrim Magnitude) <$> goAST a
+      | Just Phase     <- prj op = liftStruct (sugarSymPrim Phase)     <$> goAST a
+      | Just Conjugate <- prj op = liftStruct (sugarSymPrim Conjugate) <$> goAST a
+      | Just I2N       <- prj op = liftStruct (sugarSymPrim I2N)       <$> goAST a
+      | Just I2B       <- prj op = liftStruct (sugarSymPrim I2B)       <$> goAST a
+      | Just B2I       <- prj op = liftStruct (sugarSymPrim B2I)       <$> goAST a
+      | Just Round     <- prj op = liftStruct (sugarSymPrim Round)     <$> goAST a
+      | Just BitCompl  <- prj op = liftStruct (sugarSymPrim BitCompl)  <$> goAST a
     go _ op (a :* b :* Syn.Nil)
       | Just Add <- prj op = liftStruct2 (sugarSymPrim Add) <$> goAST a <*> goAST b
       | Just Sub <- prj op = liftStruct2 (sugarSymPrim Sub) <$> goAST a <*> goAST b
@@ -192,6 +212,14 @@ translateExp = goAST . optimize . unSExp
       | Just Lte <- prj op = liftStruct2 (sugarSymPrim Lte) <$> goAST a <*> goAST b
       | Just Gt  <- prj op = liftStruct2 (sugarSymPrim Gt)  <$> goAST a <*> goAST b
       | Just Gte <- prj op = liftStruct2 (sugarSymPrim Gte) <$> goAST a <*> goAST b
+      | Just FDiv    <- prj op =
+          liftStruct2 (sugarSymPrim FDiv)    <$> goAST a <*> goAST b
+      | Just Complex <- prj op =
+          liftStruct2 (sugarSymPrim Complex) <$> goAST a <*> goAST b
+      | Just Polar   <- prj op =
+          liftStruct2 (sugarSymPrim Polar)   <$> goAST a <*> goAST b
+      | Just Pow     <- prj op =
+          liftStruct2 (sugarSymPrim Pow)     <$> goAST a <*> goAST b
       | Just BitAnd <- prj op =
           liftStruct2 (sugarSymPrim BitAnd)  <$> goAST a <*> goAST b
       | Just BitOr  <- prj op =
@@ -229,8 +257,8 @@ translateExp = goAST . optimize . unSExp
 
 unsafeTranslateSmallExp :: Monad m => SExp a -> TargetT m (Prim a)
 unsafeTranslateSmallExp a = do
-  Node b <- translateExp a
-  return b
+  node <- translateExp a
+  case node of (Node b) -> return b
 
 --------------------------------------------------------------------------------
 -- * Interpretation of software commands.
@@ -367,12 +395,15 @@ icompile :: Software a -> IO ()
 icompile = Imp.icompile . translate
 
 runCompiled :: Software a -> IO ()
-runCompiled = Imp.runCompiled . translate
+runCompiled = Imp.runCompiled' opts . translate
 
 withCompiled :: Software a -> ((String -> IO String) -> IO b) -> IO b
-withCompiled = Imp.withCompiled . translate
+withCompiled = Imp.withCompiled' opts . translate
 
 compareCompiled :: Software a -> IO a -> String -> IO ()
-compareCompiled = Imp.compareCompiled . translate
+compareCompiled = Imp.compareCompiled' opts . translate
+
+opts :: Imp.ExternalCompilerOpts
+opts = Imp.def { Imp.externalFlagsPost = ["-lm"] }
 
 --------------------------------------------------------------------------------

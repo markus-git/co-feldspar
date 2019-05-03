@@ -12,6 +12,7 @@ import Feldspar.Representation
 
 import Data.Bits (Bits, FiniteBits)
 import Data.Constraint
+import Data.Int
 import Data.Struct
 import Data.Proxy
 import Data.Word hiding (Word)
@@ -36,8 +37,7 @@ import Prelude hiding (length, Word, (<=))
 
 -- | ...
 type Syn (dom :: * -> *) (pred :: * -> Constraint) (exp :: * -> *) (a :: *) =
-  (
-    Syntactic a
+  ( Syntactic a
   , Domain a ~ dom
   , Type pred (Internal a)
   , Tuples dom
@@ -75,9 +75,9 @@ class Share exp
   where
     share :: (Syntax exp a, Syntax exp b) => a -> (a -> b) -> b
 
-class Loop exp
+class Iterate exp
   where
-    loop :: Syntax exp st => exp Length -> st -> (exp Index -> st -> st) -> st
+    iter :: Syntax exp st => exp Length -> st -> (exp Index -> st -> st) -> st
 
 class Cond exp
   where
@@ -165,15 +165,26 @@ rotateL = rol
 rotateR :: (Bitwise exp, Bits a, Primitive exp a, Integral b, Primitive exp b) => exp a -> exp b -> exp a
 rotateR = ror
 
-infixl 8 `shiftL`, `shiftR`, `rotateL`, `rotateR`
+(.<<.)  :: (Bitwise exp, Bits a, Primitive exp a, Primitive exp Int32) => exp a -> exp Int32 -> exp a
+(.<<.) = shiftL
+
+(.>>.)  :: (Bitwise exp, Bits a, Primitive exp a, Primitive exp Int32) => exp a -> exp Int32 -> exp a
+(.>>.) = shiftR
+
+infixl 8 `shiftL`, `shiftR`, `rotateL`, `rotateR`, .<<., .>>.
 
 bitSize :: forall exp a. FiniteBits a => exp a -> Word64
 bitSize _ = fromIntegral $ Bits.finiteBitSize (a :: a)
   where a = error "Bits.finiteBitSize evaluated its argument"
 
+ones :: (Bitwise exp, Bits a, Num (exp a), Primitive exp a) => exp a
+ones = complement 0
+
 class Casting exp
   where
     i2n :: (Integral a, Primitive exp a, Num b, Primitive exp b) => exp a -> exp b
+    i2b :: (Integral a, Primitive exp a, Primitive exp Bool) => exp a -> exp Bool
+    b2i :: (Integral a, Primitive exp a, Primitive exp Bool) => exp Bool -> exp a
 
 --------------------------------------------------------------------------------
 -- * Instructions.
@@ -282,6 +293,9 @@ class Monad m => Control m
       -> m ()            -- ^ False branch.
       -> m ()
 
+
+class Monad m => Loop m
+  where
     -- | While-loop.
     while ::
          m (Expr m Bool) -- ^ Condition.
@@ -291,8 +305,14 @@ class Monad m => Control m
     -- | For-loop.
     for :: (Integral a, SyntaxM' m (Expr m a))
       => Expr m a           -- ^ Lower bound (inclusive).
+      -> Int                -- ^ Inc./dec. step.
       -> Expr m a           -- ^ Upper bound (inclusive).
       -> (Expr m a -> m ()) -- ^ Step function.
       -> m ()
+
+class Monad m => Assert m
+  where
+    break :: m ()
+    assert :: Expr m Bool -> String -> m ()
 
 --------------------------------------------------------------------------------

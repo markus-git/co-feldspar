@@ -18,7 +18,8 @@ import Feldspar.Software.Expression
 import Feldspar.Software.Representation
 import Data.Struct
 
-import Data.Bits (Bits)
+import Data.Bits (Bits, FiniteBits)
+import Data.Complex
 import Data.Constraint hiding (Sub)
 import Data.Proxy
 import Data.List (genericLength)
@@ -45,8 +46,8 @@ import Feldspar.Hardware.Primitive  (HardwarePrimType(..), HardwarePrimTypeRep(.
 import Feldspar.Hardware.Expression (HType')
 import Feldspar.Hardware.Frontend   (HSig, withHType')
 
-import Prelude hiding (length, Word, (<=))
-import qualified Prelude
+import Prelude hiding (length, Word, (<=), (<), (>=), (>))
+import qualified Prelude as P
 
 --------------------------------------------------------------------------------
 -- * Expressions.
@@ -60,9 +61,9 @@ instance Share SExp
   where
     share = sugarSymSoftware (Let "")
 
-instance Loop SExp
+instance Iterate SExp
   where
-    loop = sugarSymSoftware ForLoop
+    iter = sugarSymSoftware ForLoop
 
 instance Cond SExp
   where
@@ -105,6 +106,8 @@ instance Bitwise SExp
 instance Casting SExp
   where
     i2n = sugarSymPrimSoftware I2N
+    i2b = sugarSymPrimSoftware I2B
+    b2i = sugarSymPrimSoftware B2I
 
 --------------------------------------------------------------------------------
 
@@ -122,6 +125,73 @@ instance (Num a, SType' a) => Num (SExp a)
     negate      = sugarSymPrimSoftware Neg
     abs         = error "todo: abs not implemeted for `SExp`"
     signum      = error "todo: signum not implemented for `SExp`"
+
+instance (Fractional a, SType' a) => Fractional (SExp a)
+  where
+    fromRational = value . fromRational
+    (/)          = sugarSymPrimSoftware FDiv
+
+instance (Floating a, SType' a) => Floating (SExp a)
+  where
+    pi    = sugarSymPrimSoftware Pi
+    exp   = sugarSymPrimSoftware Exp
+    log   = sugarSymPrimSoftware Log
+    sqrt  = sugarSymPrimSoftware Sqrt
+    (**)  = sugarSymPrimSoftware Pow
+    sin   = sugarSymPrimSoftware Sin
+    cos   = sugarSymPrimSoftware Cos
+    tan   = sugarSymPrimSoftware Tan
+    asin  = sugarSymPrimSoftware Asin
+    acos  = sugarSymPrimSoftware Acos
+    atan  = sugarSymPrimSoftware Atan
+    sinh  = sugarSymPrimSoftware Sinh
+    cosh  = sugarSymPrimSoftware Cosh
+    tanh  = sugarSymPrimSoftware Tanh
+    asinh = sugarSymPrimSoftware Asinh
+    acosh = sugarSymPrimSoftware Acosh
+    atanh = sugarSymPrimSoftware Atanh
+
+--------------------------------------------------------------------------------
+
+complex :: (Num a, SType' a, SType' (Complex a)) =>
+  SExp a -> -- ^ Real
+  SExp a -> -- ^ Imaginary
+  SExp (Complex a)
+complex = sugarSymPrimSoftware Complex
+
+polar :: (Floating a, SType' a, SType' (Complex a)) =>
+  SExp a -> -- ^ Magnitude
+  SExp a -> -- ^ Phase
+  SExp (Complex a)
+polar = sugarSymPrimSoftware Polar
+
+real :: (SType' a, SType' (Complex a)) => SExp (Complex a) -> SExp a
+real = sugarSymPrimSoftware Real
+
+imaginary :: (SType' a, SType' (Complex a)) => SExp (Complex a) -> SExp a
+imaginary = sugarSymPrimSoftware Imag
+
+magnitude :: (RealFloat a, SType' a, SType' (Complex a)) => SExp (Complex a) -> SExp a
+magnitude = sugarSymPrimSoftware Magnitude
+
+phase :: (RealFloat a, SType' a, SType' (Complex a)) => SExp (Complex a) -> SExp a
+phase = sugarSymPrimSoftware Phase
+
+conjugate :: (RealFloat a, SType' a, SType' (Complex a)) => SExp (Complex a) -> SExp (Complex a)
+conjugate = sugarSymPrimSoftware Conjugate
+
+ilog2 :: (FiniteBits a, Integral a, SType' a) => SExp a -> SExp a
+ilog2 a = snd $ P.foldr (\ffi vr -> share vr (step ffi)) (a,0) ffis
+  where
+    step (ff,i) (v,r) = share (b2i (v > fromInteger ff) .<<. value i) $ \shift ->
+      (v .>>. i2n shift, r .|. shift)
+
+    -- [(0x1, 0), (0x3, 1), (0xF, 2), (0xFF, 3), (0xFFFF, 4), ...]
+    ffis = (`P.zip` [0..])
+         $ P.takeWhile (P.<= (2 P.^ (bitSize a `P.div` 2) - 1 :: Integer))
+         $ P.map ((subtract 1) . (2 P.^) . (2 P.^))
+         $ [(0::Integer)..]
+    -- Based on: http://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
 
 --------------------------------------------------------------------------------
 -- * Instructions.
@@ -282,6 +352,12 @@ instance ViewManifest Software (IArr (SExp a)) (SExp a)
 
 instance Manifestable Software (IArr (SExp a)) (SExp a)
 
+instance ArraysSwap Software
+  where
+    unsafeArrSwap arr brr = Software $ sequence_ $ zipListStruct Imp.unsafeSwap
+      (unArr arr)
+      (unArr brr)
+
 --------------------------------------------------------------------------------
 
 instance Control Software
@@ -290,17 +366,28 @@ instance Control Software
       = Software
       $ Imp.iff (resugar c)
           (unSoftware t)
-          (unSoftware f)      
+          (unSoftware f)
+
+instance Loop Software
+  where
     while c body
       = Software
       $ Imp.while
           (fmap resugar $ unSoftware c)
           (unSoftware body)
-    for lower upper body
+    for lower step upper body
       = Software
       $ Imp.for
-          (resugar lower, 1, Imp.Incl $ resugar upper)
+          (resugar lower, step, Imp.Incl $ resugar upper)
           (unSoftware . body . resugar)
+
+instance Assert Software
+  where
+    break  = error "break!"
+    assert = assertLabel $ UserAssertion ""
+
+assertLabel :: AssertionLabel -> SExp Bool -> String -> Software ()
+assertLabel lbl cond msg = Software $ Oper.singleInj $ Assert lbl cond msg
 
 --------------------------------------------------------------------------------
 -- ** Software instructions.
@@ -421,5 +508,7 @@ predicateDict rep = case rep of
   Word32ST -> Dict
   Word64ST -> Dict
   FloatST  -> Dict
+  ComplexFloatST  -> Dict
+  ComplexDoubleST -> Dict
 
 --------------------------------------------------------------------------------
