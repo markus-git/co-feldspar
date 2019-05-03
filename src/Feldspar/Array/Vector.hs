@@ -341,6 +341,22 @@ concat c vec = Push (len*c) $ \write ->
     v   = fmap toPush $ toPush vec
     len = length v
 
+-- | Embed the effects in the elements into the internal effects of a 'Push'
+-- vector
+--
+-- __WARNING:__ This function should be used with care, since it allows hiding
+-- effects inside a vector. These effects may be (seemingly) randomly
+-- interleaved with other effects when the vector is used.
+--
+-- The name 'sequens' has to do with the similarity to the standard function
+-- 'sequence'.
+sequens :: (Pushy m vec (m a), Monad m) => vec -> Push m a
+sequens vec = Push (length v) $ \write ->
+    dumpPush v $ \i m ->
+      m >>= write i
+  where
+    v = toPush vec
+
 -- | Forward-permute a 'Push' vector using an index mapping. The supplied
 --   mapping must be a bijection when restricted to the domain of the vector.
 --   This property is not checked, so use with care.
@@ -352,6 +368,41 @@ forwardPermute p vec = Push len $ \write ->
   where
     v   = toPush vec
     len = length v
+
+-- | Convert a vector to a push vector that computes @n@ elements in each step.
+-- This can be used to achieve loop unrolling.
+--
+-- The length of the vector must be divisible by the number of unrolling steps.
+unroll
+  :: ( Pully (Expr m) vec a
+     , Monad m, Assert m
+     , SyntaxM' m (Expr m Word32)
+     , Internal (ExprOf a Word32) ~ Word32
+     , Loop m     
+     , References m
+     , Value (Expr m)
+     , Multiplicative (Expr m)
+     , Equality (Expr m)
+     , Num (Expr m Word32)
+     )
+  => Length  -- ^ Number of steps to unroll
+  -> vec
+  -> Push m a
+unroll 0 _   = P.error "unroll: cannot unroll 0 steps"
+unroll 1 vec = Push len $ \write ->
+  do for 0 1 (len-1) $ \i -> write i (vec!i)
+  where
+    len = length vec
+unroll n vec = Push len $ \write ->
+  do assert ((len `Feldspar.mod` value n) Feldspar.== 0)
+            ("unroll: length not divisible by " P.++ show n)
+     for 0 (P.fromIntegral n) (len-1) $ \i ->
+       P.sequence_
+         [ do k <- shareM (i + value j)
+              write k (vec!k)
+         | j <- [0..n-1] ]
+  where
+    len = length vec
 
 --------------------------------------------------------------------------------
 -- *

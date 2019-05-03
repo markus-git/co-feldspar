@@ -37,8 +37,7 @@ import Prelude hiding (length, Word, (<=), (==), not)
 
 -- | ...
 type Syn (dom :: * -> *) (pred :: * -> Constraint) (exp :: * -> *) (a :: *) =
-  (
-    Syntactic a
+  ( Syntactic a
   , Domain a ~ dom
   , Type pred (Internal a)
   , Tuples dom
@@ -315,5 +314,10 @@ class Monad m => Loop m
       -> Expr m a           -- ^ Upper bound (inclusive).
       -> (Expr m a -> m ()) -- ^ Step function.
       -> m ()
+
+class Monad m => Assert m
+  where
+    break :: m ()
+    assert :: Expr m Bool -> String -> m ()
 
 --------------------------------------------------------------------------------

@@ -215,14 +215,6 @@ resugar = Syntactic.resugar
 
 --------------------------------------------------------------------------------
 
-assert :: SExp Bool -> String -> Software ()
-assert = assertLabel $ UserAssertion ""
-
-assertLabel :: AssertionLabel -> SExp Bool -> String -> Software ()
-assertLabel lbl cond msg = Software $ Oper.singleInj $ Assert lbl cond msg
-
---------------------------------------------------------------------------------
-
 instance References Software
   where
     type Reference Software = Ref    
@@ -410,6 +402,14 @@ instance Loop Software
       $ Imp.for
           (resugar lower, step, Imp.Incl $ resugar upper)
           (unSoftware . body . resugar)
+
+instance Assert Software
+  where
+    break  = error "break!"
+    assert = assertLabel $ UserAssertion ""
+
+assertLabel :: AssertionLabel -> SExp Bool -> String -> Software ()
+assertLabel lbl cond msg = Software $ Oper.singleInj $ Assert lbl cond msg
 
 --------------------------------------------------------------------------------
 -- ** Software instructions.
