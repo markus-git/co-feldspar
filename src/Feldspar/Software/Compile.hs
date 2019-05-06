@@ -40,6 +40,7 @@ import Language.Embedded.Expression
 --import Language.Embedded.Imperative hiding (Ref, (:+:)(..), (:<:)(..))
 import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
+import qualified Language.Embedded.Imperative.Frontend as Imp
 import qualified Language.Embedded.Backend.C  as Imp
 import qualified Language.C.Monad as C
   (CGen, addGlobal, addLocal, addInclude, addStm, gensym)
@@ -236,10 +237,15 @@ translateExp = goAST . optimize . unSExp
       | Just RotateR <- prj op =
           liftStruct2 (sugarSymPrim RotateR) <$> goAST a <*> goAST b
     go t guard (cond :* a :* Syn.Nil)
-      | Just (Guard lbl msg) <- prj guard
+      | Just (GuardVal lbl msg) <- prj guard
       = do cond' <- extractNode <$> goAST cond
            lift $ Imp.assert cond' msg
            goAST a
+    go t hint (cond :* a :* Syn.Nil)
+        | Just (HintVal) <- prj hint
+        = do cond' <- extractNode <$> goAST cond
+             lift $ Imp.hint cond'
+             goAST a
     go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
       | Just ForLoop   <- prj loop
       , Just (LamT iv) <- prj lami

@@ -45,8 +45,11 @@ instance CompTypeClass SoftwarePrimType
       Word32ST -> addInclude "<stdint.h>"  >> return [cty| typename uint32_t |]
       Word64ST -> addInclude "<stdint.h>"  >> return [cty| typename uint64_t |]
       FloatST  -> return [cty| float |]
-      ComplexFloatST  -> addInclude "<tgmath.h>" >> return [cty| float  _Complex |]
-      ComplexDoubleST -> addInclude "<tgmath.h>" >> return [cty| double _Complex |]
+      DoubleST -> return [cty| double |]
+      ComplexFloatST  ->
+        addInclude "<tgmath.h>" >> return [cty| float  _Complex |]
+      ComplexDoubleST ->
+        addInclude "<tgmath.h>" >> return [cty| double _Complex |]
 
     compLit _ a = case softwarePrimTypeOf a of
       BoolST  ->
@@ -61,6 +64,7 @@ instance CompTypeClass SoftwarePrimType
       Word32ST -> return [cexp| $a |]
       Word64ST -> return [cexp| $a |]
       FloatST  -> return [cexp| $a |]
+      DoubleST -> return [cexp| $a |]
       ComplexFloatST  -> return $ compComplexLit a
       ComplexDoubleST -> return $ compComplexLit a
 
@@ -365,6 +369,7 @@ compPrim = simpleMatch (\(s :&: t) -> go t s) . unPrim
     go _ And (a :* b :* Nil) = compBinOp C.Land a b
     go _ Or  (a :* b :* Nil) = compBinOp C.Lor  a b
     go _ Eq  (a :* b :* Nil) = compBinOp C.Eq   a b
+    go _ Neq (a :* b :* Nil) = compBinOp C.Ne   a b
     go _ Lt  (a :* b :* Nil) = compBinOp C.Lt   a b
     go _ Lte (a :* b :* Nil) = compBinOp C.Le   a b
     go _ Gt  (a :* b :* Nil) = compBinOp C.Gt   a b
@@ -391,10 +396,16 @@ compPrim = simpleMatch (\(s :&: t) -> go t s) . unPrim
       b' <- compPrim $ Prim b
       return [cexp| feld_rotr($a', $b') |]
     
-    go _ (ArrIx arr) (i :* Nil) =
-      do i' <- compPrim $ Prim i
-         touchVar arr
-         return [cexp| $id:arr[$i'] |]
+    go _ (ArrIx arr) (i :* Nil) = do
+      i' <- compPrim $ Prim i
+      touchVar arr
+      return [cexp| $id:arr[$i'] |]
+
+    go _ Cond (c :* t :* f :* Nil) = do
+      c' <- compPrim $ Prim c
+      t' <- compPrim $ Prim t
+      f' <- compPrim $ Prim f
+      return $ C.Cond c' t' f' mempty
 
 --------------------------------------------------------------------------------
 

@@ -330,7 +330,7 @@ instance Syntax SExp a => Indexed SExp (IArr a)
       where
         index :: forall b . SoftwarePrimType b => Imp.IArr Index b -> SExp b
         index arr = sugarSymPrimSoftware
-          (Guard InternalAssertion "arrIndex: index out of bounds.")
+          (GuardVal InternalAssertion "arrIndex: index out of bounds.")
           (ix < len)
           (sugarSymPrimSoftware (ArrIx arr) (ix + off) :: SExp b)
 
@@ -422,7 +422,13 @@ guard :: Syntax SExp a => SExp Bool -> String -> a -> a
 guard = guardLabel $ UserAssertion ""
 
 guardLabel :: Syntax SExp a => AssertionLabel -> SExp Bool -> String -> a -> a
-guardLabel lbl cond msg = sugarSymSoftware (Guard lbl msg) cond
+guardLabel lbl cond msg = sugarSymSoftware (GuardVal lbl msg) cond
+
+hint :: (Syntax SExp a, Syntax SExp b, Primitive SExp (Internal a))
+  => a -- ^ Value to be used in invariant.
+  -> b -- ^ Result value.
+  -> b
+hint x y = sugarSymSoftware HintVal x y
 
 --------------------------------------------------------------------------------
 -- *** File handling.

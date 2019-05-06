@@ -20,7 +20,7 @@ import Feldspar.Frontend
 import Feldspar.Storable
 import Feldspar.Array.Buffered (ArraysEq(..))
 import Feldspar.Software.Primitive
-import Feldspar.Software.Expression
+import Feldspar.Software.Expression hiding (Hint)
 
 import Feldspar.Verify.Monad (Verify)
 import qualified Feldspar.Verify.FirstOrder as FO
