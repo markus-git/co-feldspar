@@ -43,9 +43,10 @@ import qualified Language.Embedded.Imperative.CMD as Imp
 import qualified Language.Embedded.Hardware.Command.CMD as Hard
 
 -- hmm!
-import Feldspar.Hardware.Primitive  (HardwarePrimType(..), HardwarePrimTypeRep(..))
-import Feldspar.Hardware.Expression (HType')
-import Feldspar.Hardware.Frontend   (HSig, withHType')
+--import Feldspar.Hardware.Primitive
+--  (HardwarePrimType(..), HardwarePrimTypeRep(..))
+--import Feldspar.Hardware.Expression (HType')
+--import Feldspar.Hardware.Frontend   (HSig, withHType')
 
 import Prelude hiding (length, Word, (<=), (<), (>=), (>))
 import qualified Prelude as P
@@ -491,7 +492,7 @@ printf = fprintf Imp.stdout
 
 --------------------------------------------------------------------------------
 -- *** Memory.
-
+{-
 -- | Software argument specialized to software primitives.
 type SArg = Argument SoftwarePrimType
 
@@ -520,7 +521,7 @@ nil = Nil
 (>>:) = withHType' (Proxy :: Proxy a) AArr
 
 infixr 1 >:, >>:
-
+-}
 --------------------------------------------------------------------------------
 -- *** C specific.
 

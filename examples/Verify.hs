@@ -13,7 +13,7 @@ import Feldspar.Array.Buffered
 import Data.Bits (Bits)
 import Data.Complex (Complex)
 
-import Prelude hiding ((==), (/=), length, div)
+import Prelude hiding ((==), (/=), (>), length, div)
 
 --------------------------------------------------------------------------------
 
@@ -23,10 +23,32 @@ count = do
   printf "Enter a number: "
   n :: SExp Word32 <- fget stdin
 
-  let total = iter n 0 (\i n -> hintVal (n == i) $ i + 1)
+  let total = iter n 0 (\i n -> hint (n == i) $ i + 1)
   total <- initRef total >>= unsafeFreezeRef
   assert (total == n) "Count is wrong"
   printf "The count is %d\n" total
+
+--------------------------------------------------------------------------------
+
+rev :: Software ()
+rev = do
+  n <- fget stdin
+  loc :: IArr (SExp Word32) <- newArr n >>= unsafeFreezeArr
+  cpy :: Arr  (SExp Word32) <- newArr n
+  assert (n > 0) "neg"
+  for 0 1 (n-1) $ \i -> do
+    setArr cpy i (loc ! (n-i-1))
+
+rev_inplace :: Software ()
+rev_inplace = do
+    n <- fget stdin
+    loc :: Arr (SExp Word32) <- newArr n
+    vec <- unsafeFreezeArr loc >>= unsafeThawArr
+    for 0 1 ((n `div` 2 :: SExp Word32)) $ \i -> do
+      x <- getArr vec i
+      y <- getArr vec (n-i-1)
+      setArr loc i y
+      setArr loc (n-i-1) x
 
 ------------------------------------------------------------
 {-

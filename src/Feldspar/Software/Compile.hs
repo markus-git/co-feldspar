@@ -76,7 +76,7 @@ type TargetCMD
     Oper.:+: Imp.PtrCMD
     Oper.:+: Imp.C_CMD
     --
-    Oper.:+: MMapCMD
+--    Oper.:+: MMapCMD
 
 -- | Target monad during translation.
 type TargetT m = ReaderT Env (Oper.ProgramT TargetCMD (Oper.Param2 Prim SoftwarePrimType) m)
@@ -309,7 +309,7 @@ unsafeTranslateSmallExp a = do
 --------------------------------------------------------------------------------
 -- * Interpretation of software commands.
 --------------------------------------------------------------------------------
-
+{-
 instance (Imp.CompExp exp, Imp.CompTypeClass ct) =>
     Oper.Interp MMapCMD C.CGen (Oper.Param2 exp ct)
   where
@@ -416,7 +416,7 @@ int * f_map(unsigned addr) {
   return (int*) (ptr + offset);
 }
 |]
-
+-}
 --------------------------------------------------------------------------------
 
 translate' :: Env -> Software a -> ProgC a
