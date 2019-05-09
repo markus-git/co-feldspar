@@ -7,11 +7,13 @@
 
 module Feldspar.Software.Verify where
 
-import Feldspar.Software.Representation (Software(..), SoftwareCMD, AssertCMD, ControlCMD(..), PtrCMD, MMapCMD)
+import Feldspar.Software.Representation (Software(..), SoftwareCMD, AssertCMD, ControlCMD(..), MMapCMD)
 import Feldspar.Software.Primitive (Prim, SoftwarePrimType)
 import Feldspar.Software.Compile (ProgC, translate)
 import Feldspar.Software.Verify.Command
 import Feldspar.Software.Verify.Primitive
+
+import Control.Monad.Trans
 
 import qualified Feldspar.Verify.Monad as V
 import qualified Feldspar.Verify.FirstOrder as FO
@@ -33,7 +35,7 @@ verifySoft = verifiedSoft Imp.icompile
 verifiedSoft :: (ProgC () -> IO a) -> Software () -> IO a
 verifiedSoft comp prog =
   do (prg, ws) <- V.runVerify $ do
-       return $ declareFeldsparGlobals
+       lift declareFeldsparGlobals
        V.verify $ translate $ prog
      comp prg <* unless (null ws) (do
        putStrLn "Warnings:"
@@ -49,7 +51,6 @@ instance V.Verifiable
        :+: Imp.FileCMD
        :+: Imp.PtrCMD
        :+: Imp.C_CMD
-       :+: PtrCMD
        :+: MMapCMD
       )
       (Param2 Prim SoftwarePrimType))
@@ -67,7 +68,6 @@ instance V.Verifiable
        :+: Imp.FileCMD
        :+: Imp.PtrCMD
        :+: Imp.C_CMD
-       :+: PtrCMD
        :+: MMapCMD
       )
       (Param2 Prim SoftwarePrimType))
@@ -88,11 +88,9 @@ instance V.Verifiable
 --------------------------------------------------------------------------------
 
 instance FO.Defunctionalise inv AssertCMD where refunc = error "todo: assert"
-instance FO.Defunctionalise inv PtrCMD    where refunc = error "todo: ptr"
 instance FO.Defunctionalise inv MMapCMD   where refunc = error "todo: mmap"
 
 instance V.VerifyInstr AssertCMD exp pred where verifyInstr = error "todo: assert"
-instance V.VerifyInstr PtrCMD    exp pred where verifyInstr = error "todo: ptr"
 instance V.VerifyInstr MMapCMD   exp pred where verifyInstr = error "todo: mmap"
 
 --------------------------------------------------------------------------------

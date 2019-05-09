@@ -28,12 +28,13 @@ import qualified Language.C.Syntax as C
 -- imperative-edsl
 import qualified Language.Embedded.Backend.C  as Imp
 
-import Prelude hiding ((/=), length)
+import Prelude hiding ((==), (/=), length)
 
 --------------------------------------------------------------------------------
 -- * FFT
 --------------------------------------------------------------------------------
 
+type SRef    a = Reference Software a
 type SArr    a = Array  Software a
 type SIArr   a = IArray Software a
 type SStore  a = Store  Software a
@@ -102,8 +103,9 @@ revBit :: (Immutable arr a, SSyntax a)
   => SStore a -> SExp Length -> arr -> Software (SManifest a)
 revBit st n vec = loopStore st 1 1 (n-1) (step) vec
   where
-    step :: (Immutable arr a, SSyntax a) => SExp Index -> arr -> Software (SPush a)
-    step i arr = return $ unroll 2 $ riffle i arr
+    --step :: (Immutable arr a, SSyntax a) => SExp Index -> arr -> Software (SPush a)
+--    step i arr = return $ unroll 2 $ riffle i arr
+    step i arr = return $ riffle i arr
 
 --------------------------------------------------------------------------------
 -- ** Twiddle factors.
@@ -194,11 +196,39 @@ fft st vec =
 
 --------------------------------------------------------------------------------
 
+example :: Software ()
 example = do
-  st   :: SStore (SExp (Complex Double)) <- newStore (value 16)
-  arr  :: SArr   (SExp (Complex Double)) <- newArr (value 16)
+  let size = value 17
+  st   :: SStore (SExp (Complex Double)) <- newStore size
+  arr  :: SArr   (SExp (Complex Double)) <- newArr size
   iarr :: SIArr  (SExp (Complex Double)) <- freezeArr arr
   fft st iarr
+  return ()
+
+--------------------------------------------------------------------------------
+
+bad :: Software ()
+bad = do
+  let size = 17
+  arr  :: SArr   (SExp (Complex Double)) <- newArr size
+  brr  :: SArr   (SExp (Complex Double)) <- newArr size
+  ref  :: SRef   (SExp Int32) <- initRef 0
+  --
+  iarr :: SIArr  (SExp (Complex Double)) <- unsafeFreezeArr arr
+  --
+  let n = ilog2 size :: SExp Length
+  --
+  for ((i2n n :: SExp Int32)-1) (-1) (0) $ \ix -> do
+    let i = i2n ix
+        b = iarr ! flipBit i n
+    --setArr brr i b
+    v <- getRef ref
+    setRef ref (v+1)
+  --
+  v <- getRef ref
+  assert (v == 0) "!"
+  --assert (value False) "!"
+  return ()
 
 --------------------------------------------------------------------------------
 -- FFT Bench. Copy of https://github.com/Feldspar/raw-feldspar/blob/master/examples/FFT_bench.hs

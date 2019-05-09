@@ -76,7 +76,6 @@ type TargetCMD
     Oper.:+: Imp.PtrCMD
     Oper.:+: Imp.C_CMD
     --
-    Oper.:+: PtrCMD
     Oper.:+: MMapCMD
 
 -- | Target monad during translation.
@@ -309,17 +308,6 @@ unsafeTranslateSmallExp a = do
 
 --------------------------------------------------------------------------------
 -- * Interpretation of software commands.
---------------------------------------------------------------------------------
-
-instance (Imp.CompExp exp, Imp.CompTypeClass ct) =>
-    Oper.Interp PtrCMD C.CGen (Oper.Param2 exp ct)
-  where
-    interp = compPtrCMD
-
-compPtrCMD :: forall exp ct a . (Imp.CompExp exp, Imp.CompTypeClass ct) =>
-  PtrCMD (Oper.Param3 C.CGen exp ct) a -> C.CGen a
-compPtrCMD = undefined
-
 --------------------------------------------------------------------------------
 
 instance (Imp.CompExp exp, Imp.CompTypeClass ct) =>

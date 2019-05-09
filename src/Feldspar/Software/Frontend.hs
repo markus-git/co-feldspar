@@ -377,7 +377,7 @@ instance Manifestable Software (IArr (SExp a)) (SExp a)
 
 instance ArraysSwap Software
   where
-    unsafeArrSwap arr brr = Software $ sequence_ $ zipListStruct Imp.unsafeSwap
+    unsafeArrSwap arr brr = Software $ sequence_ $ zipListStruct Imp.unsafeSwapArr
       (unArr arr)
       (unArr brr)
 
