@@ -809,7 +809,8 @@ instance (V.SMTEval1 exp, V.SMTEval exp Bool, V.Pred exp ~ pred, pred Bool) =>
            getLits f =
              do new <- S.get
                 let cands = [ (SomeLiteral l, e)
-                            | (V.Name name _, V.Entry x) <- Map.toList new
+                            | (var@(V.Name name _), V.Entry x) <- Map.toList new
+                            , var `Map.member` old
                             , (l, e) <- f name x
                             ]
                 let ok (SomeLiteral _, e) = V.provable "magic safety invariant" e
