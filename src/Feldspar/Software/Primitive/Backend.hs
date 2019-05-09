@@ -217,12 +217,10 @@ compDiv Int64ST a b = do
   addGlobal ldiv_def
   compFun "feld_ldiv" (a :* b :* Nil)
 compDiv t a b | integerType t = do
-  addGlobal mod_def
-  compFun "feld_mod" (a :* b :* Nil)
-compDiv t a b | wordType t = do
-  compBinOp C.Mod a b
-compDiv t a b = do
-  error $ "compDiv: type " ++ show t ++ " not supported"
+  addGlobal div_def
+  compFun "feld_div" (a :* b :* Nil)
+compDiv t a b | wordType t = compBinOp C.Mod a b
+compDiv t a b = error $ "compDiv: type " ++ show t ++ " not supported"
 
 ldiv_def = [cedecl|
 long int feld_ldiv(long int x, long int y) {
@@ -232,11 +230,12 @@ long int feld_ldiv(long int x, long int y) {
     return q;
 } |]
 
-mod_def = [cedecl|
-int feld_mod(int x, int y) {
+div_def = [cedecl|
+int feld_div(int x, int y) {
+    int q = x/y;
     int r = x%y;
-    if ((r!=0) && ((r<0) != (y<0))) { r += y; }
-    return r;
+    if ((r!=0) && ((r<0) != (y<0))) --q;
+    return q;
 } |]
 
 compMod
@@ -250,22 +249,19 @@ compMod Int64ST a b = do
   compFun "feld_lmod" (a :* b :* Nil)
 compMod t a b | integerType t = do
   addGlobal div_def
-  compFun "feld_div" (a :* b :* Nil)
-compMod t a b | wordType t = do
-  compBinOp C.Mod a b
-compMod t a b = do
-  error $ "compMod: type " ++ show t ++ " not supported"
-
-div_def = [cedecl|
-int feld_div(int x, int y) {
-    int q = x/y;
-    int r = x%y;
-    if ((r!=0) && ((r<0) != (y<0))) --q;
-    return q;
-} |]
+  compFun "feld_mod" (a :* b :* Nil)
+compMod t a b | wordType t = compBinOp C.Mod a b
+compMod t a b = error $ "compMod: type " ++ show t ++ " not supported"
 
 lmod_def = [cedecl|
 long int feld_lmod(long int x, long int y) {
+    int r = x%y;
+    if ((r!=0) && ((r<0) != (y<0))) { r += y; }
+    return r;
+} |]
+
+mod_def = [cedecl|
+int feld_mod(int x, int y) {
     int r = x%y;
     if ((r!=0) && ((r<0) != (y<0))) { r += y; }
     return r;
