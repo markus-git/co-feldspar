@@ -20,7 +20,7 @@ import Data.List (genericLength)
 
 import Control.Monad ((<=<), void)
 
-import Prelude hiding (take, drop, reverse, length, zip, zipWith, sum, min)
+import Prelude hiding (take, drop, reverse, length, zip, zipWith, sum, min, div, (<))
 import qualified Prelude as P
 
 --------------------------------------------------------------------------------
@@ -352,6 +352,18 @@ forwardPermute p vec = Push len $ \write ->
   where
     v   = toPush vec
     len = length v
+
+pairwise :: (SyntaxM m a, SyntaxM m (Expr m Length), PredOf (Expr m) (Internal (Expr m Length)), Loop m, Num (Expr m Length), PredOf (Expr m) Length, Multiplicative (Expr m), References m, Ordered (Expr m), Control m, Pully (Expr m) vec a) =>
+  (Expr m Index -> (Expr m Index, Expr m Index)) ->
+  vec -> Push m a
+pairwise idxs vec =
+  Push (length vec) $ \write -> do
+    for 0 1 (length vec `div` 2) $ \i -> do
+      let (idx1, idx2) = idxs (i-1)
+      x <- shareM (vec ! idx1)
+      y <- shareM (vec ! idx2)
+      write idx1 x
+      write idx2 y
 
 -- | Convert a vector to a push vector that computes @n@ elements in each step.
 -- This can be used to achieve loop unrolling.

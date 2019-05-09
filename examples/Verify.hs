@@ -13,7 +13,7 @@ import Feldspar.Array.Buffered
 import Data.Bits (Bits)
 import Data.Complex (Complex)
 
-import Prelude hiding ((==), (/=), (>), length, div)
+import Prelude hiding ((==), (/=), (>), length, div, reverse)
 
 --------------------------------------------------------------------------------
 
@@ -49,6 +49,14 @@ rev_inplace = do
       y <- getArr vec (n-i-1)
       setArr loc i y
       setArr loc (n-i-1) x
+
+rev_amazing :: Software ()
+rev_amazing = do
+    n <- fget stdin
+    iarr :: IArr (SExp Word32) <- newArr n >>= unsafeFreezeArr
+    arr <- unsafeThawArr iarr
+    result <- manifestArr arr (pairwise @Software (\i -> (i, n-i-1)) (reverse iarr))
+    return ()
 
 ------------------------------------------------------------
 {-
