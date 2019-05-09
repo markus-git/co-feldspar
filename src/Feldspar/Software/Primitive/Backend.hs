@@ -219,7 +219,7 @@ compDiv Int64ST a b = do
 compDiv t a b | integerType t = do
   addGlobal div_def
   compFun "feld_div" (a :* b :* Nil)
-compDiv t a b | wordType t = compBinOp C.Mod a b
+compDiv t a b | wordType t = compBinOp C.Div a b
 compDiv t a b = error $ "compDiv: type " ++ show t ++ " not supported"
 
 ldiv_def = [cedecl|
