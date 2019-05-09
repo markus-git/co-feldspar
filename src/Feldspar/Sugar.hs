@@ -68,7 +68,6 @@ instance
 --------------------------------------------------------------------------------
 
 -- *** todo: replace current fix with comments once DTC bug is fixed.
-{-
 instance
     ( Syntactic a
     , Syntactic b
@@ -93,7 +92,7 @@ instance
         lamSym v b = Sym (InjL (LamT v) :&: FunT typeRep (getDecor b)) :$ b
 
     sugar = error "sugar not implemented for (a -> b)"
--}
+
 --------------------------------------------------------------------------------
 
 apa :: (sym ~ ((BindingT :+: sym0) :&: decor)) => AST sym a -> Name

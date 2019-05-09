@@ -7,7 +7,7 @@
 
 module Feldspar.Software.Verify where
 
-import Feldspar.Software.Representation (Software(..), SoftwareCMD, AssertCMD, ControlCMD(..)) --, MMapCMD)
+import Feldspar.Software.Representation (Software(..), SoftwareCMD, AssertCMD, ControlCMD(..), MMapCMD)
 import Feldspar.Software.Primitive (Prim, SoftwarePrimType)
 import Feldspar.Software.Compile (ProgC, translate)
 import Feldspar.Software.Verify.Command
@@ -51,7 +51,7 @@ instance V.Verifiable
        :+: Imp.FileCMD
        :+: Imp.PtrCMD
        :+: Imp.C_CMD
---       :+: MMapCMD
+       :+: MMapCMD
       )
       (Param2 Prim SoftwarePrimType))
   where
@@ -68,7 +68,7 @@ instance V.Verifiable
        :+: Imp.FileCMD
        :+: Imp.PtrCMD
        :+: Imp.C_CMD
---       :+: MMapCMD
+       :+: MMapCMD
       )
       (Param2 Prim SoftwarePrimType))
   where
@@ -88,9 +88,9 @@ instance V.Verifiable
 --------------------------------------------------------------------------------
 
 instance FO.Defunctionalise inv AssertCMD where refunc = error "todo: assert"
---instance FO.Defunctionalise inv MMapCMD   where refunc = error "todo: mmap"
+instance FO.Defunctionalise inv MMapCMD   where refunc = error "todo: mmap"
 
 instance V.VerifyInstr AssertCMD exp pred where verifyInstr = error "todo: assert"
---instance V.VerifyInstr MMapCMD   exp pred where verifyInstr = error "todo: mmap"
+instance V.VerifyInstr MMapCMD   exp pred where verifyInstr = error "todo: mmap"
 
 --------------------------------------------------------------------------------

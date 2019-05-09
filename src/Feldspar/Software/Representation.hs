@@ -70,7 +70,7 @@ import Prelude hiding ((==))
 import qualified Prelude as P
 
 -- hmm!
---import Feldspar.Hardware.Frontend (HSig)
+import Feldspar.Hardware.Frontend (HSig)
 
 --------------------------------------------------------------------------------
 -- * Programs.
@@ -144,7 +144,7 @@ instance FO.HTraversable (ControlCMD inv)
     htraverse _ (Comment msg) = pure (Comment msg)
 
 --------------------------------------------------------------------------------
-{-
+
 -- | Soften the hardware signature of a component into a type that uses the
 --   correspoinding data types in software.
 type family Soften a where
@@ -203,7 +203,7 @@ instance FO.Symbol MMapCMD
   where
     dry (MMap s sig)    = show <$> FO.fresh
     dry (Call addr sig) = return ()
--}
+
 --------------------------------------------------------------------------------
 
 -- | Software instructions.
@@ -218,7 +218,7 @@ type SoftwareCMD
   Oper.:+: Imp.C_CMD
     -- new stuff
   Oper.:+: AssertCMD
---  Oper.:+: MMapCMD
+  Oper.:+: MMapCMD
 
 -- | Monad for building software programs in Feldspar.
 newtype Software a = Software { unSoftware ::

@@ -343,17 +343,3 @@ instance {-# OVERLAPPING #-} Project ForLoop SoftwareConstructs
     prj _ = Nothing
 
 --------------------------------------------------------------------------------
-
-instance (Syntactic a, Syntactic b, Domain b ~ SoftwareDomain, Domain a ~ SoftwareDomain, SType (Internal a)) => Syntactic (a -> b)
-  where
-    type Domain   (a -> b) = Domain a
-    type Internal (a -> b) = Internal a -> Internal b
-
-    desugar f = lamT_template varSym lamSym (desugar . f . sugar)
-      where
-        varSym v   = inj (VarT v) :&: ValT typeRep
-        lamSym v b = Sym (inj (LamT v) :&: FunT typeRep (getDecor b)) :$ b
-
-    sugar = error "sugar not implemented for (a -> b)"
-
---------------------------------------------------------------------------------
