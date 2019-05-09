@@ -460,7 +460,7 @@ instance Ord Name
 
 instance Show Name
   where
-    show (Name name x) = name ++ "." ++ show (typeOf x)
+    show (Name name x) = name
 
 data Entry = forall a .
   ( Ord a
