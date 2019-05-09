@@ -2,17 +2,31 @@
 {-# language ConstraintKinds #-}
 {-# language FlexibleContexts #-}
 {-# language ScopedTypeVariables #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module FFT where
 
 import Feldspar
 import Feldspar.Software hiding (Arr)
 import Feldspar.Software.Verify
+import Feldspar.Software.Compile
 import Feldspar.Array.Vector
 import Feldspar.Array.Buffered
 
 import Data.Bits (Bits)
 import Data.Complex (Complex)
+
+import Data.Selection
+import Data.Default.Class
+
+import Control.Monad
+
+-- language-c-quote
+import Language.C.Quote.GCC
+import qualified Language.C.Syntax as C
+
+-- imperative-edsl
+import qualified Language.Embedded.Backend.C  as Imp
 
 import Prelude hiding ((/=), length)
 
@@ -62,9 +76,9 @@ leastBits :: (Bits a, Num (SExp a), SType' a) =>
 leastBits i a = a .&. oneBits i
 
 -- | Two to the power of @n@, i.e. @2^n@.
-pow2 :: (Num (SExp a), Bits a, SType' a)
+twoTo :: (Num (SExp a), Bits a, SType' a)
   => SExp Index -> SExp a
-pow2 n = 1 .<<. i2n n
+twoTo n = 1 .<<. i2n n
 
 --------------------------------------------------------------------------------
 -- ** Riffle network.
@@ -88,7 +102,8 @@ revBit :: (Immutable arr a, SSyntax a)
   => SStore a -> SExp Length -> arr -> Software (SManifest a)
 revBit st n vec = loopStore st 1 1 (n-1) (step) vec
   where
-    step i arr = return $ riffle i arr
+    step :: (Immutable arr a, SSyntax a) => SExp Index -> arr -> Software (SPush a)
+    step i arr = return $ unroll 2 $ riffle i arr
 
 --------------------------------------------------------------------------------
 -- ** Twiddle factors.
@@ -174,7 +189,7 @@ fft
   -> Software (SManifest (SExp (Complex a)))
 fft st vec =
   do n  <- shareM (ilog2 (length vec))
-     ts <- manifestFresh $ Pull (pow2 (n-1)) (tw (pow2 n))
+     ts <- manifestFresh $ Pull (twoTo (n-1)) (tw (twoTo n))
      fftCore st ts n vec
 
 --------------------------------------------------------------------------------
@@ -186,3 +201,54 @@ example = do
   fft st iarr
 
 --------------------------------------------------------------------------------
+-- FFT Bench. Copy of https://github.com/Feldspar/raw-feldspar/blob/master/examples/FFT_bench.hs
+--------------------------------------------------------------------------------
+
+printTime_def = [cedecl|
+void printTime(typename clock_t start, typename clock_t end)
+{
+  printf("CPU time (sec): %f\n", (double)(end-start) / CLOCKS_PER_SEC);
+}
+|]
+
+sizeOf_double_complex :: SExp Length
+sizeOf_double_complex = 16
+  
+-- | Measure the time for 100 runs of 'fftCore' (excluding initialization) for
+-- arrays of the given size
+benchmark :: SExp Length -> Software ()
+benchmark n = do
+  addInclude "<stdio.h>"
+  addInclude "<string.h>"
+  addInclude "<time.h>"
+
+  addDefinition printTime_def
+
+  start <- newObject "clock_t" False
+  end   <- newObject "clock_t" False
+
+  st :: SStore (SExp (Complex Double)) <- newStore n
+  inp <- unsafeFreezeStore n st
+  callProc "memset"
+      [ iarrArg (manifest inp)
+      , valArg (0 :: SExp Index)
+      , valArg (n*sizeOf_double_complex)
+      ]
+
+  n  <- shareM (ilog2 (length inp))
+  ts <- manifestFresh $ Pull (twoTo (n-1)) (tw (twoTo n))
+  -- Change `manifestFresh` to `return` to avoid pre-computing twiddle factors
+
+  callProcAssign start "clock" []
+
+  for 0 1 99 $ \(_ :: SExp Index) ->
+    void $ fftCore st ts n inp
+
+  callProcAssign end "clock" []
+  callProc "printTime" [objArg start, objArg end]
+
+runBenchmark n = runCompiled'
+    (def :: CompilerOpts) --{compilerAssertions = select []}
+    -- Note: important to turn off assertions when running the benchmarks
+    def {Imp.externalFlagsPre = ["-O3"], Imp.externalFlagsPost = ["-lm"]}
+    (benchmark n)

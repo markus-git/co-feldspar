@@ -14,6 +14,7 @@ import Feldspar.Frontend
 import Feldspar.Array.Vector hiding (reverse, (++))
 import Feldspar.Array.Buffered (ArraysSwap(..))
 import Feldspar.Software.Primitive
+import Feldspar.Software.Primitive.Backend ()
 import Feldspar.Software.Expression
 import Feldspar.Software.Representation
 import Data.Struct
@@ -215,14 +216,6 @@ resugar = Syntactic.resugar
 
 --------------------------------------------------------------------------------
 
-assert :: SExp Bool -> String -> Software ()
-assert = assertLabel $ UserAssertion ""
-
-assertLabel :: AssertionLabel -> SExp Bool -> String -> Software ()
-assertLabel lbl cond msg = Software $ Oper.singleInj $ Assert lbl cond msg
-
---------------------------------------------------------------------------------
-
 instance References Software
   where
     type Reference Software = Ref    
@@ -411,6 +404,13 @@ instance Loop Software
           (resugar lower, step, Imp.Incl $ resugar upper)
           (unSoftware . body . resugar)
 
+instance Assert Software
+  where
+    assert = assertLabel $ UserAssertion ""
+
+assertLabel :: AssertionLabel -> SExp Bool -> String -> Software ()
+assertLabel lbl cond msg = Software $ Oper.singleInj $ Assert lbl cond msg
+
 --------------------------------------------------------------------------------
 -- ** Software instructions.
 --------------------------------------------------------------------------------
@@ -521,6 +521,176 @@ nil = Nil
 
 infixr 1 >:, >>:
 
+--------------------------------------------------------------------------------
+-- *** C specific.
+
+-- | Create a null pointer
+newPtr :: SType' a => Software (Ptr a)
+newPtr = newNamedPtr "p"
+
+-- | Create a named null pointer
+--
+-- The provided base name may be appended with a unique identifier to avoid name
+-- collisions.
+newNamedPtr :: SType' a => String -> Software (Ptr a)
+newNamedPtr = Software . Imp.newNamedPtr
+
+-- | Cast a pointer to an array
+ptrToArr :: SType' a => Ptr a -> SExp Length -> Software (Arr (SExp a))
+ptrToArr ptr len = fmap (Arr 0 len . Node) $ Software $ Imp.ptrToArr ptr
+
+-- | Create a pointer to an abstract object. The only thing one can do with such
+-- objects is to pass them to 'callFun' or 'callProc'.
+newObject
+    :: String  -- ^ Object type
+    -> Bool    -- ^ Pointed?
+    -> Software Object
+newObject = newNamedObject "obj"
+
+-- | Create a pointer to an abstract object. The only thing one can do with such
+-- objects is to pass them to 'callFun' or 'callProc'.
+--
+-- The provided base name may be appended with a unique identifier to avoid name
+-- collisions.
+newNamedObject
+    :: String  -- ^ Base name
+    -> String  -- ^ Object type
+    -> Bool    -- ^ Pointed?
+    -> Software Object
+newNamedObject base t p = Software $ Imp.newNamedObject base t p
+
+-- | Add an @#include@ statement to the generated code
+addInclude :: String -> Software ()
+addInclude = Software . Imp.addInclude
+
+-- | Add a global definition to the generated code
+--
+-- Can be used conveniently as follows:
+--
+-- > {-# LANGUAGE QuasiQuotes #-}
+-- >
+-- > import Feldspar.IO
+-- >
+-- > prog = do
+-- >     ...
+-- >     addDefinition myCFunction
+-- >     ...
+-- >   where
+-- >     myCFunction = [cedecl|
+-- >       void my_C_function( ... )
+-- >       {
+-- >           // C code
+-- >           // goes here
+-- >       }
+-- >       |]
+addDefinition :: Imp.Definition -> Software ()
+addDefinition = Software . Imp.addDefinition
+
+-- | Declare an external function
+addExternFun :: SType' res
+    => String    -- ^ Function name
+    -> proxy res -- ^ Proxy for expression and result type
+    -> [FunArg SExp SoftwarePrimType]
+                 -- ^ Arguments (only used to determine types)
+    -> Software ()
+addExternFun fun res args = Software $ Imp.addExternFun fun res args
+
+-- | Declare an external procedure
+addExternProc
+    :: String -- ^ Procedure name
+    -> [FunArg SExp SoftwarePrimType]
+              -- ^ Arguments (only used to determine types)
+    -> Software ()
+addExternProc proc args = Software $ Imp.addExternProc proc args
+
+-- | Call a function
+callFun :: SType' a
+    => String -- ^ Function name
+    -> [FunArg SExp SoftwarePrimType]
+              -- ^ Arguments
+    -> Software (SExp a)
+callFun fun as = Software $ Imp.callFun fun as
+
+-- | Call a procedure
+callProc
+    :: String -- ^ Function name
+    -> [FunArg SExp SoftwarePrimType]
+              -- ^ Arguments
+    -> Software ()
+callProc fun as = Software $ Imp.callProc fun as
+
+-- | Call a procedure and assign its result
+callProcAssign :: Assignable obj
+    => obj    -- ^ Object to which the result should be assigned
+    -> String -- ^ Procedure name
+    -> [FunArg SExp SoftwarePrimType]
+              -- ^ Arguments
+    -> Software ()
+callProcAssign obj fun as = Software $ Imp.callProcAssign obj fun as
+
+-- | Declare and call an external function
+externFun :: SType' res
+    => String -- ^ Procedure name
+    -> [FunArg SExp SoftwarePrimType]
+              -- ^ Arguments
+    -> Software (SExp res)
+externFun fun args = Software $ Imp.externFun fun args
+
+-- | Declare and call an external procedure
+externProc
+    :: String -- ^ Procedure name
+    -> [FunArg SExp SoftwarePrimType]
+              -- ^ Arguments
+    -> Software ()
+externProc proc args = Software $ Imp.externProc proc args
+
+-- | Generate code into another translation unit
+inModule :: String -> Software () -> Software ()
+inModule mod = Software . Imp.inModule mod . unSoftware
+
+-- | Get current time as number of seconds passed today
+getTime :: Software (SExp Double)
+getTime = Software Imp.getTime
+
+-- | Constant string argument
+strArg :: String -> FunArg SExp SoftwarePrimType
+strArg = Imp.strArg
+
+-- | Value argument
+valArg :: SoftwarePrimType a => SExp a -> FunArg SExp SoftwarePrimType
+valArg = Imp.valArg
+
+-- | Reference argument
+refArg :: SoftwarePrimType (Internal a) => Ref a -> FunArg SExp SoftwarePrimType
+refArg (Ref r) = Imp.refArg (extractNode r)
+
+-- | Mutable array argument
+arrArg :: SoftwarePrimType (Internal a) => Arr a -> FunArg SExp SoftwarePrimType
+arrArg (Arr o _ a) = Imp.offset (Imp.arrArg (extractNode a)) o
+
+-- | Immutable array argument
+iarrArg :: SoftwarePrimType (Internal a) => IArr a -> FunArg SExp SoftwarePrimType
+iarrArg (IArr o _ a) = Imp.offset (Imp.iarrArg (extractNode a)) o
+
+-- | Abstract object argument
+objArg :: Object -> FunArg SExp SoftwarePrimType
+objArg = Imp.objArg
+
+-- | Named constant argument
+constArg
+    :: String  -- ^ Type
+    -> String  -- ^ Named constant
+    -> FunArg SExp SoftwarePrimType
+constArg = Imp.constArg
+
+-- | Modifier that takes the address of another argument
+addr :: FunArg SExp SoftwarePrimType -> FunArg SExp SoftwarePrimType
+addr = Imp.addr
+
+-- | Modifier that dereferences another argument
+deref :: FunArg SExp SoftwarePrimType -> FunArg SExp SoftwarePrimType
+deref = Imp.deref
+  
 --------------------------------------------------------------------------------
 --
 --------------------------------------------------------------------------------

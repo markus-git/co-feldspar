@@ -52,6 +52,7 @@ library
     constraints >=0.8,
     containers >=0.5,
     array >=0.5,
+    data-default-class,
     exception-transformers,
     minisat,
     simple-smt,

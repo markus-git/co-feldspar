@@ -316,4 +316,8 @@ class Monad m => Loop m
       -> (Expr m a -> m ()) -- ^ Step function.
       -> m ()
 
+class Monad m => Assert m
+  where
+    assert :: Expr m Bool -> String -> m ()
+
 --------------------------------------------------------------------------------

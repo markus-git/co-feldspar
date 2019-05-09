@@ -249,6 +249,7 @@ type SoftwareCMD
     -- ^ Software specific instructions.
   Oper.:+: Imp.FileCMD
   Oper.:+: Imp.PtrCMD
+  Oper.:+: Imp.C_CMD
     -- new stuff
   Oper.:+: AssertCMD
   Oper.:+: PtrCMD

@@ -25,6 +25,9 @@ import Data.Constraint hiding (Sub)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
+import Data.Selection
+import Data.Default.Class
+
 -- syntactic.
 import Language.Syntactic (AST (..), ASTF, (:&:) (..), Args((:*)), prj)
 import Language.Syntactic.Functional hiding (Binding (..))
@@ -108,15 +111,47 @@ unsafeFreezeRefV :: Monad m => Struct SoftwarePrimType Imp.Ref a -> TargetT m (V
 unsafeFreezeRefV = lift . mapStructA Imp.unsafeFreezeRef
 
 --------------------------------------------------------------------------------
+-- ** Compilation options.
 
-type Env = Map Name VExp'
+-- | Options affecting code generation
+--
+-- A default set of options is given by 'def'.
+--
+-- The assertion labels to include in the generated code can be stated using the
+-- functions 'select', 'allExcept' and 'selectBy'. For example
+--
+-- @`def` {compilerAssertions = `allExcept` [`InternalAssertion`]}@
+--
+-- states that we want to include all except internal assertions.
+data CompilerOpts = CompilerOpts
+    { compilerAssertions :: Selection AssertionLabel
+        -- ^ Which assertions to include in the generated code
+    }
+
+instance Default CompilerOpts
+  where
+    def = CompilerOpts
+      { compilerAssertions = universal
+      }
+
+--------------------------------------------------------------------------------
+-- ** Compilation environment.
+
+data Env = Env {
+    envAliases :: Map Name VExp'
+  , envOptions :: CompilerOpts
+  }
+
+env0 :: Env
+env0 = Env Map.empty def
 
 localAlias :: MonadReader Env m => Name -> VExp a -> m b -> m b
-localAlias v e = local (Map.insert v (VExp' e))
+localAlias v e = local (\env ->
+  env {envAliases = Map.insert v (VExp' e) (envAliases env)})
 
 lookAlias :: MonadReader Env m => STypeRep a -> Name -> m (VExp a)
 lookAlias t v = do
-  env <- ask
+  env <- asks envAliases
   return $ case Map.lookup v env of
     Nothing -> error $ "lookAlias: variable " ++ show v ++ " not in scope."
     Just (VExp' e) -> case softwareTypeEq t (softwareTypeRep e) of Just Dict -> e
@@ -396,10 +431,14 @@ int * f_map(unsigned addr) {
 
 --------------------------------------------------------------------------------
 
+translate' :: Env -> Software a -> ProgC a
+translate' env =
+    flip runReaderT env
+  . Oper.reexpressEnv unsafeTranslateSmallExp
+  . unSoftware
+  
 translate :: Software a -> ProgC a
-translate = flip runReaderT Map.empty
-          . Oper.reexpressEnv unsafeTranslateSmallExp
-          . unSoftware
+translate = translate' env0
 
 --------------------------------------------------------------------------------
 -- * Interpretation of software programs.
@@ -428,5 +467,14 @@ compareCompiled = Imp.compareCompiled' opts . translate
 
 opts :: Imp.ExternalCompilerOpts
 opts = Imp.def { Imp.externalFlagsPost = ["-lm"] }
+
+--------------------------------------------------------------------------------
+
+runCompiled' ::
+       CompilerOpts
+    -> Imp.ExternalCompilerOpts
+    -> Software a
+    -> IO ()
+runCompiled' opts eopts = Imp.runCompiled' eopts . translate' (Env mempty opts)
 
 --------------------------------------------------------------------------------
