@@ -74,6 +74,7 @@ import Prelude hiding ((==))
 import qualified Prelude as P
 
 import GHC.Stack
+import Control.Monad.IO.Class
 
 --------------------------------------------------------------------------------
 -- *
@@ -760,9 +761,15 @@ instance (V.SMTEval1 exp, V.SMTEval exp Bool, V.Pred exp ~ pred, pred Bool) =>
                 i <- peekValue name
                 n <- V.eval (Imp.borderVal hi)
                 m <- V.eval lo
-                V.hintFormula (m V..<=. i)
-                V.hintFormula (i V..<=. n)
-                return (if Imp.borderIncl hi then i V..<=. n else i V..<. n)
+                guard <-
+                  if step P.>= 0 then do
+                    V.hintFormula (m V..<=. i)
+                    return (if Imp.borderIncl hi then i V..<=. n else i V..<. n)
+                  else do
+                    V.hintFormula (i V..<=. m)
+                    return (if Imp.borderIncl hi then n V..<=. i else i V..<. n)
+                V.hintFormula guard
+                return guard
          let
            loop body =
              do cond <- cond
