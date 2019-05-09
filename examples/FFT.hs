@@ -28,7 +28,7 @@ import qualified Language.C.Syntax as C
 -- imperative-edsl
 import qualified Language.Embedded.Backend.C  as Imp
 
-import Prelude hiding ((==), (/=), length)
+import Prelude hiding ((==), (/=), (>=), length)
 
 --------------------------------------------------------------------------------
 -- * FFT
@@ -186,48 +186,35 @@ fft
      , SType' a
      , SType' (Complex a)
      )
-  => SStore (SExp (Complex a))
+  => SExp Length
+  -> SStore (SExp (Complex a))
   -> vec
   -> Software (SManifest (SExp (Complex a)))
-fft st vec =
-  do n  <- shareM (ilog2 (length vec))
-     ts <- manifestFresh $ Pull (twoTo (n-1)) (tw (twoTo n))
+fft n st vec =
+  do ts@(M (_ :: SIArr (SExp (Complex a)))) <- manifestFresh $ Pull (twoTo (n-1)) (tw (twoTo n))
      fftCore st ts n vec
 
 --------------------------------------------------------------------------------
 
 example :: Software ()
 example = do
-  let size = value 17
+  size :: SExp Length <- fget stdin
+  n :: SExp Length <- fget stdin
+  assert (1 `shiftL` n == size) "2^n == size"
+  assert (size >= 2) "not too small"
   st   :: SStore (SExp (Complex Double)) <- newStore size
   arr  :: SArr   (SExp (Complex Double)) <- newArr size
   iarr :: SIArr  (SExp (Complex Double)) <- freezeArr arr
-  fft st iarr
+  fft n st iarr
+  assert (value False) "oh no"
   return ()
 
 --------------------------------------------------------------------------------
 
 bad :: Software ()
 bad = do
-  let size = 17
-  arr  :: SArr   (SExp (Complex Double)) <- newArr size
-  brr  :: SArr   (SExp (Complex Double)) <- newArr size
-  ref  :: SRef   (SExp Int32) <- initRef 0
-  --
-  iarr :: SIArr  (SExp (Complex Double)) <- unsafeFreezeArr arr
-  --
-  let n = ilog2 size :: SExp Length
-  --
-  for ((i2n n :: SExp Int32)-1) (-1) (0) $ \ix -> do
-    let i = i2n ix
-        b = iarr ! flipBit i n
-    --setArr brr i b
-    v <- getRef ref
-    setRef ref (v+1)
-  --
-  v <- getRef ref
-  assert (v == 0) "!"
-  --assert (value False) "!"
+  size :: SExp Length <- fget stdin
+  fprintf stdout "%d" (share size id)
   return ()
 
 --------------------------------------------------------------------------------
