@@ -62,8 +62,8 @@ testBit a i = i2b (a .&. (1 .<<. i2n i))
 
 -- | Flip the @i@'th bit of @a@.
 flipBit :: (Bits a, Num (SExp a), SType' a) =>
-  SExp Index -> SExp a -> SExp a
-flipBit i a = a `xor` (1 .<<. (i2n i))
+  SExp a -> SExp Index -> SExp a
+flipBit a i = a `xor` (1 .<<. (i2n i))
 
 -- | 
 zeroBit :: (Bits a, Num (SExp a), SType' a) =>
@@ -172,7 +172,7 @@ fftCore st ts n vec =
   let
     step i = return . twids ts n i (length vec) . bfly i
   in
-    do arr <- loopStore st ((i2n n)-1) (-1) 0 (step . i2n) vec
+    do arr <- loopStore st ((i2n n :: SExp Int32)-1) (-1) 0 (step . i2n) vec
        revBit st n arr
 
 -- | Radix-2 Decimation-In-Frequency Fast Fourier Transformation of the given
@@ -252,3 +252,5 @@ runBenchmark n = runCompiled'
     -- Note: important to turn off assertions when running the benchmarks
     def {Imp.externalFlagsPre = ["-O3"], Imp.externalFlagsPost = ["-lm"]}
     (benchmark n)
+
+--------------------------------------------------------------------------------

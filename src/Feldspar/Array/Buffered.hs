@@ -122,6 +122,8 @@ loopStore
      , MonadComp m
      , Loop m
      --
+     , Integral i
+     , SyntaxM' m (Expr m i)
      , SyntaxM' m (Expr m Length)
      --
      , Finite   (Expr m) (Array  m a)
@@ -132,10 +134,10 @@ loopStore
      , ArraysEq (Array m) (IArray m)
      )
   => Store m a
-  -> Expr m Length  -- ^ Lower bound.
-  -> Int            -- ^ Step.
-  -> Expr m Length  -- ^ Upper bound.
-  -> (Expr m Index -> Manifest m a -> m vec1)
+  -> Expr m i  -- ^ Lower bound.
+  -> Int       -- ^ Step.
+  -> Expr m i  -- ^ Upper bound.
+  -> (Expr m i -> Manifest m a -> m vec1)
   -> vec2
   -> m (Manifest m a)
 loopStore store low step high body init = do
