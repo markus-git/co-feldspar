@@ -3,6 +3,7 @@
 {-# language FlexibleContexts #-}
 {-# language ScopedTypeVariables #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# language TypeApplications #-}
 
 module FFT where
 
@@ -105,7 +106,7 @@ revBit st n vec = loopStore st 1 1 (n-1) (step) vec
   where
     --step :: (Immutable arr a, SSyntax a) => SExp Index -> arr -> Software (SPush a)
 --    step i arr = return $ unroll 2 $ riffle i arr
-    step i arr = return $ riffle i arr
+    step k arr = return $ pairwise @Software (\i -> (i, rotBit k i)) $ riffle k arr
 
 --------------------------------------------------------------------------------
 -- ** Twiddle factors.
@@ -172,10 +173,12 @@ fftCore
   -> Software (SManifest (SExp (Complex a)))
 fftCore st ts n vec =
   let
-    step i = return . twids ts n i (length vec) . bfly i
+    step k =
+      return . pairwise @Software (\i -> (i, flipBit i k)) . twids ts n k (length vec) . bfly k
   in
     do arr <- loopStore st ((i2n n :: SExp Int32)-1) (-1) 0 (step . i2n) vec
-       revBit st n arr
+       --revBit st n vec
+       return arr
 
 -- | Radix-2 Decimation-In-Frequency Fast Fourier Transformation of the given
 -- complex vector. The given vector must be power-of-two sized, (for example 2,
@@ -191,7 +194,7 @@ fft
   -> vec
   -> Software (SManifest (SExp (Complex a)))
 fft n st vec =
-  do ts@(M (_ :: SIArr (SExp (Complex a)))) <- manifestFresh $ Pull (twoTo (n-1)) (tw (twoTo n))
+  do ts <- manifestFresh $ Pull (twoTo (n-1)) (tw (twoTo n))
      fftCore st ts n vec
 
 --------------------------------------------------------------------------------
@@ -202,7 +205,7 @@ example = do
   n :: SExp Length <- fget stdin
   assert (1 `shiftL` n == size) "2^n == size"
   assert (size >= 2) "not too small"
-  st   :: SStore (SExp (Complex Double)) <- newStore size
+  st   :: SStore (SExp (Complex Double)) <- newInPlaceStore size
   arr  :: SArr   (SExp (Complex Double)) <- newArr size
   iarr :: SIArr  (SExp (Complex Double)) <- freezeArr arr
   fft n st iarr
