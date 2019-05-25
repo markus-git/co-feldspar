@@ -19,6 +19,7 @@ import MiniSat hiding (withNewSolver)
 abstract ::
   (Ord a, MonadIO m, MonadAsyncException m) => ([a] -> m Bool) -> [a] -> m [[a]]
 abstract provable preds0 =
+  fmap (filter (\ls -> length ls <= 3)) $
   execWriterT $
   withNewSolver $ \sat -> do
     let preds = nub preds0
