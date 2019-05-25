@@ -236,11 +236,15 @@ warn msg = warning () $ tell ([], Warns [msg] [msg], [], [])
 
 -- | Add a hint to the output.
 hint :: TypedSExpr a => a -> Verify ()
-hint exp = tell ([], mempty, [HintBody (toSMT exp) (smtType exp)], [])
+hint exp = do
+  smt <- lift $ simplify (toSMT exp)
+  tell ([], mempty, [HintBody smt (smtType exp)], [])
 
 -- | Add a hint for a `SExpr` to the output.
 hintFormula :: SExpr -> Verify ()
-hintFormula exp = tell ([], mempty, [HintBody exp tBool],[])
+hintFormula exp = do
+  smt <- lift $ simplify exp
+  tell ([], mempty, [HintBody smt tBool],[])
 
 -- | Run a computation but ignoring its warnings.
 noWarn :: Verify a -> Verify a
