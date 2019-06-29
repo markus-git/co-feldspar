@@ -35,7 +35,8 @@ runZ3 :: [String] -> SMT a -> IO a
 runZ3 args m = do
   --logger <- fmap Just (SMT.newLogger 0)
   let logger = Nothing
-  solver <- SMT.newSolver "z3" (["-smt2", "-in"] ++ args) logger
+  solver <- SMT.newSolver "z3" (["-smt2", "-in", "-t:10000"] ++ args) logger
+  --solver <- SMT.newSolver "cvc4" (["--lang=smt", "--force-logic=ALL", "--incremental","-"] ++ args) logger
   evalStateT m (SMTState solver 0)
 
 freshNum :: SMT Integer

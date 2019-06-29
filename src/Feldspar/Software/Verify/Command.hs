@@ -732,8 +732,8 @@ instance (V.SMTEval1 exp, V.SMTEval exp Bool, V.Pred exp ~ pred, pred Bool) =>
     verifyInstr (If cond t f) () =
       do b <- V.eval cond
          (vt, vf) <- V.ite (V.toSMT b) (V.verify t) (V.verify f)
-         V.hintFormula (V.toSMT b)
-         V.hintFormula (SMT.not (V.toSMT b))
+         --V.hintFormula (V.toSMT b)
+         --V.hintFormula (SMT.not (V.toSMT b))
          return (If cond vt vf)
     verifyInstr (While inv cond body) () =
       do let
