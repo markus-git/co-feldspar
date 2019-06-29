@@ -1,6 +1,7 @@
 {-# language FlexibleContexts #-}
 {-# language GADTs #-}
 {-# language ScopedTypeVariables #-}
+{-# language TypeApplications #-}
 
 module Verify where
 
@@ -13,7 +14,39 @@ import Feldspar.Array.Buffered
 import Data.Bits (Bits)
 import Data.Complex (Complex)
 
-import Prelude hiding ((==), (/=), (>), length, div, reverse)
+import Prelude hiding ((==), (/=), (>), (<=), length, div, reverse, sum)
+
+--------------------------------------------------------------------------------
+
+inc :: Software ()
+inc = do
+  len :: SExp Length <- fget stdin
+  ix  :: SExp Index  <- fget stdin
+  arr :: Arr (SExp Word32) <- newArr len
+--  assert (ix <= length arr) "ix out of bounds"
+  val <- getArr arr ix
+  setArr arr ix (val + 1)  
+
+copy :: Software ()
+copy = do
+  arr1 :: Arr (SExp Word32) <- newArr 10
+  arr2 :: Arr (SExp Word32) <- unsafeFreezeArr arr1 >>= unsafeThawArr
+  --
+  setArr arr1 0 0
+  val <- getArr arr1 0
+  setArr arr2 0 val
+
+
+inplace :: Software ()
+inplace = do 
+  st  :: Store Software (SExp Word32) <- newInPlaceStore 10
+  arr :: Manifest Software (SExp Word32) <- store st $ (1...10)
+  brr <- store st $ reverse arr
+  val <- shareM $ sum brr
+  return ()
+ where
+  reverse :: Manifest Software (SExp Word32) -> Push Software (SExp Word32)
+  reverse = pairwise (\ix -> (ix, 10-ix-1))
 
 --------------------------------------------------------------------------------
 
