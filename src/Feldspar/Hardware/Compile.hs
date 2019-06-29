@@ -123,9 +123,9 @@ translateExp = goAST . optimize . unHExp
     go t lit Syn.Nil
       | Just (Lit a) <- prj lit
       = return $ mapStruct (litE . runIdentity) $ toStruct t a
-    go t lit Syn.Nil
-      | Just (Literal a) <- prj lit
-      = return $ mapStruct (litE . runIdentity) $ toStruct t a
+--    go t lit Syn.Nil
+--      | Just (Literal a) <- prj lit
+--      = return $ mapStruct (litE . runIdentity) $ toStruct t a
     go t var Syn.Nil
       | Just (FreeVar v) <- prj var
       = return $ Node $ sugarSymPrim $ FreeVar v

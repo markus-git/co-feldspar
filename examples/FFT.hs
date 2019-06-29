@@ -199,6 +199,29 @@ fft n st vec =
 
 --------------------------------------------------------------------------------
 
+fftCore2 ::
+  SStore (SExp (Complex Double)) ->
+  SIArr (SExp (Complex Double)) ->
+  SExp Length ->
+  SPull (SExp (Complex Double)) ->
+  Software (SIArr (SExp (Complex Double)))
+fftCore2 store iarr exp pull = do
+  let iarrm :: SManifest (SExp (Complex Double))
+      iarrm = M iarr
+  (M ibrr) <- fftCore store iarrm exp pull
+  return ibrr
+
+fft2 ::
+  SExp Length ->
+  SStore (SExp (Complex Double)) ->
+  SPull (SExp (Complex Double)) ->
+  Software (SIArr (SExp (Complex Double)))
+fft2 n store pull = do
+  (M ts) <- manifestFresh $ Pull (twoTo (n-1)) (tw (twoTo n))
+  fftCore2 store ts n pull
+
+--------------------------------------------------------------------------------
+
 example :: Software ()
 example = do
   size :: SExp Length <- fget stdin
