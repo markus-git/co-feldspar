@@ -189,6 +189,10 @@ translateExp = goAST . optimize . unSExp
            r  <- initRefV base =<< goAST a
            a' <- unsafeFreezeRefV r
            localAlias v a' $ goAST body
+    go t ffi args
+      | Just (Construct addr sem) <- prj ffi
+      = do 
+           undefined
     go t tup (a :* b :* Syn.Nil)
       | Just Pair <- prj tup
       = Branch <$> goAST a <*> goAST b

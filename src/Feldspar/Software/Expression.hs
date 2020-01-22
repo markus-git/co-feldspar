@@ -133,6 +133,13 @@ deriving instance Show     (ForLoop a)
 deriving instance Typeable (ForLoop a)
 
 --------------------------------------------------------------------------------
+{-
+-- |
+data Foreign sig
+  where
+    Foreign :: Signature sig => String -> Denotation sig -> Foreign sig
+-}
+--------------------------------------------------------------------------------
 
 -- | Software symbols.
 type SoftwareConstructs = 
@@ -140,6 +147,7 @@ type SoftwareConstructs =
   Syn.:+: Let
   Syn.:+: Tuple
   Syn.:+: SoftwarePrimConstructs
+  Syn.:+: Construct
   -- ^ Software specific symbol.
   Syn.:+: GuardVal
   Syn.:+: HintVal
@@ -265,11 +273,9 @@ instance Render HintVal
     renderSym  = show
     renderArgs = renderArgsSmart
 
-instance EvalEnv HintVal env
-
+instance EvalEnv    HintVal env
 instance StringTree HintVal
-
-instance Equality HintVal
+instance Equality   HintVal
 
 --------------------------------------------------------------------------------
 
@@ -287,11 +293,9 @@ instance Render ForLoop
     renderSym  = show
     renderArgs = renderArgsSmart
 
-instance EvalEnv ForLoop env
-
+instance EvalEnv    ForLoop env
 instance StringTree ForLoop
-
-instance Equality ForLoop
+instance Equality   ForLoop
 
 --------------------------------------------------------------------------------
 -- *** Temporary fix until GHC fixes their class resolution for DTC ***
@@ -327,19 +331,24 @@ instance {-# OVERLAPPING #-} Project SoftwarePrimConstructs SoftwareConstructs
     prj (InjR (InjR (InjR (InjL a)))) = Just a
     prj _ = Nothing
 
-instance {-# OVERLAPPING #-} Project GuardVal SoftwareConstructs
+instance {-# OVERLAPPING #-} Project Construct SoftwareConstructs
   where
     prj (InjR (InjR (InjR (InjR (InjL a))))) = Just a
     prj _ = Nothing
 
-instance {-# OVERLAPPING #-} Project HintVal SoftwareConstructs
+instance {-# OVERLAPPING #-} Project GuardVal SoftwareConstructs
   where
     prj (InjR (InjR (InjR (InjR (InjR (InjL a)))))) = Just a
     prj _ = Nothing
 
+instance {-# OVERLAPPING #-} Project HintVal SoftwareConstructs
+  where
+    prj (InjR (InjR (InjR (InjR (InjR (InjR (InjL a))))))) = Just a
+    prj _ = Nothing
+
 instance {-# OVERLAPPING #-} Project ForLoop SoftwareConstructs
   where
-    prj (InjR (InjR (InjR (InjR (InjR (InjR a)))))) = Just a
+    prj (InjR (InjR (InjR (InjR (InjR (InjR (InjR a))))))) = Just a
     prj _ = Nothing
 
 --------------------------------------------------------------------------------

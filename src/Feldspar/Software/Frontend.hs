@@ -5,6 +5,7 @@
 {-# language UndecidableInstances  #-}
 {-# language Rank2Types            #-}
 {-# language ScopedTypeVariables   #-}
+{-# language TypeOperators #-}
 
 module Feldspar.Software.Frontend where
 
@@ -29,7 +30,7 @@ import Data.Word hiding (Word)
 -- syntactic.
 import Language.Syntactic (Syntactic(..))
 import Language.Syntactic.Functional
-import qualified Language.Syntactic as Syntactic
+import qualified Language.Syntactic as Syn
 
 -- operational-higher.
 import qualified Control.Monad.Operational.Higher as Oper
@@ -195,14 +196,28 @@ ilog2 a = snd $ P.foldr (\ffi vr -> share vr (step ffi)) (a,0) ffis
     -- Based on: http://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
 
 --------------------------------------------------------------------------------
+
+foreignImport
+  :: ( Syn.Signature sig
+     , fi  ~ Syn.SmartFun dom sig
+     , sig ~ Syn.SmartSig fi
+     , dom ~ Syn.SmartSym fi
+     , dom ~ SoftwareDomain
+     , Syn.SyntacticN f fi
+     , Type SoftwarePrimType (Syn.DenResult sig)
+     )
+  => String -> Denotation sig -> f
+foreignImport str f = sugarSymSoftware (Construct str f)
+
+--------------------------------------------------------------------------------
 -- * Instructions.
 --------------------------------------------------------------------------------
 
 desugar :: (Syntactic a, Domain a ~ SoftwareDomain) => a -> SExp (Internal a)
-desugar = SExp . Syntactic.desugar
+desugar = SExp . Syn.desugar
 
 sugar   :: (Syntactic a, Domain a ~ SoftwareDomain) => SExp (Internal a) -> a
-sugar   = Syntactic.sugar . unSExp
+sugar   = Syn.sugar . unSExp
 
 resugar
   :: ( Syntactic a
@@ -212,7 +227,7 @@ resugar
      , Domain b   ~ SoftwareDomain
      )
   => a -> b
-resugar = Syntactic.resugar
+resugar = Syn.resugar
 
 --------------------------------------------------------------------------------
 

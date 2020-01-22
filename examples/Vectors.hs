@@ -2,6 +2,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# LANGUAGE PartialTypeSignatures #-}
+
 module Vectors where
 
 import Feldspar
@@ -10,10 +12,12 @@ import Feldspar.Array.Vector
 import Feldspar.Software
 import Feldspar.Software as Soft (icompile)
 
-import Feldspar.Hardware hiding (Arr, Ref)
+import Feldspar.Software.Marshal
+
+import Feldspar.Hardware hiding (Arr, IArr, Ref)
 import Feldspar.Hardware as Hard (icompile, icompileSig, icompileAXILite)
 
-import Prelude hiding (take, drop, reverse, length, zip, zipWith, sum)
+import Prelude hiding (take, drop, reverse, length, zip, zipWith, sum, tail, map)
 
 --------------------------------------------------------------------------------
 -- * ...
@@ -36,6 +40,29 @@ test1 = Soft.icompile $ printf "%d" $ sumLast5 inp
 
 dot :: (Vector exp, Pully exp vec a, Num a, Syntax exp a) => vec -> vec -> a
 dot a b = sum $ zipWith (*) a b
+
+dotArr :: IArr (SExp Int32) -> IArr (SExp Int32) -> SExp Int32
+dotArr = dot
+
+dotProg :: Software ()
+dotProg = connectStdIO $ return . uncurry dotArr
+
+dotIO :: IO ()
+dotIO = Soft.icompile dotProg
+
+--------------------------------------------------------------------------------
+
+fir :: (Vector exp, Num a, Syntax exp a) => Pull exp a -> Pull exp a -> Pull exp a
+fir coeff = map (dot coeff . reverse) . tail . inits
+
+firArr :: IArr (SExp Int32) -> IArr (SExp Int32) -> Pull SExp (SExp Int32)
+firArr a b = fir (toPull a) (toPull b)
+
+firProg :: Software ()
+firProg = connectStdIO $ manifestFresh . uncurry firArr
+
+firIO :: IO ()
+firIO = Soft.icompile firProg
 
 --------------------------------------------------------------------------------
 
