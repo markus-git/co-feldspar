@@ -20,7 +20,7 @@ import Data.List (genericLength)
 
 import Control.Monad ((<=<), void)
 
-import Prelude hiding (take, drop, reverse, length, zip, zipWith, sum, min)
+import Prelude hiding (take, drop, reverse, length, zip, zipWith, sum, min, div, (<), (>=))
 import qualified Prelude as P
 
 --------------------------------------------------------------------------------
@@ -367,6 +367,19 @@ forwardPermute p vec = Push len $ \write ->
     v   = toPush vec
     len = length v
 
+pairwise :: (SyntaxM m a, SyntaxM m (Expr m Length), PredOf (Expr m) (Internal (Expr m Length)), Loop m, Num (Expr m Length), PredOf (Expr m) Length, Multiplicative (Expr m), References m, Ordered (Expr m), Control m, Pully (Expr m) vec a) =>
+  (Expr m Index -> (Expr m Index, Expr m Index)) ->
+  vec -> Push m a
+pairwise idxs vec =
+  Push (length vec) $ \write -> do
+    for 1 1 (length vec) $ \i -> do
+      let (idx1, idx2) = idxs (i-1)
+      iff (idx1 >= idx2) (return ()) $ do
+        x <- shareM (vec ! idx1)
+        y <- shareM (vec ! idx2)
+        write idx1 x
+        write idx2 y
+
 -- | Convert a vector to a push vector that computes @n@ elements in each step.
 -- This can be used to achieve loop unrolling.
 --
@@ -383,23 +396,24 @@ unroll
      , Equality (Expr m)
      , Num (Expr m Word32)
      )
-  => Length  -- ^ Number of steps to unroll
-  -> vec
-  -> Push m a
-unroll 0 _   = P.error "unroll: cannot unroll 0 steps"
-unroll 1 vec = Push len $ \write ->
-  do for 0 1 (len-1) $ \i -> write i (vec!i)
+    => Length  -- ^ Number of steps to unroll
+    -> vec
+    -> Push m a
+unroll 0 _   = Prelude.error "unroll: cannot unroll 0 steps"
+unroll 1 vec = Push len $ \write -> do
+    for 0 1 (len-1) $ \i -> write i (vec!i)
   where
     len = length vec
-unroll n vec = Push len $ \write ->
-  do assert ((len `Feldspar.mod` value n) Feldspar.== 0)
-            ("unroll: length not divisible by " P.++ show n)
-     for 0 (P.fromIntegral n) (len-1) $ \i ->
-       P.sequence_
-         [ do k <- shareM (i + value j)
-              write k (vec!k)
-         | j <- [0..n-1] ]
+unroll n vec = Push len $ \write -> do
+    assert
+      ((len `Feldspar.mod` value n) Feldspar.== 0)
+      ("unroll: length not divisible by " Prelude.++ show n)
+    for 0 n' (len-1) $ \i -> Prelude.sequence_
+        [ do k <- shareM (i + value j)
+             write k (vec!k)
+        | j <- [0..n-1]]
   where
+    n'  = Prelude.fromIntegral n
     len = length vec
 
 --------------------------------------------------------------------------------

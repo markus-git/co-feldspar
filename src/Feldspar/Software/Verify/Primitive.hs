@@ -46,6 +46,8 @@ import Data.Typeable
 
 import Language.Syntactic
 
+import GHC.Stack
+
 --------------------------------------------------------------------------------
 -- *
 --------------------------------------------------------------------------------
@@ -497,7 +499,7 @@ instance V.TypedSExpr (V.SMTExpr Prim Bool) where
 --------------------------------------------------------------------------------
 
 verifyPrim :: forall a .
-  (SoftwarePrimType (DenResult a), V.SMTEval Prim (DenResult a)) =>
+  (SoftwarePrimType (DenResult a), V.SMTEval Prim (DenResult a), HasCallStack) =>
   SoftwarePrim a ->
   Args (AST SoftwarePrimDomain) a ->
   V.Verify (V.SMTExpr Prim (DenResult a))

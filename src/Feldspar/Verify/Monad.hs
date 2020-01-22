@@ -8,6 +8,7 @@
 {-# language MultiParamTypeClasses #-}
 {-# language PolyKinds #-}
 {-# language GeneralizedNewtypeDeriving #-}
+{-# language BangPatterns #-}
 
 module Feldspar.Verify.Monad where
 
@@ -29,6 +30,9 @@ import Data.ALaCarte
 import Feldspar.Verify.SMT hiding (not, ite, stack, concat)
 import qualified Feldspar.Verify.SMT as SMT
 import qualified Feldspar.Verify.Abstract as Abstract
+
+import GHC.Stack
+import Debug.Trace (traceShowM, traceShow)
 
 import Prelude hiding (break)
 
@@ -196,7 +200,7 @@ branch :: Verify [SExpr]
 branch = asks (\(branch, _, _) -> branch)
 
 -- | Read the context.
-peek :: (Typeable a, Ord a, Mergeable a, Show a, ShowModel a, Invariant a, Exprs a) => String -> Verify a
+peek :: forall a. (Typeable a, Ord a, Mergeable a, Show a, ShowModel a, Invariant a, Exprs a, HasCallStack) => String -> Verify a
 peek name = do
   ctx <- get
   return (lookupContext name ctx)
@@ -232,11 +236,15 @@ warn msg = warning () $ tell ([], Warns [msg] [msg], [], [])
 
 -- | Add a hint to the output.
 hint :: TypedSExpr a => a -> Verify ()
-hint exp = tell ([], mempty, [HintBody (toSMT exp) (smtType exp)], [])
+hint exp = do
+  smt <- lift $ simplify (toSMT exp)
+  tell ([], mempty, [HintBody smt (smtType exp)], [])
 
 -- | Add a hint for a `SExpr` to the output.
 hintFormula :: SExpr -> Verify ()
-hintFormula exp = tell ([], mempty, [HintBody exp tBool],[])
+hintFormula exp = do
+  smt <- lift $ simplify exp
+  tell ([], mempty, [HintBody smt tBool],[])
 
 -- | Run a computation but ignoring its warnings.
 noWarn :: Verify a -> Verify a
@@ -296,7 +304,7 @@ class Typeable exp => SMTEval1 exp
     -- A predicate which must be true of the expression type.
     type Pred exp :: * -> Constraint
     -- Evaluate an expression to its SMT expression.
-    eval :: exp a -> Verify (SMTExpr exp a)
+    eval :: HasCallStack => exp a -> Verify (SMTExpr exp a)
     -- Witness the fact that (SMTEval1 exp, Pred exp a) => SMTEval exp a.
     witnessPred :: Pred exp a => exp a -> Dict (SMTEval exp a)
 
@@ -456,7 +464,7 @@ instance Ord Name
 
 instance Show Name
   where
-    show (Name name _) = name
+    show (Name name x) = name
 
 data Entry = forall a .
   ( Ord a
@@ -485,10 +493,12 @@ instance Show Entry
 type Context = Map Name Entry
 
 -- | Look up a value in the context.
-lookupContext :: forall a . Typeable a => String -> Context -> a
+lookupContext :: forall a . (Typeable a, HasCallStack) => String -> Context -> a
 lookupContext name ctx =
   case maybeLookupContext name ctx of
-    Nothing -> error ("variable " ++ name ++ " not found in context")
+    Nothing -> error $ "variable " ++ name ++ " not found in context" ++
+      "\nctx:" ++ unlines (map (show) (Map.toList ctx)) ++
+      "\ntype: " ++ show (typeOf (undefined :: a))
     Just x -> x
 
 -- | ...
@@ -501,7 +511,7 @@ maybeLookupContext name ctx = do
 
 -- | Add a value to the context or modify an existing binding.
 insertContext :: forall a . (Typeable a, Ord a, Mergeable a, Show a, ShowModel a, Invariant a, Exprs a) => String -> a -> Context -> Context
-insertContext name x ctx = Map.insert (Name name (undefined :: a)) (Entry x) ctx
+insertContext name !x ctx = Map.insert (Name name (undefined :: a)) (Entry x) ctx
 
 -- | Modified ctx1 ctx2 returns a subset of ctx2 that contains only the values
 --   that have been changed from ctx1.

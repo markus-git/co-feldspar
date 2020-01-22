@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                co-feldspar
-version:             0.1.0.0
+version:             0.1.0.1
 -- synopsis:            
 -- description:         
 license:             BSD3
@@ -40,7 +40,16 @@ library
     Feldspar.Software.Representation,
     Feldspar.Software.Frontend,
     Feldspar.Software.Compile,
+    Feldspar.Software.Marshal,
     Feldspar.Software.Optimize,
+    Feldspar.Software.Verify,
+    Feldspar.Software.Verify.Command,
+    Feldspar.Software.Verify.Primitive,
+    Feldspar.Verify.Abstract,
+    Feldspar.Verify.Arithmetic,
+    Feldspar.Verify.FirstOrder,
+    Feldspar.Verify.Monad,
+    Feldspar.Verify.SMT,
     Data.Struct,
     Data.Selection
     
@@ -52,6 +61,7 @@ library
     constraints >=0.8,
     containers >=0.5,
     array >=0.5,
+    data-default-class,
     exception-transformers,
     minisat,
     simple-smt,

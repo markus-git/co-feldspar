@@ -73,6 +73,9 @@ import qualified Language.Embedded.Hardware.Expression.Represent as Hard
 import Prelude hiding ((==))
 import qualified Prelude as P
 
+import GHC.Stack
+import Control.Monad.IO.Class
+
 --------------------------------------------------------------------------------
 -- *
 --------------------------------------------------------------------------------
@@ -181,7 +184,7 @@ instance V.SMTEval exp a => V.Exprs (ValueBinding exp a)
     exprs val = V.toSMT (vb_value val) : []
 
 -- | ...
-peekValue :: forall exp a . V.SMTEval exp a => String -> V.Verify (V.SMTExpr exp a)
+peekValue :: forall exp a . (V.SMTEval exp a, HasCallStack) => String -> V.Verify (V.SMTExpr exp a)
 peekValue name =
   do ValueBinding val ref <- V.peek name
      V.warning () $ case ref of
@@ -226,7 +229,9 @@ instance V.SMTEval exp a => V.IsLiteral (V.Literal (ReferenceBinding exp a))
       where
         ref :: ReferenceBinding exp a
         ref = V.lookupContext name new
-    smtLit old new (ReferenceSame name) = rb_init refNew `SMT.eq` rb_init refOld
+    smtLit old new (ReferenceSame name) =
+      V.toSMT (rb_value refNew) `SMT.eq` V.toSMT (rb_value refOld)
+      --rb_init refNew `SMT.eq` rb_init refOld
       where
         refNew, refOld :: ReferenceBinding exp a
         refNew = V.lookupContext name new
@@ -272,7 +277,7 @@ unsafeFreezeReference :: forall exp a . V.SMTEval exp a => String -> String ->
   exp a -> V.Verify ()
 unsafeFreezeReference nameRef nameVal (_ :: exp a) =
   do ref <- V.peek nameRef :: V.Verify (ReferenceBinding exp a)
-     V.poke nameRef (ValueBinding (rb_value ref) (Just nameRef))
+     V.poke nameVal (ValueBinding (rb_value ref) (Just nameRef))
 
 --------------------------------------------------------------------------------
 
@@ -379,8 +384,10 @@ instance (V.SMTEval exp a, V.SMTEval exp i) =>
       arr_readable (V.lookupContext name new :: ArrayBinding exp i a)
     smtLit old new (ArraySafetyPreserved name) =
       case V.maybeLookupContext name old of
-        Just (arr :: ArrayBinding exp i a) -> arr_failed arr SMT..||.
-          SMT.not (arr_failed (V.lookupContext name new :: ArrayBinding exp i a))
+        Just (arr :: ArrayBinding exp i a) ->
+          arr_failed arr SMT..||.
+          SMT.bool True
+          --SMT.not (arr_failed (V.lookupContext name new :: ArrayBinding exp i a))
         Nothing -> SMT.bool False
 
 instance (V.SMTEval exp a, V.SMTEval exp i) => V.Invariant (ArrayBinding exp i a)
@@ -391,7 +398,7 @@ instance (V.SMTEval exp a, V.SMTEval exp i) => V.Invariant (ArrayBinding exp i a
       | ArraySafetyPreserved String
       deriving (Eq, Ord, Show, Typeable)
 
-    literals name _ = ArrayAccessible name
+    literals name _ = ArrayAccessible name 
                     : ArrayReadable name
                     : ArraySafetyPreserved name
                     : []
@@ -650,12 +657,12 @@ instance (V.SMTEval1 exp, V.Pred exp ~ pred) =>
     verifyInstr i@(Imp.UnsafeFreezeArr (Imp.ArrComp arr :: Imp.Arr i a)) (Imp.IArrComp name)
       | Dict <- V.witnessPred (undefined :: exp i) =
       withWitness (undefined :: a) i $
-        do arr' :: ArrayBinding exp i a <- V.peek name
+        do arr' :: ArrayBinding exp i a <- V.peek arr
            V.poke name arr'
     verifyInstr i@(Imp.UnsafeThawArr (Imp.IArrComp iarr :: Imp.IArr i a)) (Imp.ArrComp name)
       | Dict <- V.witnessPred (undefined :: exp i) =
       withWitness (undefined :: a) i $
-        do iarr' :: ArrayBinding exp i a <- V.peek name
+        do iarr' :: ArrayBinding exp i a <- V.peek iarr
            V.poke name iarr'
 
 --------------------------------------------------------------------------------
@@ -676,9 +683,29 @@ instance (V.SMTEval1 exp, V.Pred exp ~ pred) =>
 
 --------------------------------------------------------------------------------
 
-instance V.VerifyInstr Imp.PtrCMD exp pred
+instance (V.SMTEval1 exp, V.Pred exp ~ pred) =>
+    V.VerifyInstr Imp.PtrCMD exp pred
   where
-    verifyInstr = error "don't know how to verify pointers."
+    verifyInstr instr@(Imp.SwapPtr _ _) () = error "oh no!"
+    verifyInstr instr@(Imp.SwapArr (Imp.ArrComp x :: Imp.Arr i a) (Imp.ArrComp y)) ()
+      | Dict <- V.witnessPred (undefined :: exp i),
+        Dict <- V.witnessPred (undefined :: exp a) = do
+        ctx  <- S.get
+        marr1 <- peekArray x
+        marr2 <- peekArray y
+        case (marr1, marr2) of
+          (Just (arr1 :: ArrayBinding exp i a, source1, src1),
+           Just (arr2 :: ArrayBinding exp i a, source2, src2)) -> do
+            -- Invalidate all existing references to the arrays
+            forM_ (arrayBindings ctx source1 ++ arrayBindings ctx source2) $
+              \(name, arr :: ArrayBinding exp i a) ->
+                V.poke name (arr { arr_accessible = SMT.bool False }
+                             :: ArrayBinding exp i a)
+            -- Swap the two arrays around
+            V.poke x arr2
+            V.poke y arr1
+          _ -> return ()
+        return instr
 
 instance V.VerifyInstr Imp.C_CMD exp pred
   where
@@ -705,8 +732,8 @@ instance (V.SMTEval1 exp, V.SMTEval exp Bool, V.Pred exp ~ pred, pred Bool) =>
     verifyInstr (If cond t f) () =
       do b <- V.eval cond
          (vt, vf) <- V.ite (V.toSMT b) (V.verify t) (V.verify f)
-         V.hintFormula (V.toSMT b)
-         V.hintFormula (SMT.not (V.toSMT b))
+         --V.hintFormula (V.toSMT b)
+         --V.hintFormula (SMT.not (V.toSMT b))
          return (If cond vt vf)
     verifyInstr (While inv cond body) () =
       do let
@@ -734,9 +761,15 @@ instance (V.SMTEval1 exp, V.SMTEval exp Bool, V.Pred exp ~ pred, pred Bool) =>
                 i <- peekValue name
                 n <- V.eval (Imp.borderVal hi)
                 m <- V.eval lo
-                V.hintFormula (m V..<=. i)
-                V.hintFormula (i V..<=. n)
-                return (if Imp.borderIncl hi then i V..<=. n else i V..<. n)
+                guard <-
+                  if step P.>= 0 then do
+                    V.hintFormula (m V..<=. i)
+                    return (if Imp.borderIncl hi then i V..<=. n else i V..<. n)
+                  else do
+                    V.hintFormula (i V..<=. m)
+                    return (if Imp.borderIncl hi then n V..<=. i else i V..<. n)
+                V.hintFormula guard
+                return guard
          let
            loop body =
              do cond <- cond
@@ -776,7 +809,8 @@ instance (V.SMTEval1 exp, V.SMTEval exp Bool, V.Pred exp ~ pred, pred Bool) =>
            getLits f =
              do new <- S.get
                 let cands = [ (SomeLiteral l, e)
-                            | (V.Name name _, V.Entry x) <- Map.toList new
+                            | (var@(V.Name name _), V.Entry x) <- Map.toList new
+                            , var `Map.member` old
                             , (l, e) <- f name x
                             ]
                 let ok (SomeLiteral _, e) = V.provable "magic safety invariant" e
@@ -1109,6 +1143,12 @@ instance FO.Defunctionalise inv Imp.FileCMD
     refunc _ sub (Imp.FGet h) =
       named1 $ Imp.FGet (FO.lookupSubst sub h)
 
+instance FO.Defunctionalise inv Imp.PtrCMD
+  where
+    refunc inv sub (Imp.SwapPtr a b) = error "oh no!"
+    refunc inv sub (Imp.SwapArr a b) =
+      FO.Unnamed $ Imp.SwapArr (FO.lookupSubst sub a) (FO.lookupSubst sub b)
+
 instance FO.Defunctionalise inv Imp.ControlCMD
   where
     type FO inv Imp.ControlCMD = ControlCMD inv
@@ -1126,6 +1166,8 @@ instance FO.Defunctionalise inv Imp.ControlCMD
       return (Test (Just cond) msg)
     defunc _ (Imp.Hint exp) =
       return (Hint exp)
+    defunc _ (Imp.Comment msg) =
+      return (Comment msg)
 
     refunc inv sub (If cond t f) =
       FO.Unnamed $ Imp.If
@@ -1144,12 +1186,12 @@ instance FO.Defunctionalise inv Imp.ControlCMD
       FO.Unnamed $ Imp.Break
     refunc inv sub (Test (Just cond) msg) =
       FO.Unnamed $ Imp.Assert (FO.subst sub cond) msg
+    refunc inv sub (Test Nothing msg) =
+      FO.Unnamed $ Imp.Comment $ "proved: " ++ msg
     refunc inv sub (Hint exp) =
       FO.Unnamed $ Imp.Hint $ FO.subst sub exp
-
-instance FO.Defunctionalise inv Imp.PtrCMD
-  where
-    refunc = error "don't know how to refunc. pointers."
+    refunc inv sub (Comment msg) =
+      FO.Unnamed $ Imp.Comment msg
 
 instance FO.Defunctionalise inv Imp.C_CMD
   where
@@ -1204,6 +1246,7 @@ instance FO.Symbol Imp.FileCMD
 instance FO.Symbol Imp.PtrCMD
   where
     dry (Imp.SwapPtr _ _) = return ()
+    dry (Imp.SwapArr _ _) = return ()
 
 instance FO.Symbol Imp.C_CMD
   where

@@ -102,13 +102,24 @@ data AssertionLabel =
   deriving (Eq, Show)
 
 -- | Guard a value with an assertion.
-data Guard sig
+data GuardVal sig
   where
-    Guard :: AssertionLabel -> String -> Guard (Bool :-> a :-> Full a)
+    GuardVal :: AssertionLabel -> String -> GuardVal (Bool :-> a :-> Full a)
 
-deriving instance Eq       (Guard a)
-deriving instance Show     (Guard a)
-deriving instance Typeable (Guard a)
+deriving instance Eq       (GuardVal a)
+deriving instance Show     (GuardVal a)
+deriving instance Typeable (GuardVal a)
+
+--------------------------------------------------------------------------------
+
+-- | Hint that a value may appear in an invariant
+data HintVal sig
+  where
+    HintVal :: SoftwarePrimType a => HintVal (a :-> b :-> Full b)
+
+deriving instance Eq       (HintVal a)
+deriving instance Show     (HintVal a)
+deriving instance Typeable (HintVal a)
 
 --------------------------------------------------------------------------------
 
@@ -123,6 +134,13 @@ deriving instance Show     (ForLoop a)
 deriving instance Typeable (ForLoop a)
 
 --------------------------------------------------------------------------------
+{-
+-- |
+data Foreign sig
+  where
+    Foreign :: Signature sig => String -> Denotation sig -> Foreign sig
+-}
+--------------------------------------------------------------------------------
 
 -- | Software symbols.
 type SoftwareConstructs = 
@@ -130,8 +148,10 @@ type SoftwareConstructs =
   Syn.:+: Let
   Syn.:+: Tuple
   Syn.:+: SoftwarePrimConstructs
+  Syn.:+: Construct
   -- ^ Software specific symbol.
-  Syn.:+: Guard
+  Syn.:+: GuardVal
+  Syn.:+: HintVal
   Syn.:+: ForLoop
 
 -- | Software symbols tagged with their type representation.
@@ -217,27 +237,46 @@ instance FreeExp SExp
 --------------------------------------------------------------------------------
 -- syntactic instances.
 
-instance Eval Guard
+instance Eval GuardVal
   where
-    evalSym (Guard InternalAssertion msg) = \cond a ->
+    evalSym (GuardVal InternalAssertion msg) = \cond a ->
       if cond then a else error $ "Internal assertion failure: " ++ show msg
-    evalSym (Guard (UserAssertion ass) msg) = \cond a ->
+    evalSym (GuardVal (UserAssertion ass) msg) = \cond a ->
       if cond then a else error $ "User assertion " ++ show ass ++ " failure: " ++ show msg
 
-instance Symbol Guard
+instance Symbol GuardVal
   where
-    symSig (Guard _ _) = signature
+    symSig (GuardVal _ _) = signature
 
-instance Render Guard
+instance Render GuardVal
   where
     renderSym  = show
     renderArgs = renderArgsSmart
 
-instance EvalEnv Guard env
+instance EvalEnv GuardVal env
 
-instance StringTree Guard
+instance StringTree GuardVal
 
-instance Equality Guard
+instance Equality GuardVal
+
+--------------------------------------------------------------------------------
+
+instance Eval HintVal
+  where
+    evalSym (HintVal) = flip const
+
+instance Symbol HintVal
+  where
+    symSig (HintVal) = signature
+
+instance Render HintVal
+  where
+    renderSym  = show
+    renderArgs = renderArgsSmart
+
+instance EvalEnv    HintVal env
+instance StringTree HintVal
+instance Equality   HintVal
 
 --------------------------------------------------------------------------------
 
@@ -255,11 +294,9 @@ instance Render ForLoop
     renderSym  = show
     renderArgs = renderArgsSmart
 
-instance EvalEnv ForLoop env
-
+instance EvalEnv    ForLoop env
 instance StringTree ForLoop
-
-instance Equality ForLoop
+instance Equality   ForLoop
 
 --------------------------------------------------------------------------------
 -- *** Temporary fix until GHC fixes their class resolution for DTC ***
@@ -295,14 +332,24 @@ instance {-# OVERLAPPING #-} Project SoftwarePrimConstructs SoftwareConstructs
     prj (InjR (InjR (InjR (InjL a)))) = Just a
     prj _ = Nothing
 
-instance {-# OVERLAPPING #-} Project Guard SoftwareConstructs
+instance {-# OVERLAPPING #-} Project Construct SoftwareConstructs
   where
     prj (InjR (InjR (InjR (InjR (InjL a))))) = Just a
     prj _ = Nothing
 
+instance {-# OVERLAPPING #-} Project GuardVal SoftwareConstructs
+  where
+    prj (InjR (InjR (InjR (InjR (InjR (InjL a)))))) = Just a
+    prj _ = Nothing
+
+instance {-# OVERLAPPING #-} Project HintVal SoftwareConstructs
+  where
+    prj (InjR (InjR (InjR (InjR (InjR (InjR (InjL a))))))) = Just a
+    prj _ = Nothing
+
 instance {-# OVERLAPPING #-} Project ForLoop SoftwareConstructs
   where
-    prj (InjR (InjR (InjR (InjR (InjR a))))) = Just a
+    prj (InjR (InjR (InjR (InjR (InjR (InjR (InjR a))))))) = Just a
     prj _ = Nothing
 
 --------------------------------------------------------------------------------

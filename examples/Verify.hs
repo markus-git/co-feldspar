@@ -1,6 +1,7 @@
 {-# language FlexibleContexts #-}
 {-# language GADTs #-}
 {-# language ScopedTypeVariables #-}
+{-# language TypeApplications #-}
 
 module Verify where
 
@@ -13,131 +14,148 @@ import Feldspar.Array.Buffered
 import Data.Bits (Bits)
 import Data.Complex (Complex)
 
-import Prelude hiding ((/=), length, div)
-
---------------------------------------------------------------------------------
--- FFT
---------------------------------------------------------------------------------
-
-fftCore
-  :: forall vec a .
-     ( Manifestable Software vec (SExp (Complex a))
-     , Finite SExp vec
-     , RealFloat a
-     , SType' a
-     , SType' (Complex a)
-     , Indexed SExp vec 
-     , ArrElem vec ~ SExp (Complex a)
-     )
-  => Store Software (SExp (Complex a))
-  -> Bool        -- ^ Inverese?
-  -> SExp Length -- ^ Iteration count
-  -> vec         -- ^ Initial vector
-  -> Software (Manifest Software (SExp (Complex a)))
-fftCore st inverse n vec =
-    loopStore st (n+1) (-1) (1) (\ix -> return . ilv2 ix) vec
-  where
-    ilv2 :: SExp Index -> Manifest Software (SExp (Complex a)) ->
-      Push Software (SExp (Complex a))
-    ilv2 k vec = Push len $ \write ->
-        for 0 1 (len2 - 1) $ \i -> do
-          lix <- shareM (left  i)
-          rix <- shareM (right i)
-          a   <- shareM (vec ! lix)
-          b   <- shareM (vec ! rix)
-          write lix (a + b)
-          write rix ((twid rix) * (a - b))
-      where
-        pi'   = if inverse then pi else -pi
-        len   = length vec  :: SExp Index
-        len2  = len `div` 2 :: SExp Index
-        ix    = i2n k       :: SExp Int32
-        ix2   = 1 .<<. ix   :: SExp Index
-        left  = zeroBit k
-        right = flipBit k . left
-        twid rix = polar 1 (pi' * i2n (leastBits ix rix) / i2n ix2)
-
-fftContainer
-  :: ( Manifestable Software vec (SExp (Complex a))
-     , Finite SExp vec
-     , RealFloat a
-     , SType' a
-     , SType' (Complex a)
-     , Indexed SExp vec 
-     , ArrElem vec ~ SExp (Complex a)
-     )
-  => Store Software (SExp (Complex a))
-  -> Bool
-  -> vec
-  -> Software (Manifest Software (SExp (Complex a)))
-fftContainer st inverse vec = do
-  n <- shareM (ilog2 (length vec) - 1)
-  v <- fftCore st inverse n vec
-  st <- replaceFreeStore (length v) st
-  revBit st n v
-
-fft
-  :: ( Manifestable Software vec (SExp (Complex a))
-     , Finite SExp vec
-     , RealFloat a
-     , SType' a
-     , SType' (Complex a)
-     , Indexed SExp vec 
-     , ArrElem vec ~ SExp (Complex a)
-     )
-  => Store Software (SExp (Complex a))
-  -> vec
-  -> Software (Manifest Software (SExp (Complex a)))
-fft st = fftContainer st False
-
+import Prelude hiding ((==), (/=), (>), (<=), length, div, reverse, sum)
 
 --------------------------------------------------------------------------------
 
-testFFT :: Software ()
-testFFT = do
-  st  :: Store Software (SExp (Complex Float)) <- newStore 5
-  arr :: Array Software (SExp (Complex Float)) <- initArr [0.2,0.1,0.2,0.1,0.2]
-  brr <- unsafeFreezeArr arr
-  fft st brr
+inc :: Software ()
+inc = do
+  len :: SExp Length <- fget stdin
+  ix  :: SExp Index  <- fget stdin
+  arr :: Arr (SExp Word32) <- newArr len
+--  assert (ix <= length arr) "ix out of bounds"
+  val <- getArr arr ix
+  setArr arr ix (val + 1)  
+
+copy :: Software ()
+copy = do
+  arr1 :: Arr (SExp Word32) <- newArr 10
+  arr2 :: Arr (SExp Word32) <- unsafeFreezeArr arr1 >>= unsafeThawArr
+  --
+  setArr arr1 0 0
+  val <- getArr arr1 0
+  setArr arr2 0 val
+
+
+inplace :: Software ()
+inplace = do 
+  st  :: Store Software (SExp Word32) <- newInPlaceStore 10
+  arr :: Manifest Software (SExp Word32) <- store st $ (1...10)
+  brr <- store st $ reverse arr
+  val <- shareM $ sum brr
   return ()
+ where
+  reverse :: Manifest Software (SExp Word32) -> Push Software (SExp Word32)
+  reverse = pairwise (\ix -> (ix, 10-ix-1))
 
 --------------------------------------------------------------------------------
 
-rotBit :: SExp Index -> SExp Index -> SExp Index
-rotBit k i = lefts .|. rights
-  where
-    k' = i2n k
-    ir = i .>>. 1
-    rights = ir .&. oneBits k'
-    lefts  = (((ir .>>. k') .<<. 1) .|. (i .&. 1)) .<<. k'
+-- A super-simple verification example.
+count :: Software ()
+count = do
+  printf "Enter a number: "
+  n :: SExp Word32 <- fget stdin
 
-riffle :: (Pully SExp vec a, Syntax SExp a) => SExp Index -> vec -> Pull SExp a
-riffle = backPermute . const . rotBit
-
-revBit :: (Manifestable Software vec a, Finite SExp vec, SyntaxM Software a)
-  => Store Software a -> SExp Length -> vec -> Software (Manifest Software a)
-revBit st n = loopStore st 1 1 n $ \i -> return . riffle i
+  let total = iter n 0 (\i n -> hint (n == i) $ i + 1)
+  total <- initRef total >>= unsafeFreezeRef
+  assert (total == n) "Count is wrong"
+  printf "The count is %d\n" total
 
 --------------------------------------------------------------------------------
 
-oneBits :: (Bits a, Num a, SType a, SoftwarePrimType a) =>
-  SExp Int32 -> SExp a
-oneBits n = complement (ones .<<. n)
+rev :: Software ()
+rev = do
+  n <- fget stdin
+  loc :: IArr (SExp Word32) <- newArr n >>= unsafeFreezeArr
+  cpy :: Arr  (SExp Word32) <- newArr n
+  assert (n > 0) "neg"
+  for 0 1 (n-1) $ \i -> do
+    setArr cpy i (loc ! (n-i-1))
 
-testBit :: (Bits a, Num a, SType a, SoftwarePrimType a) =>
-  SExp a -> SExp Index -> SExp Bool
-testBit a i = a .&. (1 .<<. i2n i) /= 0
+rev_inplace :: Software ()
+rev_inplace = do
+    n <- fget stdin
+    loc :: Arr (SExp Word32) <- newArr n
+    vec <- unsafeFreezeArr loc >>= unsafeThawArr
+    for 0 1 ((n `div` 2 :: SExp Word32)) $ \i -> do
+      x <- getArr vec i
+      y <- getArr vec (n-i-1)
+      setArr loc i y
+      setArr loc (n-i-1) x
 
-flipBit :: (Bits a, Num a, SType a, SoftwarePrimType a) =>
-  SExp Index -> SExp a -> SExp a
-flipBit i a = a `xor` (1 .<<. (i2n i))
+rev_amazing :: Software ()
+rev_amazing = do
+    n <- fget stdin
+    iarr :: IArr (SExp Word32) <- newArr n >>= unsafeFreezeArr
+    arr <- unsafeThawArr iarr
+    result <- manifestArr arr (pairwise @Software (\i -> (i, n-i-1)) (reverse iarr))
+    return ()
 
-zeroBit :: (Bits a, Num a, SType a, SoftwarePrimType a) =>
-  SExp Index -> SExp a -> SExp a
-zeroBit i a = a + (a .&. (ones .<<. (i2n i)))
+------------------------------------------------------------
+{-
+test_scProd1 = do
+    n <- fget stdin
+    printf "result: %.3f\n" $
+      (scProd (fmap i2n (0 ... n-1)) (fmap i2n (2 ... n+1)) :: Data Double)
 
-leastBits :: (Bits a, Num a, SType a, SoftwarePrimType a) =>
-  SExp Int32 -> SExp a -> SExp a
-leastBits i a = a .&. oneBits i
+test_scProd2 = do
+    n  <- fget stdin
+    v1 <- manifestFresh $ fmap i2n (0 ... n-1)
+    v2 <- manifestFresh $ fmap i2n (2 ... n+1)
+    printf "result: %.3f\n" (scProd v1 v2 :: Data Double)
 
+map_inplace :: Run ()
+map_inplace = do
+    n   <- fget stdin
+    loc <- newArr n
+    vec <- manifest loc (0 ... n-1)
+    manifestStore loc $ map (+1) vec
+    vec <- unsafeFreezeArr loc
+    printf "result: %d\n" $ sum vec
+
+map2_inplace :: Run ()
+map2_inplace = do
+    n   <- fget stdin
+    assert (n < maxBound) "oops"
+    loc :: Arr (Data Word32) <- newArr (n+1)
+    vec <- unsafeFreezeArr loc
+    for (0, 1, Excl (n :: Data Word32)) $ \i -> do
+      setArr loc i (arrIx vec i+1)
+
+tail_inplace :: Run ()
+tail_inplace = do
+    n <- fget stdin
+    loc :: Arr (Data Word32) <- newArr n
+    vec <- unsafeFreezeArr loc
+    let when cond x = iff cond x (return ())
+    when (n > 0) $
+      for (0, 1, Excl (n-1)) $ \i -> do
+        setArr loc i (arrIx vec (i+1)+1)
+
+filter_inplace :: Run ()
+filter_inplace = do
+    n <- fget stdin
+    loc :: Arr (Data Word32) <- newArr n
+    vec <- unsafeFreezeArr loc
+    ref <- initRef 0
+    let when cond x = iff cond x (return ())
+    for (0, 1, Excl n) $ \i -> do
+      let x = arrIx vec i
+      when (x > 5) $ do
+        j <- unsafeFreezeRef ref
+        hint (j <= i)
+        setArr loc j x
+        setRef ref (j+1)
+
+rev_inplace :: Software ()
+rev_inplace = do
+    n <- fget stdin
+    loc :: Arr (Data Word32) <- newArr n
+    vec <- unsafeFreezeArr loc >>= unsafeThawArr
+    for (0, 1, Excl (n `div` 2 :: Data Word32)) $ \i -> do
+      x <- getArr vec i
+      y <- getArr vec (n-i-1)
+      setArr loc i y
+      setArr loc (n-i-1) x
+-}
 --------------------------------------------------------------------------------

@@ -25,6 +25,9 @@ import Data.Constraint hiding (Sub)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
+import Data.Selection
+import Data.Default.Class
+
 -- syntactic.
 import Language.Syntactic (AST (..), ASTF, (:&:) (..), Args((:*)), prj)
 import Language.Syntactic.Functional hiding (Binding (..))
@@ -39,6 +42,7 @@ import qualified Control.Monad.Operational.Higher as Oper
 import Language.Embedded.Expression
 import qualified Language.Embedded.Imperative as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp
+import qualified Language.Embedded.Imperative.Frontend as Imp
 import qualified Language.Embedded.Backend.C  as Imp
 import qualified Language.C.Monad as C
   (CGen, addGlobal, addLocal, addInclude, addStm, gensym)
@@ -71,7 +75,6 @@ type TargetCMD
     Oper.:+: Imp.PtrCMD
     Oper.:+: Imp.C_CMD
     --
-    Oper.:+: PtrCMD
     Oper.:+: MMapCMD
 
 -- | Target monad during translation.
@@ -106,15 +109,47 @@ unsafeFreezeRefV :: Monad m => Struct SoftwarePrimType Imp.Ref a -> TargetT m (V
 unsafeFreezeRefV = lift . mapStructA Imp.unsafeFreezeRef
 
 --------------------------------------------------------------------------------
+-- ** Compilation options.
 
-type Env = Map Name VExp'
+-- | Options affecting code generation
+--
+-- A default set of options is given by 'def'.
+--
+-- The assertion labels to include in the generated code can be stated using the
+-- functions 'select', 'allExcept' and 'selectBy'. For example
+--
+-- @`def` {compilerAssertions = `allExcept` [`InternalAssertion`]}@
+--
+-- states that we want to include all except internal assertions.
+data CompilerOpts = CompilerOpts
+    { compilerAssertions :: Selection AssertionLabel
+        -- ^ Which assertions to include in the generated code
+    }
+
+instance Default CompilerOpts
+  where
+    def = CompilerOpts
+      { compilerAssertions = universal
+      }
+
+--------------------------------------------------------------------------------
+-- ** Compilation environment.
+
+data Env = Env {
+    envAliases :: Map Name VExp'
+  , envOptions :: CompilerOpts
+  }
+
+env0 :: Env
+env0 = Env Map.empty def
 
 localAlias :: MonadReader Env m => Name -> VExp a -> m b -> m b
-localAlias v e = local (Map.insert v (VExp' e))
+localAlias v e = local (\env ->
+  env {envAliases = Map.insert v (VExp' e) (envAliases env)})
 
 lookAlias :: MonadReader Env m => STypeRep a -> Name -> m (VExp a)
 lookAlias t v = do
-  env <- ask
+  env <- asks envAliases
   return $ case Map.lookup v env of
     Nothing -> error $ "lookAlias: variable " ++ show v ++ " not in scope."
     Just (VExp' e) -> case softwareTypeEq t (softwareTypeRep e) of Just Dict -> e
@@ -137,9 +172,9 @@ translateExp = goAST . optimize . unSExp
     go t lit Syn.Nil
       | Just (Lit a) <- prj lit
       = return $ mapStruct (constExp . runIdentity) $ toStruct t a
-    go t lit Syn.Nil
-      | Just (Literal a) <- prj lit
-      = return $ mapStruct (constExp . runIdentity) $ toStruct t a
+--    go t lit Syn.Nil
+--      | Just (Literal a) <- prj lit
+--      = return $ mapStruct (constExp . runIdentity) $ toStruct t a
     go t var Syn.Nil
       | Just (FreeVar v) <- prj var
       = return $ Node $ sugarSymPrim $ FreeVar v
@@ -153,6 +188,10 @@ translateExp = goAST . optimize . unSExp
            r  <- initRefV base =<< goAST a
            a' <- unsafeFreezeRefV r
            localAlias v a' $ goAST body
+    go t ffi args
+      | Just (Construct addr sem) <- prj ffi
+      = do 
+           undefined
     go t tup (a :* b :* Syn.Nil)
       | Just Pair <- prj tup
       = Branch <$> goAST a <*> goAST b
@@ -235,10 +274,15 @@ translateExp = goAST . optimize . unSExp
       | Just RotateR <- prj op =
           liftStruct2 (sugarSymPrim RotateR) <$> goAST a <*> goAST b
     go t guard (cond :* a :* Syn.Nil)
-      | Just (Guard lbl msg) <- prj guard
+      | Just (GuardVal lbl msg) <- prj guard
       = do cond' <- extractNode <$> goAST cond
            lift $ Imp.assert cond' msg
            goAST a
+    go t hint (cond :* a :* Syn.Nil)
+        | Just (HintVal) <- prj hint
+        = do cond' <- extractNode <$> goAST cond
+             lift $ Imp.hint cond'
+             goAST a
     go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
       | Just ForLoop   <- prj loop
       , Just (LamT iv) <- prj lami
@@ -268,7 +312,7 @@ unsafeTranslateSmallExp a = do
 --------------------------------------------------------------------------------
 -- * Interpretation of software commands.
 --------------------------------------------------------------------------------
-
+{-
 instance (Imp.CompExp exp, Imp.CompTypeClass ct) =>
     Oper.Interp PtrCMD C.CGen (Oper.Param2 exp ct)
   where
@@ -277,10 +321,11 @@ instance (Imp.CompExp exp, Imp.CompTypeClass ct) =>
 compPtrCMD :: forall exp ct a . (Imp.CompExp exp, Imp.CompTypeClass ct) =>
   PtrCMD (Oper.Param3 C.CGen exp ct) a -> C.CGen a
 compPtrCMD = undefined
-
+-}
 --------------------------------------------------------------------------------
 
-instance (Imp.CompExp exp, Imp.CompTypeClass ct) => Oper.Interp MMapCMD C.CGen (Oper.Param2 exp ct)
+instance (Imp.CompExp exp, Imp.CompTypeClass ct) =>
+    Oper.Interp MMapCMD C.CGen (Oper.Param2 exp ct)
   where
     interp = compMMapCMD
 
@@ -389,10 +434,14 @@ int * f_map(unsigned addr) {
 
 --------------------------------------------------------------------------------
 
+translate' :: Env -> Software a -> ProgC a
+translate' env =
+    flip runReaderT env
+  . Oper.reexpressEnv unsafeTranslateSmallExp
+  . unSoftware
+  
 translate :: Software a -> ProgC a
-translate = flip runReaderT Map.empty
-          . Oper.reexpressEnv unsafeTranslateSmallExp
-          . unSoftware
+translate = translate' env0
 
 --------------------------------------------------------------------------------
 -- * Interpretation of software programs.
@@ -421,5 +470,14 @@ compareCompiled = Imp.compareCompiled' opts . translate
 
 opts :: Imp.ExternalCompilerOpts
 opts = Imp.def { Imp.externalFlagsPost = ["-lm"] }
+
+--------------------------------------------------------------------------------
+
+runCompiled' ::
+       CompilerOpts
+    -> Imp.ExternalCompilerOpts
+    -> Software a
+    -> IO ()
+runCompiled' opts eopts = Imp.runCompiled' eopts . translate' (Env mempty opts)
 
 --------------------------------------------------------------------------------

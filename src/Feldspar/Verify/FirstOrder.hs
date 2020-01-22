@@ -42,6 +42,7 @@ data Sequence instr fs a
 
 data HO instr fs a
   where
+    Skip    :: HO instr fs ()
     Unnamed :: instr fs a -> HO instr fs a
     Named   :: (Ex a, Typeable a) => instr fs a -> HO instr fs a
 
@@ -71,10 +72,12 @@ instance (Defunctionalise inv instr, Defunctionalise inv jnstr) =>
     refunc inv sub (Inl instr) = case refunc inv sub instr of
       Named i   -> Named $ Inl i
       Unnamed i -> Unnamed $ Inl i
+      Skip      -> Skip
 
     refunc inv sub (Inr jnstr) = case refunc inv sub jnstr of
       Named j   -> Named $ Inr j
       Unnamed j -> Unnamed $ Inr j
+      Skip      -> Skip
 
 --------------------------------------------------------------------------------
 
@@ -127,6 +130,8 @@ refunctionaliseM inv sub (Seq n fo tail) =
     Named instr -> do
       new <- singleton instr
       refunctionaliseM inv (extendSubst n new sub) tail
+    Skip -> do 
+      refunctionaliseM inv sub tail
 
 --------------------------------------------------------------------------------
 

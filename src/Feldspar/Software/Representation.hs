@@ -17,7 +17,7 @@ import Feldspar.Frontend
 import Feldspar.Storable
 import Feldspar.Array.Buffered (ArraysEq(..))
 import Feldspar.Software.Primitive
-import Feldspar.Software.Expression
+import Feldspar.Software.Expression hiding (Hint)
 
 import Feldspar.Verify.Monad (Verify)
 import qualified Feldspar.Verify.FirstOrder as FO
@@ -139,40 +139,6 @@ instance FO.HTraversable (ControlCMD inv)
 
 --------------------------------------------------------------------------------
 
-data PtrCMD fs a
-  where
-    SwapPtr :: (pred a, Typeable a, pred i, Typeable i, Ix i, Integral i) =>
-      Imp.Arr i a -> Imp.Arr i a -> PtrCMD (Oper.Param3 prog exp pred) ()
-
-instance Oper.HFunctor PtrCMD
-  where
-    hfmap _ (SwapPtr a b) = SwapPtr a b
-
-instance Oper.HBifunctor PtrCMD
-  where
-    hbimap _ _ (SwapPtr a b) = SwapPtr a b
-
-instance Oper.InterpBi PtrCMD IO (Oper.Param1 SoftwarePrimType)
-  where
-    interpBi (SwapPtr (Imp.ArrRun a) (Imp.ArrRun b)) = do
-      arr <- readIORef a
-      brr <- readIORef b
-      writeIORef a brr
-      writeIORef b arr
-
-instance (PtrCMD Oper.:<: instr) => Oper.Reexpressible PtrCMD instr env
-  where
-    reexpressInstrEnv reexp (SwapPtr a b) = do
-      lift $ Oper.singleInj (SwapPtr a b)
-
-instance FO.HTraversable PtrCMD
-
-instance FO.Symbol PtrCMD
-  where
-    dry (SwapPtr {}) = return ()
-
---------------------------------------------------------------------------------
-
 -- | Soften the hardware signature of a component into a type that uses the
 --   correspoinding data types in software.
 type family Soften a where
@@ -243,9 +209,9 @@ type SoftwareCMD
     -- ^ Software specific instructions.
   Oper.:+: Imp.FileCMD
   Oper.:+: Imp.PtrCMD
+  Oper.:+: Imp.C_CMD
     -- new stuff
   Oper.:+: AssertCMD
-  Oper.:+: PtrCMD
   Oper.:+: MMapCMD
 
 -- | Monad for building software programs in Feldspar.

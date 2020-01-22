@@ -293,7 +293,6 @@ class Monad m => Control m
       -> m ()            -- ^ False branch.
       -> m ()
 
-
 class Monad m => Loop m
   where
     -- | While-loop.
@@ -312,7 +311,7 @@ class Monad m => Loop m
 
 class Monad m => Assert m
   where
-    break :: m ()
+    break  :: m ()
     assert :: Expr m Bool -> String -> m ()
 
 --------------------------------------------------------------------------------

@@ -13,24 +13,19 @@
 
 module Feldspar.Software.Verify where
 
-import Feldspar.Sugar
-import Feldspar.Representation
-import Feldspar.Frontend
-import Feldspar.Software.Primitive
-import Feldspar.Software.Expression
-import Feldspar.Software.Representation
+import Feldspar.Software.Representation (Software(..), SoftwareCMD, AssertCMD, ControlCMD(..), MMapCMD)
+import Feldspar.Software.Primitive (Prim, SoftwarePrimType)
+import Feldspar.Software.Compile (ProgC, translate)
+import Feldspar.Software.Verify.Command
+import Feldspar.Software.Verify.Primitive
 
-import Data.Struct
-
-import Feldspar.Verify.Monad (Verify)
-import qualified Feldspar.Verify.Monad    as V
-import qualified Feldspar.Verify.SMT      as SMT
-import qualified Feldspar.Verify.Abstract as A
+import qualified Feldspar.Verify.Monad      as V
 import qualified Feldspar.Verify.FirstOrder as FO
-import qualified Data.Map.Strict          as Map
-import qualified Control.Monad.RWS.Strict as S
+import qualified Data.Map.Strict            as Map
+import qualified Control.Monad.RWS.Strict   as S
 
 import Control.Monad.Identity
+import Control.Monad.Trans
 
 import Data.Array (Ix)
 import Data.Function (on)
@@ -79,6 +74,15 @@ class Verifiable prog
 
 verify :: Verifiable prog => prog a -> V.Verify (prog a)
 verify = fmap fst . verifyWithResult
+
+verifiedSoft :: (ProgC () -> IO a) -> Software () -> IO a
+verifiedSoft comp prog =
+  do (prg, ws) <- V.runVerify $ do
+       lift declareFeldsparGlobals
+       V.verify $ translate $ prog
+     comp prg <* unless (null ws) (do
+       putStrLn "Warnings:"
+       sequence_ [ putStrLn ('\t' : warn) | warn <- ws])
 
 class VerifyInstr instr exp pred
   where
@@ -904,6 +908,41 @@ discoverInvariant minv body = do
       (_, _, hints, decls) <- fmap snd (S.listen body)
       after <- S.get
 
+instance V.Verifiable
+    (Program
+      (    Imp.RefCMD
+       :+: Imp.ArrCMD
+       :+: Imp.ControlCMD
+       :+: Imp.FileCMD
+       :+: Imp.PtrCMD
+       :+: Imp.C_CMD
+       :+: MMapCMD
+      )
+      (Param2 Prim SoftwarePrimType))
+  where
+    verifyWithResult prog = do
+      let inv = undefined :: [[SomeLiteral]]
+      (p, r) <- V.verifyWithResult (FO.defunctionalise inv prog)
+      return (FO.refunctionalise inv p, r)
+
+instance V.Verifiable
+    (FO.Sequence
+      (    Imp.RefCMD
+       :+: Imp.ArrCMD
+       :+: ControlCMD [[SomeLiteral]]
+       :+: Imp.FileCMD
+       :+: Imp.PtrCMD
+       :+: Imp.C_CMD
+       :+: MMapCMD
+      )
+      (Param2 Prim SoftwarePrimType))
+  where
+    verifyWithResult (FO.Val a)     = return (FO.Val a, a)
+    verifyWithResult (FO.Seq a m k) = do
+      ((m', breaks), warns) <- V.swallowWarns $ 
+        V.getWarns $ V.withBreaks $ V.verifyInstr m a
+      (_, (k', res)) <-
+        V.ite breaks (return ()) (V.verifyWithResult k)
       let
         atoms (SMT.Atom x) = [x]
         atoms (SMT.List xs) = concatMap atoms xs
