@@ -17,7 +17,7 @@ import Language.Syntactic
 import qualified Language.Syntactic.Traversal as Syn (Args(Nil))
 
 -- hardware-edsl.
-import Language.Embedded.Hardware
+import Language.Embedded.Hardware hiding (Sym)
 import Language.Embedded.Hardware.Expression.Represent
 import Language.Embedded.Hardware.Expression.Represent.Bit (Bits, ni)
 import Language.Embedded.Hardware.Expression.Hoist (lift, Kind)

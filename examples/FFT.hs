@@ -1,32 +1,24 @@
 {-# language GADTs #-}
 {-# language ConstraintKinds #-}
 {-# language FlexibleContexts #-}
-<<<<<<< HEAD
 
-=======
 {-# language ScopedTypeVariables #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# language TypeApplications #-}
->>>>>>> foreign
 
 module FFT where
 
 import Feldspar
 import Feldspar.Software hiding (Arr)
 import Feldspar.Software.Verify
-<<<<<<< HEAD
-=======
 import Feldspar.Software.Compile
->>>>>>> foreign
+
 import Feldspar.Array.Vector
 import Feldspar.Array.Buffered
 
 import Data.Bits (Bits)
 import Data.Complex (Complex)
 
-<<<<<<< HEAD
-import Prelude hiding ((/=), length)
-=======
 import Data.Selection
 import Data.Default.Class
 
@@ -40,18 +32,14 @@ import qualified Language.C.Syntax as C
 import qualified Language.Embedded.Backend.C  as Imp
 
 import Prelude hiding ((==), (/=), (>=), length)
->>>>>>> foreign
 
 --------------------------------------------------------------------------------
 -- * FFT
 --------------------------------------------------------------------------------
 
-<<<<<<< HEAD
-=======
 type SRef    a = Reference Software a
 type SArr    a = Array  Software a
 type SIArr   a = IArray Software a
->>>>>>> foreign
 type SStore  a = Store  Software a
 type SSyntax a = Syntax SExp a
 
@@ -78,13 +66,10 @@ testBit a i = i2b (a .&. (1 .<<. i2n i))
 
 -- | Flip the @i@'th bit of @a@.
 flipBit :: (Bits a, Num (SExp a), SType' a) =>
-<<<<<<< HEAD
-  SExp Index -> SExp a -> SExp a
-flipBit i a = a `xor` (1 .<<. (i2n i))
-=======
   SExp a -> SExp Index -> SExp a
 flipBit a i = a `xor` (1 .<<. (i2n i))
->>>>>>> foreign
+--  SExp Index -> SExp a -> SExp a
+--flipBit i a = a `xor` (1 .<<. (i2n i))
 
 -- | 
 zeroBit :: (Bits a, Num (SExp a), SType' a) =>
@@ -97,15 +82,10 @@ leastBits :: (Bits a, Num (SExp a), SType' a) =>
 leastBits i a = a .&. oneBits i
 
 -- | Two to the power of @n@, i.e. @2^n@.
-<<<<<<< HEAD
 pow2 :: (Num (SExp a), Bits a, SType' a)
   => SExp Index -> SExp a
-pow2 n = 1 .<<. i2n n
-=======
-twoTo :: (Num (SExp a), Bits a, SType' a)
-  => SExp Index -> SExp a
-twoTo n = 1 .<<. i2n n
->>>>>>> foreign
+pow2  n = 1 .<<. i2n n
+twoTo n = pow2 n
 
 --------------------------------------------------------------------------------
 -- ** Riffle network.
@@ -129,13 +109,10 @@ revBit :: (Immutable arr a, SSyntax a)
   => SStore a -> SExp Length -> arr -> Software (SManifest a)
 revBit st n vec = loopStore st 1 1 (n-1) (step) vec
   where
-<<<<<<< HEAD
     step i arr = return $ riffle i arr
-=======
     --step :: (Immutable arr a, SSyntax a) => SExp Index -> arr -> Software (SPush a)
 --    step i arr = return $ unroll 2 $ riffle i arr
-    step k arr = return $ pairwise @Software (\i -> (i, rotBit k i)) $ riffle k arr
->>>>>>> foreign
+--    step k arr = return $ pairwise @Software (\i -> (i, rotBit k i)) $ riffle k arr
 
 --------------------------------------------------------------------------------
 -- ** Twiddle factors.
@@ -202,19 +179,12 @@ fftCore
   -> Software (SManifest (SExp (Complex a)))
 fftCore st ts n vec =
   let
-<<<<<<< HEAD
-    step i = return . twids ts n i (length vec) . bfly i
-  in
-    do arr <- loopStore st ((i2n n)-1) (-1) 0 (step . i2n) vec
-       revBit st n arr
-=======
-    step k =
-      return . pairwise @Software (\i -> (i, flipBit i k)) . twids ts n k (length vec) . bfly k
+    step k = return . twids ts n k (length vec) . bfly k
+--    step k = return . pairwise @Software (\i -> (i, flipBit i k)) . twids ts n k (length vec) . bfly k
   in
     do arr <- loopStore st ((i2n n :: SExp Int32)-1) (-1) 0 (step . i2n) vec
-       --revBit st n vec
+--       revBit st n arr
        return arr
->>>>>>> foreign
 
 -- | Radix-2 Decimation-In-Frequency Fast Fourier Transformation of the given
 -- complex vector. The given vector must be power-of-two sized, (for example 2,
@@ -225,23 +195,13 @@ fft
      , SType' a
      , SType' (Complex a)
      )
-<<<<<<< HEAD
-  => SStore (SExp (Complex a))
-  -> vec
-  -> Software (SManifest (SExp (Complex a)))
-fft st vec =
-  do n  <- shareM (ilog2 (length vec))
-     ts <- manifestFresh $ Pull (pow2 (n-1)) (tw (pow2 n))
-     fftCore st ts n vec
-
---------------------------------------------------------------------------------
-=======
   => SExp Length
   -> SStore (SExp (Complex a))
   -> vec
   -> Software (SManifest (SExp (Complex a)))
 fft n st vec =
-  do ts <- manifestFresh $ Pull (twoTo (n-1)) (tw (twoTo n))
+  do n  <- shareM (ilog2 (length vec))
+     ts <- manifestFresh $ Pull (pow2 (n-1)) (tw (pow2 n))
      fftCore st ts n vec
 
 --------------------------------------------------------------------------------
@@ -340,8 +300,24 @@ benchmark n = do
 runBenchmark n = runCompiled'
     (def :: CompilerOpts) --{compilerAssertions = select []}
     -- Note: important to turn off assertions when running the benchmarks
+    --       (in old Raw-Feldspar that is, Co-Feldspar gets rid of them)
     def {Imp.externalFlagsPre = ["-O3"], Imp.externalFlagsPost = ["-lm"]}
     (benchmark n)
 
 --------------------------------------------------------------------------------
->>>>>>> foreign
+
+dummy :: Software ()
+dummy = do
+  size :: SExp Length <- fget stdin
+  n :: SExp Length <- fget stdin
+  assert (1 `shiftL` n == size) "2^n == size"
+  assert (size >= 2) "not too small"
+  st   :: SStore (SExp (Complex Double)) <- newInPlaceStore size
+  arr  :: SArr   (SExp (Complex Double)) <- newArr size
+  iarr :: SIArr  (SExp (Complex Double)) <- freezeArr arr
+  fft n st iarr
+  fft n st iarr
+  assert (value False) "oh no"
+  return ()
+
+--------------------------------------------------------------------------------
