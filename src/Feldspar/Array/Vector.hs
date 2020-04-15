@@ -369,9 +369,20 @@ forwardPermute p vec = Push len $ \write ->
     v   = toPush vec
     len = length v
 
-pairwise :: (SyntaxM m a, SyntaxM m (Expr m Length), PredOf (Expr m) (Internal (Expr m Length)), Loop m, Num (Expr m Length), PredOf (Expr m) Length, Multiplicative (Expr m), References m, Ordered (Expr m), Control m, Pully (Expr m) vec a) =>
-  (Expr m Index -> (Expr m Index, Expr m Index)) ->
-  vec -> Push m a
+-- I should use the short-hand constraints for 'pariwise' and 'unroll'... their signatures are quite long.
+pairwise
+  :: ( SyntaxM m a
+     , SyntaxM m (Expr m Length)
+     , Loop m
+     , References m
+     , Control m
+     , Multiplicative (Expr m)
+     , Ordered (Expr m)
+     , Num (Expr m Length)
+     , PredOf (Expr m) Length
+     , PredOf (Expr m) (Internal (Expr m Length))
+     , Pully (Expr m) vec a)
+  => (Expr m Index -> (Expr m Index, Expr m Index)) -> vec -> Push m a
 pairwise idxs vec =
   Push (length vec) $ \write -> do
     for 1 1 (length vec) $ \i -> do
