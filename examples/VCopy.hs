@@ -46,5 +46,16 @@ prog' = do
   vec2 <- store buf $ reverse' vec1
   printf "%d" $ sum $ map (*2) vec2
 
+--------------------------------------------------------------------------------
+
+test :: Software ()
+test = do
+  buf :: Store Software (SExp Word32) <- newInPlaceStore 10
+  arr <- store buf (1...10)
+  brr <- store buf (rev arr)
+  return ()
+  where
+    rev :: Manifest Software (SExp Word32) -> Push Software (SExp Word32)
+    rev = pairwise (\ix -> (ix, 10-ix-1))
 
 --------------------------------------------------------------------------------

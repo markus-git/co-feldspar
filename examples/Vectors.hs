@@ -3,19 +3,32 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Vectors where
 
 import Feldspar
 import Feldspar.Array.Vector
+import Feldspar.Array.Buffered
 
 import Feldspar.Software
 import Feldspar.Software as Soft (icompile)
+import Feldspar.Software.Compile
 
 import Feldspar.Software.Marshal
 
 import Feldspar.Hardware hiding (Arr, IArr, Ref)
 import Feldspar.Hardware as Hard (icompile, icompileSig, icompileAXILite)
+
+import Control.Monad (void)
+import Data.Complex (Complex)
+
+-- language-c-quote
+import Language.C.Quote.GCC
+import qualified Language.C.Syntax as C
+
+-- imperative-edsl
+import qualified Language.Embedded.Backend.C  as Imp
 
 import Prelude hiding (take, drop, reverse, length, zip, zipWith, sum, tail, map)
 
@@ -66,12 +79,56 @@ firIO = Soft.icompile firProg
 
 --------------------------------------------------------------------------------
 
-test2 :: IO ()
-test2 = Soft.icompile $ printf "%d" $ scProd inp1 inp2
-  where
-    inp1, inp2 :: SPull (SExp Word32)
-    inp1 = 1 ... 2
-    inp2 = 1 ... 2 
+type SStore  a = Store  Software a
+
+printTime_def = [cedecl|
+void printTime(typename clock_t start, typename clock_t end)
+{
+  printf("CPU time (sec): %f\n", (double)(end-start) / CLOCKS_PER_SEC);
+}
+|]
+
+sizeOf_double_complex :: SExp Length
+sizeOf_double_complex = 16
+
+-- | Measure the time for 100 runs of 'fftCore' (excluding initialization) for
+-- arrays of the given size
+benchmark :: SExp Length -> Software ()
+benchmark n = do
+  addInclude "<stdio.h>"
+  addInclude "<string.h>"
+  addInclude "<time.h>"
+  addDefinition printTime_def
+  start <- newObject "clock_t" False
+  end   <- newObject "clock_t" False
+  st1 :: SStore (SExp (Complex Double)) <- newStore n
+  inp1 <- unsafeFreezeStore n st1
+  callProc "memset"
+      [ iarrArg (manifest inp1)
+      , valArg (0 :: SExp Index)
+      , valArg (n*sizeOf_double_complex)
+      ]
+  st2 :: SStore (SExp (Complex Double)) <- newStore n
+  inp2 <- unsafeFreezeStore n st2
+  callProc "memset"
+      [ iarrArg (manifest inp1)
+      , valArg (0 :: SExp Index)
+      , valArg (n*sizeOf_double_complex)
+      ]  
+  callProcAssign start "clock" []
+
+  for 0 1 99 $ \(_ :: SExp Index) ->
+    void $ manifestFresh (fir (toPull inp1) (toPull inp2))
+
+  callProcAssign end "clock" []
+  callProc "printTime" [objArg start, objArg end]
+
+runBenchmark n = runCompiled'
+  (Imp.def :: CompilerOpts)
+  (Imp.def {Imp.externalFlagsPre = ["-O3"], Imp.externalFlagsPost = ["-lm"]})
+  (benchmark n)
+
+printBenchmark n = Soft.icompile (benchmark n)
 
 --------------------------------------------------------------------------------
 
