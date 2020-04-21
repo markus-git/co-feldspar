@@ -14,7 +14,6 @@ import Feldspar.Array.Buffered
 import Feldspar.Software
 import Feldspar.Software as Soft (icompile)
 import Feldspar.Software.Compile
-
 import Feldspar.Software.Marshal
 
 import Feldspar.Hardware hiding (Arr, IArr, Ref)

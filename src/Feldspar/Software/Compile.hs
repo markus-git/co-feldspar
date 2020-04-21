@@ -283,14 +283,14 @@ translateExp = goAST . optimize . unSExp
         = do cond' <- extractNode <$> goAST cond
              lift $ Imp.hint cond'
              goAST a
-    go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
+    go t loop (min :* max :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
       | Just ForLoop   <- prj loop
       , Just (LamT iv) <- prj lami
-      , Just (LamT sv) <- prj lams
-      , trace ("names: (" ++ show iv ++ ", " ++ show sv ++ ")") True = do
-          len'  <- goSmallAST len
+      , Just (LamT sv) <- prj lams = do
+          min'  <- goSmallAST min
+          max'  <- goSmallAST max
           state <- initRefV "state" =<< goAST init
-          ReaderT $ \env -> Imp.for (0, 1, Imp.Excl len') $ \i ->
+          ReaderT $ \env -> Imp.for (min', 1, Imp.Excl max') $ \i ->
             flip runReaderT env $ do
               s <- case t of
                 Node _ -> unsafeFreezeRefV state

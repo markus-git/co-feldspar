@@ -24,6 +24,7 @@ import qualified Language.Embedded.Hardware.Interface.AXI as Hard (FreePrim(..))
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Data.Constraint hiding (Sub)
+import Data.Proxy
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -103,7 +104,8 @@ lookAlias t v = do
   env <- ask
   return $ case Map.lookup v env of
     Nothing -> error $ "lookAlias: variable " ++ show v ++ " not in scope."
-    Just (VExp' e) -> case hardwareTypeEq t (hardwareTypeRep e) of Just Dict -> e
+    Just (VExp' e) ->
+      case hardwareTypeEq t (hardwareTypeRep e) of Just Dict -> e
 
 --------------------------------------------------------------------------------
 
@@ -192,20 +194,26 @@ translateExp = goAST . optimize . unHExp
           liftStruct2 (sugarSymPrim RotateL) <$> goAST a <*> goAST b
       | Just RotateR <- prj op =
           liftStruct2 (sugarSymPrim RotateR) <$> goAST a <*> goAST b
-    go t loop (len :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
+    go t loop (min :* max :* init :* (lami :$ (lams :$ body)) :* Syn.Nil)
       | Just ForLoop   <- prj loop
       , Just (LamT iv) <- prj lami
       , Just (LamT sv) <- prj lams = do
-          len'  <- goSmallAST len
+          min'  <- goSmallAST min
+          max'  <- goSmallAST max
           state <- initRefV "state" =<< goAST init
-          ReaderT $ \env -> Hard.for 0 (len'-1) $ \i ->
+          let int = Hard.cast (fromIntegral)
+          ReaderT $ \env -> Hard.for (int min') (int max') $ \i ->
             flip runReaderT env $ do
               s <- case t of
                 Node _ -> unsafeFreezeRefV state
                 _      -> getRefV state
-              s' <- localAlias iv (Node i) $ localAlias sv s $ goAST body
+              let i' = Hard.cast' (proxyE min') i
+              s' <- localAlias iv (Node i') $ localAlias sv s $ goAST body
               setRefV state s'
           unsafeFreezeRefV state
+      where
+        proxyE :: Prim x -> Proxy x
+        proxyE _ = Proxy
     go _ arrIx (i :* Syn.Nil)
       | Just (ArrIx arr) <- prj arrIx = do
           i' <- goSmallAST i

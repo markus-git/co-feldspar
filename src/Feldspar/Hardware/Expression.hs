@@ -91,7 +91,7 @@ type HType'   = PrimType HardwarePrimType
 data ForLoop sig
   where
     ForLoop :: HType st =>
-      ForLoop (Length :-> st :-> (Index -> st -> st) :-> Full st)
+      ForLoop (Length :-> Length :-> st :-> (Index -> st -> st) :-> Full st)
 
 deriving instance Eq       (ForLoop a)
 deriving instance Show     (ForLoop a)
@@ -194,8 +194,8 @@ instance FreeExp HExp
 
 instance Eval ForLoop
   where
-    evalSym ForLoop = \len init body ->
-        foldl (flip body) init $ genericTake len [0..]
+    evalSym ForLoop = \min max init body ->
+        foldl (flip body) init [min..max]
 
 instance Symbol ForLoop
   where

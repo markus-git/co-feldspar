@@ -44,15 +44,7 @@ double a = a * 2
 -- Wrapper for `double` that reads a number of the incoming port and writes its
 -- result to outgoing port.
 doubleProg :: Hardware ()
-doubleProg =
-  do (a, b) <- entity "a" $ do
-       a :: Signal Int32 <- newPort In
-       b :: Signal Int32 <- newPort Out
-       return (a, b)
-     architecture "a" "behav" $ do
-       process (a .: []) $ do
-         va <- getSignal a
-         setSignal b (double va)
+doubleProg = undefined -- todo: frontend changed, update example.
 
 test3 = Hard.icompile doubleProg
 
@@ -81,7 +73,7 @@ test4 = Soft.icompile pointyProg
 
 -- A function that computes the nth Fibonacci number.
 fib :: SExp Word32 -> SExp Word32
-fib n = fst $ loop n (0, 1) $ \_ (a, b) -> (b, a + b)
+fib n = fst $ loop 0 n (0, 1) $ \_ (a, b) -> (b, a + b)
 -- The `loop` expression implements a pure for-loop and takes three arguments:
 --
 -- > The number of iterations.

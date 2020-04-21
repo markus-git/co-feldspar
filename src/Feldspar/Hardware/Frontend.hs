@@ -39,7 +39,8 @@ import qualified Language.Embedded.Hardware.Command   as Imp
 import qualified Language.Embedded.Hardware.Interface as Imp
 import qualified Language.Embedded.Hardware.Expression.Represent as Imp
 
-import Prelude hiding (length)
+import Prelude hiding (length, toInteger)
+import qualified Prelude as P
 
 --------------------------------------------------------------------------------
 -- * Expressions.
@@ -55,7 +56,7 @@ instance Share HExp
 
 instance Iterate HExp
   where
-    iter = sugarSymHardware ForLoop
+    loop = sugarSymHardware ForLoop
 
 instance Cond HExp
   where
@@ -98,8 +99,37 @@ instance Bitwise HExp
 instance Casting HExp
   where
     i2n = sugarSymPrimHardware I2N
-    i2b = error "todo: i2b"
-    b2i = error "todo: b2i"
+    i2b = error "hardware.todo: i2b"
+    b2i = error "hardware.todo: b2i"
+
+cast :: (HardwarePrimType a, HardwarePrimType b) => (a -> b) -> HExp a -> HExp b
+cast f = sugarSymPrimHardware (Cast f)
+
+toInteger :: (HardwarePrimType a, Integral a) => HExp a -> HExp Integer
+toInteger = cast (fromIntegral)
+
+toUnsigned :: (HardwarePrimType a, Integral a, HardwarePrimType b, Num b) => HExp a -> HExp b
+toUnsigned = cast (fromIntegral)
+
+toSigned :: (HardwarePrimType a, Integral a, HardwarePrimType b, Num b) => HExp a -> HExp b
+toSigned = cast (fromIntegral)
+
+{-
+toBits :: (HardwarePrimType a, Integral a, KnownNat b) => HExp a -> HExp (Bits b)
+toBits = cast (bitFrom
+-}
+
+toIntegral :: forall a . HardwarePrimType a => Proxy a -> HExp Integer -> HExp a
+toIntegral _ = case hardwareRep :: HardwarePrimTypeRep a of
+  IntegerHT -> id
+  Int8HT    -> toSigned
+  Int16HT   -> toSigned
+  Int32HT   -> toSigned
+  Int64HT   -> toSigned
+  Word8HT   -> toUnsigned
+  Word16HT  -> toUnsigned
+  Word32HT  -> toUnsigned
+  Word64HT  -> toUnsigned
 
 --------------------------------------------------------------------------------
 
@@ -185,7 +215,7 @@ instance Arrays Hardware
     newArr len
       = Hardware
       $ fmap (Arr 0 len)
-      $ mapStructA (const (Imp.newVArray len))
+      $ mapStructA (const (Imp.newVArray (toInteger len)))
       $ typeRep
     initArr as
       = Hardware
@@ -206,17 +236,20 @@ instance Arrays Hardware
       = Hardware
       $ sequence_
       $ zipListStruct (\a b ->
-          Imp.copyVArray (a, arrOffset arr) (b, arrOffset brr) (length brr))
+          Imp.copyVArray
+            (a, toInteger (arrOffset arr))
+            (b, toInteger (arrOffset brr))
+            (toInteger (length brr)))
         (unArr arr)
         (unArr brr)
 
 -- 'Imp.getVArr' specialized to hardware.
-getArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
-getArr' = withHType (Proxy :: Proxy b) Imp.getVArray
+getArr' :: forall b . HardwarePrimType b => Imp.VArray b -> HExp Index -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) (HExp b)
+getArr' varr ix = withHType (Proxy :: Proxy b) $ Imp.getVArray varr (toInteger ix)
 
 -- 'Imp.setVArr' specialized to hardware.
-setArr' :: forall b . HardwarePrimType b => Imp.VArray Index b -> HExp Index -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
-setArr' = withHType (Proxy :: Proxy b) Imp.setVArray
+setArr' :: forall b . HardwarePrimType b => Imp.VArray b -> HExp Index -> HExp b -> Oper.Program HardwareCMD (Oper.Param2 HExp HardwarePrimType) ()
+setArr' varr ix b = withHType (Proxy :: Proxy b) $ Imp.setVArray varr (toInteger ix) b
 
 --------------------------------------------------------------------------------
 
@@ -225,7 +258,7 @@ instance Syntax HExp a => Indexed HExp (IArr a)
     type ArrElem (IArr a) = a
     (!) (IArr off len a) ix = resugar $ mapStruct index a
       where
-        index :: HardwarePrimType b => Imp.IArray Index b -> HExp b
+        index :: HardwarePrimType b => Imp.IArray b -> HExp b
         index arr = sugarSymPrimHardware (ArrIx arr) (ix + off)
 
 instance Slicable HExp (IArr a)
@@ -292,9 +325,12 @@ instance Loop Hardware
     for lower _ upper body
       = Hardware
       $ Imp.for
-          (resugar lower)
-          (resugar upper)
-          (unHardware . body . resugar)
+          (resugar (toInteger lower))
+          (resugar (toInteger upper))
+          (unHardware . body . resugar . toIntegral (proxyE lower))
+      where
+        proxyE :: forall a . HExp a -> Proxy a
+        proxyE _ = Proxy
 
 --------------------------------------------------------------------------------
 -- ** Hardware instructions.
@@ -334,11 +370,11 @@ veryUnsafeFreezeSignal _ = error "veryUnsafeFreezeSignal shouldn't be used durin
 --------------------------------------------------------------------------------
 
 -- | Arrays based on signals.
-type SArr a = Imp.Array Index a
+type SArr a = Imp.Array a
 
 -- | Creates a empty array of the given length.
 newSArr :: HType' a => HExp Index -> Hardware (SArr a)
-newSArr = Hardware . Imp.newArray
+newSArr = Hardware . Imp.newArray . toInteger
 
 -- | Initialize an array with the given elements.
 initSArr :: HType' a => [a] -> Hardware (SArr a)
@@ -346,11 +382,11 @@ initSArr = Hardware . Imp.initArray
 
 -- | Fetches the indexed element out of the array.
 getSArr :: HType' a => SArr a -> HExp Index -> Hardware (HExp a)
-getSArr arr ix = Hardware $ Imp.getArray arr ix
+getSArr arr ix = Hardware $ Imp.getArray arr (toInteger ix)
 
 -- | Sets the indexed element of the array to the given value.
 setSArr :: HType' a => SArr a -> HExp Index -> HExp a -> Hardware ()
-setSArr arr ix val = Hardware $ Imp.setArray arr ix val
+setSArr arr ix val = Hardware $ Imp.setArray arr (toInteger ix) val
 
 -- | ...
 veryUnsafeFreezeSArr :: HType' a => Length -> SArr a -> IArr (HExp a)
@@ -374,34 +410,42 @@ ret prg = withHType' (Proxy :: Proxy a) $ Imp.output $ \o -> Imp.ret $ Imp.proce
     v <- unHardware prg
     Imp.setSignal o v
 
+retExpr :: forall a . (HType' a, Integral a) => HExp a -> HSig (Signal a -> ())
+retExpr expr = ret (return expr)
+
 -- | Finalize signature with an output of a immutable array.
 retIArr :: forall a . (HType' a, Integral a) => Length -> Hardware (IArr (HExp a)) -> HSig (SArr a -> ())
-retIArr len prg = withHType' (Proxy :: Proxy a) $ Imp.outputArray len $ \o -> Imp.ret $ Imp.process [] $ do
-  (IArr _ _ node) <- unHardware prg
-  let iarr = case node of (Node iarr) -> iarr
-  arr <- Imp.unsafeThawArray iarr
-  Imp.copyArray (o,0) (arr,0) (value len)
+retIArr len prg = withHType' (Proxy :: Proxy a) $
+  Imp.outputArray (P.toInteger len) $ \o -> Imp.ret $ Imp.process [] $ do
+    (IArr _ _ node) <- unHardware prg
+    let iarr = case node of (Node iarr) -> iarr
+    arr <- Imp.unsafeThawArray iarr
+    Imp.copyArray (o,0) (arr,0) (value (P.toInteger len))
 
 -- | Finalize signature with an output of an array.
 retVArr :: forall a . (HType' a, Integral a) => Length -> Hardware (Arr (HExp a)) -> HSig (SArr a -> ())
-retVArr len prg = withHType' (Proxy :: Proxy a) $ Imp.outputArray len $ \o -> Imp.ret $ Imp.process [] $ do
-  (Arr _ _ node) <- unHardware prg
-  let arr = case node of (Node arr) -> arr
-  iarr <- Imp.unsafeFreezeVArray arr -- this is so bad.
-  brr  <- Imp.unsafeThawArray iarr
-  Imp.copyArray (o,0) (brr, 0) (value len)
+retVArr len prg = withHType' (Proxy :: Proxy a) $
+  Imp.outputArray (P.toInteger len) $ \o -> Imp.ret $ Imp.process [] $ do
+    (Arr _ _ node) <- unHardware prg
+    let arr = case node of (Node arr) -> arr
+    iarr <- Imp.unsafeFreezeVArray arr -- this is so bad.
+    brr  <- Imp.unsafeThawArray iarr
+    Imp.copyArray (o,0) (brr, 0) (value (P.toInteger len))
 
 --------------------------------------------------------------------------------
 
 -- | Extend signature with an input signal.
 input :: forall a b . (HType' a, Integral a) => (HExp a -> HSig b) -> HSig (Signal a -> b)
-input f = withHType' (Proxy :: Proxy a) $ Imp.input $ f . veryUnsafeFreezeSignal
+input f = withHType' (Proxy :: Proxy a) $
+  Imp.input $ f . veryUnsafeFreezeSignal
 
 -- | Extend signature with an input array.
 inputIArr :: forall a b . (HType' a, Integral a) => Length -> (IArr (HExp a) -> HSig b) -> HSig (SArr a -> b)
-inputIArr len f = withHType' (Proxy :: Proxy a) $ Imp.inputArray len $ f . veryUnsafeFreezeSArr len
+inputIArr len f = withHType' (Proxy :: Proxy a) $
+  Imp.inputArray (P.toInteger len) $ f . veryUnsafeFreezeSArr len
 
 -- inputVec :: forall a b . (HType' a, Integral a) => Lenght -> () -> HSig (SArr a -> b)
+
 
 --------------------------------------------------------------------------------
 --

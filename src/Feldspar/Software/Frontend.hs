@@ -65,7 +65,7 @@ instance Share SExp
 
 instance Iterate SExp
   where
-    iter = sugarSymSoftware ForLoop
+    loop = sugarSymSoftware ForLoop
 
 instance Cond SExp
   where
@@ -510,10 +510,18 @@ nil = Nil
   => Ref (SExp a) -> SArg b -> SArg (Ref (SExp a) -> b)
 (>:) = withHType' (Proxy :: Proxy a) ARef
 
+(>.) :: forall a b . (SType' a, HType' a, Integral a)
+  => SExp a -> SArg b -> SArg (Ref (SExp a) -> b)
+(>.) v = undefined
+
 -- | ...
 (>>:) :: forall a b . (SType' a, HType' a, Integral a)
   => Arr (SExp a) -> SArg b -> SArg (Arr (SExp a) -> b)
 (>>:) = withHType' (Proxy :: Proxy a) AArr
+
+(>>.) :: forall a b . (SType' a, HType' a, Integral a)
+  => IArr (SExp a) -> SArg b -> SArg (Arr (SExp a) -> b)
+(>>.) = undefined
 
 infixr 1 >:, >>:
 

@@ -20,7 +20,7 @@ import Prelude hiding (map, zipWith, sum, take, reverse, (++))
 
 -- todo: write text.
 genericPushy
-  :: (Pully (Expr m) vec a, Num a, SyntaxM m a, VectorM m, MonadComp m)
+  :: (Pully (Expr m) vec a, Num a, SyntaxM m a, VectorM m, MonadComp m, Loop m)
   => vec -> Push m a
 genericPushy vec = reverse vec ++ map (*2) vec
 
@@ -34,6 +34,7 @@ buildPushy_safe :: forall m .
      ( SyntaxM m (Expr m Word32)
      , VectorM m
      , MonadComp m
+     , Loop m
      --
      , Finite   (Expr m) (Array  m (Expr m Word32))
      , Slicable (Expr m) (IArray m (Expr m Word32))
@@ -72,6 +73,7 @@ buildPushy_managed
      ( SyntaxM m (Expr m Word32)
      , VectorM m
      , MonadComp m
+     , Loop m
      --
      , Finite   (Expr m) (Array  m (Expr m Word32))
      , Slicable (Expr m) (IArray m (Expr m Word32))

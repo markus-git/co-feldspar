@@ -29,7 +29,7 @@ import qualified Control.Monad.Operational.Higher as Oper (Program, Param2)
 import qualified Language.Embedded.Imperative     as Imp
 import qualified Language.Embedded.Imperative.CMD as Imp (Ref)
 
-import Prelude hiding (length, Word, (<=))
+import Prelude hiding (length, Word, (<), (>))
 
 --------------------------------------------------------------------------------
 -- * ...
@@ -77,7 +77,12 @@ class Share exp
 
 class Iterate exp
   where
-    iter :: Syntax exp st => exp Length -> st -> (exp Index -> st -> st) -> st
+    loop :: Syntax exp st => exp Length -> exp Length -> st
+         -> (exp Index -> st -> st) -> st
+
+iter :: (Iterate exp, Syntax exp st, Num (exp Length))
+  => exp Length -> st -> (exp Index -> st -> st) -> st
+iter = loop 0
 
 class Cond exp
   where
@@ -110,9 +115,13 @@ class Equality exp => Ordered exp
 
 infix 4 <, >, <=, >=
 
+max :: (Cond exp, Ordered exp, Syntax exp (exp a), Ord a, Primitive exp a)
+    => exp a -> exp a -> exp a
+max a b = cond (a > b) a b
+  
 min :: (Cond exp, Ordered exp, Syntax exp (exp a), Ord a, Primitive exp a)
     => exp a -> exp a -> exp a
-min a b = cond (a <= b) a b
+min a b = cond (a < b) a b
 
 class Logical exp
   where
@@ -209,6 +218,9 @@ class Monad m => References m
     getRef  :: SyntaxM m a => Reference m a -> m a
     setRef  :: SyntaxM m a => Reference m a -> a -> m ()
     unsafeFreezeRef :: SyntaxM m a => Reference m a -> m a
+
+updateRef :: (References m, SyntaxM m a) => Reference m a -> (a -> a) -> m ()
+updateRef ref f = do v <- unsafeFreezeRef ref; setRef ref (f v)
 
 shareM :: (SyntaxM m a, References m) => a -> m a
 shareM a = initRef a >>= unsafeFreezeRef

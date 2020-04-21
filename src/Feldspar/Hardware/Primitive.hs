@@ -146,7 +146,7 @@ data HardwarePrim sig
     
     -- ^ array indexing.
     ArrIx :: (HardwarePrimType a)
-      => Imp.IArray Index a -> HardwarePrim (Index :-> Full a)
+      => Imp.IArray a -> HardwarePrim (Index :-> Full a)
             
     -- ^ numerical operations.
     Neg :: (HardwarePrimType a, Num a) => HardwarePrim (a :-> Full a)
@@ -350,7 +350,7 @@ instance Eval HardwarePrim
     evalSym Lte         = (<=)
     evalSym Gt          = (>)
     evalSym Gte         = (>=)
-    evalSym (ArrIx (Imp.IArrayE a)) = \i -> a ! i
+    evalSym (ArrIx (Imp.IArrayE a)) = \i -> a ! toInteger i
     evalSym (ArrIx _)   = error "eval of array variable"
 
 instance Symbol HardwarePrim

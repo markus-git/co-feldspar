@@ -2,6 +2,7 @@
 {-# language ConstraintKinds #-}
 {-# language ScopedTypeVariables #-}
 {-# language Rank2Types #-}
+{-# language StandaloneDeriving #-}
 
 module Data.Struct where
 

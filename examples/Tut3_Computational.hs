@@ -21,10 +21,11 @@ import Prelude hiding (length, reverse, div)
 -- interpreted as. We can write such a program for reversing an array of 32-bit
 -- integers by making use of type classes:
 reverse :: forall m .
-  ( Monad m      -- Our program type `m` is an monad.
-  , Control m    -- It supports control statements like \for\ and \if\.
-  , References m -- It handles references.
-  , Arrays m     -- It handles arrays.
+  ( Monad m      -- Our program type `m` is an monad that supports ...
+  , Control m    --  control statements like \for\ and \if\,
+  , References m --  references,
+  , Arrays m     --  arrays and
+  , Loop m       --  for-loops.
   -- As the inner for-loop runs along the entire length of the given array
   -- we make sure that array has a known length.
   , Finite (Expr m) (Array m (Expr m Int32))
@@ -37,12 +38,12 @@ reverse :: forall m .
   -- a well typed, primitive expression and have a `Syntactic` instance.
   , SyntaxM' m (Expr m Int32)
   , SyntaxM' m (Expr m Word32)
-  -- todo: hmm... this should be implied by `SyntaxM'` for `Word32`.
+  -- todo: hmm... maybe this should be implied by `SyntaxM'` for `Word32`.
   , Primitive (Expr m) Word32
   )
   => Array m (Expr m Int32) -> m ()
 reverse arr =
-  do for 0 (len `div` 2) $ \ix ->
+  do for 0 1 (len `div` 2) $ \ix ->
        do aix <- getArr arr ix
           ajx <- getArr arr (len - ix)
           setArr arr ix         ajx
@@ -66,7 +67,7 @@ test1 = Soft.icompile $
 -- Similarily, the computational instructions of `reverse` can also be
 -- interpreted as hardware instructions. So we can interpret `reverse` as a
 -- hardware program as well.
-test2 = Hard.icompileWrap $
+test2 = Hard.icompile $
   do arr <- initArr [1, 2, 3, 4]
      reverse arr
 

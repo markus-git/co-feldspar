@@ -130,7 +130,7 @@ test4 = Soft.icompile dotProdProg
 --
 -- The following function appends two modified compies of a vector to each
 -- other:
-pushy :: (Num a, SyntaxM m a, VectorM m, MonadComp m)
+pushy :: (Num a, SyntaxM m a, VectorM m, Loop m, MonadComp m)
   => Pull (Expr m) a -> Push m a
 pushy vec = reverse vec ++ map (*2) vec
 -- Note that any writing done by a `Push` vector is an stateful operations,
@@ -174,6 +174,7 @@ manifestPushy :: forall m a .
   , MonadComp m
   , SyntaxM m a
   , VectorM m
+  , Loop m
   -- Make sure we can manifest our arrays (todo: maybe put these in `Vector`?).
   , Finite   (Expr m) (Array m a)
   , Slicable (Expr m) (IArray m a)

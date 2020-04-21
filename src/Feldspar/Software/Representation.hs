@@ -143,8 +143,8 @@ instance FO.HTraversable (ControlCMD inv)
 --   correspoinding data types in software.
 type family Soften a where
   Soften ()                   = ()
-  Soften (Hard.Signal  a -> b) = Ref (SExp a) -> Soften b
-  Soften (Hard.Array i a -> b) = Arr (SExp a) -> Soften b
+  Soften (Hard.Signal a -> b) = Ref (SExp a) -> Soften b
+  Soften (Hard.Array  a -> b) = Arr (SExp a) -> Soften b
 
 -- | Software argument for a hardware component.
 data Argument pred a

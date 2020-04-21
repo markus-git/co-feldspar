@@ -74,14 +74,14 @@ newtype Ref a = Ref { unRef :: Struct HardwarePrimType Imp.Variable (Internal a)
 data Arr a = Arr
   { arrOffset :: HExp Index
   , arrLength :: HExp Length
-  , unArr     :: Struct HardwarePrimType (Imp.VArray Index) (Internal a)
+  , unArr     :: Struct HardwarePrimType Imp.VArray (Internal a)
   }
 
 -- | Immutable hardware arrays.
 data IArr a = IArr
   { iarrOffset :: HExp Index
   , iarrLength :: HExp Length
-  , unIArr     :: Struct HardwarePrimType (Imp.IArray Index) (Internal a)
+  , unIArr     :: Struct HardwarePrimType Imp.IArray (Internal a)
   }
 
 --------------------------------------------------------------------------------
@@ -93,7 +93,7 @@ instance ArraysEq Arr IArr
     unsafeArrEq (Arr _ _ arr) (IArr _ _ brr) =
         and (zipListStruct sameId arr brr)
       where
-        sameId :: Imp.VArray Index a -> Imp.IArray Index a -> Bool
+        sameId :: Imp.VArray a -> Imp.IArray a -> Bool
         sameId (Imp.VArrayC a) (Imp.IArrayC b) = a P.== b
         sameId _ _ = False
 

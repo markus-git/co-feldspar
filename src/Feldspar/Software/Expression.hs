@@ -127,7 +127,7 @@ deriving instance Typeable (HintVal a)
 data ForLoop sig
   where
     ForLoop :: SType st =>
-        ForLoop (Length :-> st :-> (Index -> st -> st) :-> Full st)
+        ForLoop (Length :-> Length :-> st :-> (Index -> st -> st) :-> Full st)
 
 deriving instance Eq       (ForLoop a)
 deriving instance Show     (ForLoop a)
@@ -282,8 +282,8 @@ instance Equality   HintVal
 
 instance Eval ForLoop
   where
-    evalSym ForLoop = \len init body ->
-        foldl (flip body) init $ genericTake len [0..]
+    evalSym ForLoop = \min max init body ->
+      foldl (flip body) init [min..max]
 
 instance Symbol ForLoop
   where
