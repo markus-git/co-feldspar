@@ -112,7 +112,7 @@ fir :: forall m . (CompM m)
 fir x b = do
   let l' = length x
       n' = length b
-  y   :: Array m (Expr m Int32)      <- newArr (l' + n')
+  y   :: Array m (Expr m Int32)      <- newArr (l' + n' - 1)
   for 0 1 l' $ \(n :: Expr m Word32) -> do
     min <- shareM (n >= n'-1 ? n-n'-1 $ 0)
     max <- shareM (n+1 < l' ? n+1 $ l')
@@ -123,7 +123,7 @@ firC :: HSig (SArr Int32 -> SArr Int32 -> SArr Int32 -> ())
 firC =
   inputIArr size $ \x ->
   inputIArr size $ \b ->
-  retVArr (size*2-1) $
+  retVArr (size+size-1) $
     fir x b
 
 firS ::
@@ -140,7 +140,9 @@ firS x b = do
 
 --------------------------------------------------------------------------------
 
-test = test_dotC >> test_dotS >> test_firC >> test_firS
+test = Hard.icompileSig firC
+
+--test = test_dotC >> test_dotS >> test_firC >> test_firS
 
 test_dotC = writeFile ("dot" ++ show size ++ ".vhd") (Hard.compileAXILite dotC)
 test_dotS = writeFile ("dot" ++ show size ++ ".c") (Soft.compile prog)
