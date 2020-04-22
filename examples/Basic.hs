@@ -6,11 +6,11 @@ module Basic where
 
 import Feldspar
 
-import Feldspar.Software
-import Feldspar.Software as Soft (icompile)
+import Feldspar.Software as Soft
+--import Feldspar.Software as Soft (icompile)
 
-import Feldspar.Hardware
-import Feldspar.Hardware as Hard (icompile)
+import Feldspar.Hardware as Hard
+--import Feldspar.Hardware as Hard (icompile)
 
 --------------------------------------------------------------------------------
 -- * Basic example of how our hardware software co-design works.
@@ -42,10 +42,33 @@ exampleExpr =
 
 --------------------------------------------------------------------------------
 
-soft :: IO ()
-soft = Soft.icompile example
+soft1 :: IO ()
+soft1 = Soft.icompile example
 
-hard :: IO ()
-hard = Hard.icompile example
+hard1 :: IO ()
+hard1 = Hard.icompile example
+
+--------------------------------------------------------------------------------
+
+type HArr  a = Array  Hardware (HExp a)
+type HIArr a = IArray Hardware (HExp a)
+
+dot :: HExp Length -> HExp Length -> HExp Length
+    -> HIArr Int32 -> HIArr Int32 -> HExp Int32
+dot min max n x b = loop min max 0 (\j sum -> sum + x!j * b!(n-j))
+
+dotC :: Word32 ->
+  HSig (Signal Length -> Signal Length -> Signal Index
+     -> SArr   Int32  -> SArr   Int32  -> Signal Int32
+     -> ())
+dotC size =
+  input $ \min ->
+  input $ \max ->
+  input $ \n ->
+  inputIArr size $ \x ->
+  inputIArr size $ \b ->
+  retExpr $ dot min max n x b
+
+test = Hard.icompileSig (dotC 10)
 
 --------------------------------------------------------------------------------

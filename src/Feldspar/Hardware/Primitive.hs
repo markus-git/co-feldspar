@@ -146,7 +146,7 @@ data HardwarePrim sig
     
     -- ^ array indexing.
     ArrIx :: (HardwarePrimType a)
-      => Imp.IArray a -> HardwarePrim (Index :-> Full a)
+      => Imp.IArray a -> HardwarePrim (Integer :-> Full a)
             
     -- ^ numerical operations.
     Neg :: (HardwarePrimType a, Num a) => HardwarePrim (a :-> Full a)

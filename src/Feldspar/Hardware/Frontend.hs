@@ -259,7 +259,7 @@ instance Syntax HExp a => Indexed HExp (IArr a)
     (!) (IArr off len a) ix = resugar $ mapStruct index a
       where
         index :: HardwarePrimType b => Imp.IArray b -> HExp b
-        index arr = sugarSymPrimHardware (ArrIx arr) (ix + off)
+        index arr = sugarSymPrimHardware (ArrIx arr) (toInteger (ix + off))
 
 instance Slicable HExp (IArr a)
   where

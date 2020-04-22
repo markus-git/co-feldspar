@@ -13,7 +13,7 @@ import Feldspar.Software
 import Feldspar.Software as Soft (icompile,compile)
 
 import Feldspar.Hardware
-import Feldspar.Hardware as Hard (icompile,compile,compileAXILite)
+import Feldspar.Hardware as Hard (icompile,icompileSig,compile,compileAXILite)
 
 import Data.Int
 import Data.Word
