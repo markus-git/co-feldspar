@@ -140,9 +140,7 @@ firS x b = do
 
 --------------------------------------------------------------------------------
 
-test = Hard.icompileSig firC
-
---test = test_dotC >> test_dotS >> test_firC >> test_firS
+test = test_dotC >> test_dotS >> test_firC >> test_firS
 
 test_dotC = writeFile ("dot" ++ show size ++ ".vhd") (Hard.compileAXILite dotC)
 test_dotS = writeFile ("dot" ++ show size ++ ".c") (Soft.compile prog)
@@ -166,3 +164,9 @@ test_firS = writeFile ("fir" ++ show size ++ ".c") (Soft.compile prog)
 
 size  = 20 :: Word32
 sizeI = 20 :: Int32
+
+--------------------------------------------------------------------------------
+
+-- todo: Casting "int" -> "unsigned" -> "int" is a bit funnny. Problem is that
+-- hardware & software currently uses different indices (int vs int32).
+--test = Hard.icompileSig firC
