@@ -10,16 +10,49 @@ import Feldspar.Hardware as Hard
 
 import Prelude hiding (length, reverse, div)
 
-
 --------------------------------------------------------------------------------
 -- * Purely computational programs.
 --------------------------------------------------------------------------------
 
 -- The previous tutorial's example programs have been restricted to either
--- `Software` or `Hardware` monads. Its also possible to write programs in such
--- a way that they are independent of whatever monad they eventually will be
--- interpreted as. We can write such a program for reversing an array of 32-bit
--- integers by making use of type classes:
+-- `Software` or `Hardware` monads and thir respective exprission types 'SExp'
+-- and 'HExp'. Its also possible to write programs in such a way that they are
+-- independent of whatever monad they eventually will be interpreted as.
+--
+-- In co-feldspar write such generic programs with the help of overloading.
+-- That is, explicit `Software` or `Hardware` types are replaced by constraints
+-- and associated types, and programs or expressions are written in the more
+-- generic operations provided by the `Feldspar.Frontend` module.
+--
+-- For example, the square function from Tut2
+--
+-- > square :: (SType' a, Num a) => SExp a -> SExp a
+-- > square a = a * a
+--
+-- was defined using `SExp`, limiting its use to the `Software` monad.
+-- A software/hardware overloaded version can be defined as:
+
+square :: (Syntax exp a, Num (exp a)) => exp a -> exp a
+square a = a * a
+
+-- Here the explicit type `SExp` has been replaced by a variable `exp` and
+-- the `Num a` and `SType' a` constraints have been replaced by `Num (exp a)`
+-- and `Syntax exp a`, respectively.
+--
+-- - `Num` is still used to ensure `exp` supports multiplication. But with the
+-- now variable type we cannot derive `Num (exp a)` from `Num a`, so we must
+-- constrain the entire expression instead.
+--
+-- - `Syntax exp` ensures that our expression type `exp` is a "valid" type and
+-- fills the same role as `SType` and `HType`. (Every expression must use such
+-- "valid" in order to ensure we can internally build an ASTs around them.)
+--
+-- The process of defining overloaded programs is very much the same as it was
+-- for expressions. That is, swap out specific types for overloaded or associated
+-- ones and use the generic front-end provided by the `Feldspar.Frontend` module.
+-- 
+-- As an example, a generic program for reversing an array of 32-bit integers:
+
 reverse :: forall m .
   ( Monad m      -- Our program type `m` is an monad that supports ...
   , Control m    --  control statements like \for\ and \if\,
@@ -70,6 +103,5 @@ test1 = Soft.icompile $
 test2 = Hard.icompile $
   do arr <- initArr [1, 2, 3, 4]
      reverse arr
-
 
 --------------------------------------------------------------------------------

@@ -3,14 +3,15 @@
 
 name:                co-feldspar
 version:             0.1.0.1
--- synopsis:            
--- description:         
+synopsis:            Hardware software co-design Feldspar
+description:         An implementation of the Feldspar EDSL with a focus on
+                     hardware software co-design and resource-awareness.
 license:             BSD3
 license-file:        LICENSE
 author:              Markus
 maintainer:          mararon@chalmers.se
--- copyright:           
--- category:            
+copyright:           Copyright (c) 2015 Markus Aronsson, Emil Axelsson
+category:            Language
 build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10

@@ -18,7 +18,6 @@ import Language.Embedded.Hardware.Command (Mode(..))
 helloWorld :: Software ()
 helloWorld = printf "Hello world!\n"
 
-
 --------------------------------------------------------------------------------
 
 -- Generate C code, call the C compiler, and then run the resulting executable:
@@ -50,46 +49,40 @@ testAll =
      test5
      test6
 
-
 --------------------------------------------------------------------------------
 -- * Adder (Hardware).
 --------------------------------------------------------------------------------
 
--- A simple adder that runs in the `Hardware` monad.
-adder :: Signal Int32 -> Signal Int32 -> Signal Int32 -> Hardware ()
-adder a b c =
-  do va <- getSignal a
-     vb <- getSignal b
-     setSignal c (va + vb)
+-- A simple adder impl. for 'Hardware' expressions.
+adder :: HExp Int32 -> HExp Int32 -> HExp Int32
+adder a b = a + b
 
--- Explicit entity/architecture wrapper for `adder`.
-component :: Hardware ()
-component =
-  do (a, b, c) <- entity "a" $ do
-       a :: Signal Int32 <- newPort In
-       b :: Signal Int32 <- newPort In
-       c :: Signal Int32 <- newPort Out
-       return (a, b, c)
-     architecture "a" "behav" $ do
-       process (a .: b .: []) $ do
-         adder a b c
-
-
---------------------------------------------------------------------------------
-
--- Compile to VHDL and show the generated design:
-test7 = putStrLn $ Hard.compile component
-
--- Same as above, but shorter:
-test8 = Hard.icompile component
-
--- If we don't care about wires, we can wrap our designs in an empty entity and
--- use local signals instead (useful for inspecting an unfinished design).
-test9 = Hard.icompileWrap $
-  do a <- newSignal
-     b <- newSignal
+-- Program running in the 'Hardware' monad and using 'adder' with local
+-- signals/variables.
+adder_wrap :: Hardware ()
+adder_wrap =
+  do a <- initSignal 5
+     b <- initSignal 10
      c <- newSignal
-     adder a b c
+     -- Here we could safely swap getSignal out for unsafeFreezeSignal to get
+     -- rid of the extra (but harmless) variable reads of 'a' and 'b'.
+     va <- getSignal a 
+     vb <- getSignal b
+     setSignal c (adder va vb)
 
+test7 = Hard.icompile adder_wrap
+
+-- Another program running in the 'Hardware' monad using 'adder' with
+-- input/output signals (put into either a component decl. or an AXI4-lite
+-- wrapper by the two compiler calls below).
+adder_hsig :: HSig (Signal Int32 -> Signal Int32 -> Signal Int32 -> ())
+adder_hsig =
+  input $ \a ->
+  input $ \b ->
+  retExpr $ adder a b
+
+test8 = Hard.icompileSig adder_hsig
+
+test9 = Hard.icompileAXILite adder_hsig
 
 --------------------------------------------------------------------------------

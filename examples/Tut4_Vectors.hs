@@ -76,7 +76,6 @@ test1 = Soft.icompile sumLast5Prog
 
 test2 = Soft.runCompiled sumLast5Prog
 
-
 --------------------------------------------------------------------------------
 
 -- Compute the sum of the square of the numbers from 1 to n:
@@ -92,7 +91,6 @@ sumSqProg = printf "square sum: %d\n" (sumSq 4)
 test3 = Soft.icompile sumSqProg
 -- Note that, as with our previous example, there are no arrays declared in the
 -- generated code, only scalars.
-
 
 --------------------------------------------------------------------------------
 
@@ -117,7 +115,6 @@ dotProdProg =
 -- todo: clean up/automate conversion from/to pull and regular arrays.
      
 test4 = Soft.icompile dotProdProg
-
 
 --------------------------------------------------------------------------------
 
@@ -156,7 +153,6 @@ pushyProg =
 -- The idea of `manifest` vectors is explained below.
 
 test5 = Soft.icompile pushyProg
-
 
 --------------------------------------------------------------------------------
 
@@ -215,6 +211,5 @@ manifestPushyProg =
      printf "manifest apa: %d\n" out
 
 test6 = Soft.icompile manifestPushyProg
-
 
 --------------------------------------------------------------------------------
